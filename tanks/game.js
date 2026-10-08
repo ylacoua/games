@@ -694,17 +694,18 @@ class AI {
 
 // ---------------------------------------------------------------- input
 const keys = new Set();
+const tapped = new Set();   // keys pressed since the last frame, so a quick tap is never missed
 const KEYMAP = {
   up: ['ArrowUp', 'KeyW'],
   down: ['ArrowDown', 'KeyS'],
   left: ['ArrowLeft', 'KeyA'],
   right: ['ArrowRight', 'KeyD'],
-  fire: ['Space'],
-  missile: ['KeyF', 'Enter', 'NumpadEnter', 'ShiftRight'],
+  fire: ['Enter', 'NumpadEnter'],
+  missile: ['Space'],
 };
 function readInput() {
   const o = {};
-  for (const k in KEYMAP) o[k] = KEYMAP[k].some((c) => keys.has(c));
+  for (const k in KEYMAP) o[k] = KEYMAP[k].some((c) => keys.has(c) || tapped.has(c));
   return o;
 }
 addEventListener('keydown', (e) => {
@@ -712,6 +713,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyM' && !e.repeat) Sound.toggleMute();
   if (G.mode !== 'menu') {
     keys.add(e.code);
+    tapped.add(e.code);
     if (e.code.startsWith('Arrow') || e.code === 'Space' || e.code === 'Enter') e.preventDefault();
   }
   Sound.init();
@@ -1305,6 +1307,7 @@ function frame(now) {
     Net.sendInput(dt);
   }
 
+  tapped.clear();
   updateEffects(dt);
   render();
   syncOverlay();
