@@ -10,7 +10,7 @@
 const CELL = 64, COLS = 13, ROWS = 9, WALL = 6;
 const W = COLS * CELL, H = ROWS * CELL, HUD_H = 56;
 
-const TANK_R = 17, TANK_SPEED = 140, TANK_REV = 0.65, TANK_ROT = 3.2;
+const TANK_R = 17, TANK_SPEED = 112, TANK_REV = 0.65, TANK_ROT = 3.2;
 const MAX_HP = 100;
 
 const SHELL_SPEED = 430, SHELL_R = 3, SHELL_DMG = 20, FIRE_CD = 0.35, SHELL_LIFE = 4;
