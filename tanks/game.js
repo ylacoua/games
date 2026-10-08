@@ -20,7 +20,7 @@ const MISSILE_SPEED = 220, MISSILE_MIN_SPEED = 45, MISSILE_TURN = 8;
 const MISSILE_R = 5, MISSILE_DMG = 40;
 const MISSILE_RANGE = W / 2;           // flight distance: half the maze, then it vanishes
 
-const ROUNDS = 3;
+const ROUND_OPTIONS = [3, 5, 7];
 const COUNTDOWN = 3, ROUND_END_TIME = 3;
 
 const COLORS = [
@@ -382,6 +382,7 @@ const G = {
   tanks: [], shells: [], missiles: [],
   phase: 'idle',           // idle | countdown | playing | roundEnd | gameover
   timer: 0, round: 0, score: [0, 0], winner: -1,
+  totalRounds: 3, clinched: false,
   events: [],
   ai: null,
 };
@@ -402,16 +403,22 @@ function makeTank(i, row) {
   };
 }
 
+// the game ends early once the trailing tank can no longer catch up
+function isClinched() {
+  return Math.abs(G.score[0] - G.score[1]) > G.totalRounds - G.round;
+}
+
 function newGame() {
   G.score = [0, 0];
+  G.clinched = false;
   G.round = 0;
   nextRound();
 }
 
 function nextRound() {
   G.round++;
-  if (G.round > ROUNDS) {
-    G.round = ROUNDS;
+  if (G.round > G.totalRounds || G.clinched) {
+    G.round--;
     G.phase = 'gameover';
     ev({ k: 'over' });
     return;
@@ -563,6 +570,7 @@ function step(dt, inputs) {
   if (dead[0] || dead[1]) {
     G.winner = dead[0] && dead[1] ? -1 : dead[0] ? 1 : 0;
     if (G.winner >= 0) G.score[G.winner]++;
+    G.clinched = isClinched();
     G.phase = 'roundEnd';
     G.timer = ROUND_END_TIME;
     G.shells = [];
@@ -810,7 +818,7 @@ const Net = {
     this.sendT = 1 / 40;
     this.send({
       t: 's',
-      p: G.phase, tm: r2(G.timer), r: G.round, sc: G.score, w: G.winner, mid: G.mazeId,
+      p: G.phase, tm: r2(G.timer), r: G.round, tr: G.totalRounds, c: G.clinched ? 1 : 0, sc: G.score, w: G.winner, mid: G.mazeId,
       k: G.tanks.map((t) => [r1(t.x), r1(t.y), r2(t.a), t.hp, t.missiles, t.alive ? 1 : 0]),
       sh: G.shells.map((s) => [r1(s.x), r1(s.y), s.o]),
       ms: G.missiles.map((m) => [r1(m.x), r1(m.y), r2(m.a), Math.round(m.d), m.o]),
@@ -824,7 +832,7 @@ const Net = {
     if (d.t === 'maze') { setMaze(d.maze, d.id); return; }
     if (d.t !== 's') return;
     if (d.mid !== G.mazeId) return;          // wait for the matching maze
-    G.phase = d.p; G.timer = d.tm; G.round = d.r; G.score = d.sc; G.winner = d.w;
+    G.phase = d.p; G.timer = d.tm; G.round = d.r; G.totalRounds = d.tr; G.clinched = !!d.c; G.score = d.sc; G.winner = d.w;
     G.tanks = d.k.map((k) => ({ x: k[0], y: k[1], a: k[2], hp: k[3], missiles: k[4], alive: !!k[5] }));
     G.shells = d.sh.map((s) => ({ x: s[0], y: s[1], o: s[2] }));
     G.missiles = d.ms.map((m) => ({ x: m[0], y: m[1], a: m[2], d: m[3], o: m[4] }));
@@ -1142,7 +1150,7 @@ function drawHud() {
   ctx.font = '700 13px Rubik, sans-serif';
   ctx.fillStyle = '#9aa3b5';
   ctx.direction = 'rtl';
-  ctx.fillText(`סיבוב ${G.round} מתוך ${ROUNDS}`, W / 2, 44);
+  ctx.fillText(`סיבוב ${G.round} מתוך ${G.totalRounds}`, W / 2, 44);
   ctx.direction = 'ltr';
 }
 
@@ -1153,7 +1161,7 @@ function drawBanner() {
     big = String(Math.max(1, Math.ceil(G.timer)));
   } else if (G.phase === 'roundEnd') {
     big = G.winner < 0 ? 'תיקו!' : `${COLORS[G.winner].name} ניצח בסיבוב!`;
-    small = G.round < ROUNDS ? 'מבוך חדש בדרך…' : '';
+    small = G.clinched || G.round >= G.totalRounds ? 'המשחק הוכרע!' : 'מבוך חדש בדרך…';
   }
   if (!big) return;
   const cy = HUD_H + H / 2;
@@ -1196,6 +1204,7 @@ function startGame(mode) {
   particles.length = 0;
   $('#menu').classList.add('hidden');
   $('#gameover').classList.add('hidden');
+  if (mode !== 'guest') G.totalRounds = selectedRounds;
   if (mode === 'local') {
     G.me = 0;
     G.names = ['אתה (אדום)', 'המחשב (כחול)'];
@@ -1247,6 +1256,17 @@ function syncOverlay() {
   if (!over && shownOver) $('#gameover').classList.add('hidden');
   shownOver = over;
 }
+
+let selectedRounds = 3;
+try { selectedRounds = ROUND_OPTIONS.includes(+localStorage.getItem('tankduel.rounds')) ? +localStorage.getItem('tankduel.rounds') : 3; } catch (e) { /* storage blocked */ }
+document.querySelectorAll('#rounds button').forEach((b) => {
+  b.setAttribute('aria-pressed', +b.dataset.r === selectedRounds);
+  b.onclick = () => {
+    selectedRounds = +b.dataset.r;
+    try { localStorage.setItem('tankduel.rounds', selectedRounds); } catch (e) { /* storage blocked */ }
+    document.querySelectorAll('#rounds button').forEach((o) => o.setAttribute('aria-pressed', o === b));
+  };
+});
 
 $('#btn-ai').onclick = () => startGame('local');
 $('#btn-host').onclick = () => { Sound.init(); showMenuPage('menu-host'); Net.host(); };

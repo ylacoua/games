@@ -89,6 +89,29 @@ h1 {
 .hidden { display: none !important; }
 
 .row { display: flex; gap: 8px; }
+
+.rounds-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.seg { display: flex; gap: 4px; direction: ltr; }
+.seg button {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 13px;
+  width: 44px;
+  height: 36px;
+  border-radius: 6px;
+  border: 2px solid #3a445c;
+  background: #11151f;
+  color: var(--muted);
+  cursor: pointer;
+}
+.seg button:hover { color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: #c9a21f; color: #1a1a1a; }
 .row .btn { flex: 1; }
 
 .btn {
