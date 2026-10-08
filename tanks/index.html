@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>קרב טנקים</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="stage">
+      <canvas id="game"></canvas>
+
+      <!-- Main menu -->
+      <div id="menu" class="overlay">
+        <div class="panel">
+          <h1>קרב טנקים</h1>
+          <p class="sub">TANK DUEL · 8-BIT</p>
+
+          <div id="menu-main" class="menu-page">
+            <div class="row">
+              <button class="btn primary" id="btn-ai">🤖 נגד המחשב</button>
+              <select id="difficulty" aria-label="רמת קושי">
+                <option value="easy">קל</option>
+                <option value="normal" selected>רגיל</option>
+                <option value="hard">קשה</option>
+              </select>
+            </div>
+            <button class="btn" id="btn-host">🌐 צור משחק אונליין</button>
+            <button class="btn" id="btn-join">🔗 הצטרף למשחק אונליין</button>
+          </div>
+
+          <div id="menu-host" class="menu-page hidden">
+            <p>שלח ליריב את הקוד או את הקישור:</p>
+            <div class="code" id="host-code">·····</div>
+            <button class="btn small" id="btn-copy">📋 העתק קישור הזמנה</button>
+            <p class="status" id="host-status">מתחבר לשרת…</p>
+            <button class="btn ghost" data-back>חזרה</button>
+          </div>
+
+          <div id="menu-join" class="menu-page hidden">
+            <p>הכנס את קוד המשחק שקיבלת:</p>
+            <input id="join-code" maxlength="5" autocomplete="off" spellcheck="false" placeholder="ABCDE">
+            <button class="btn primary" id="btn-join-go">הצטרף</button>
+            <p class="status" id="join-status"></p>
+            <button class="btn ghost" data-back>חזרה</button>
+          </div>
+
+          <div class="help">
+            <div><kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> / <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> תנועה</div>
+            <div><kbd>רווח</kbd> תותח (אין סוף יריות, 20% נזק)</div>
+            <div><kbd>F</kbd> / <kbd>Enter</kbd> טיל מונחה (2 לסיבוב, 40% נזק)</div>
+            <div><kbd>M</kbd> השתקת מוזיקה</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Game over -->
+      <div id="gameover" class="overlay hidden">
+        <div class="panel">
+          <h2 id="go-title">המשחק נגמר</h2>
+          <div class="final" id="go-score"></div>
+          <p id="go-sub"></p>
+          <button class="btn primary" id="btn-again">שחק שוב</button>
+          <button class="btn ghost" id="btn-menu">לתפריט הראשי</button>
+        </div>
+      </div>
+
+      <div id="toast" class="hidden"></div>
+
+      <div id="toolbar">
+        <button class="tbtn" id="btn-mute" title="מוזיקה (M)">🔊</button>
+        <button class="tbtn" id="btn-exit" title="יציאה לתפריט">✕</button>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>
