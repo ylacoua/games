@@ -81,9 +81,9 @@ function newLevel(idx, loadout, def){
   }
   if(L.jcarrier){
     // a Japanese carrier steaming beyond the last island; fighters launch from its deck while it floats
-    const lastIs = G.islands[G.islands.length-1];
+    const base = G.L - 900;   // end of the last island, or beyond the battleship's patrol when there is one
     G.L += 1500;
-    G.ships.push(makeShip('jcarrier', lastIs.x1+1000, lastIs.x1+600, G.L-500));
+    G.ships.push(makeShip('jcarrier', base+1000, base+600, G.L-500));
   }
   // clouds
   for(let i=0;i<Math.ceil(G.L/500);i++) G.clouds.push({x:rnd(-500,G.L+500), y:rnd(CEIL-100,280), s:rnd(0.6,1.6), par:rnd(0.06,0.2)});

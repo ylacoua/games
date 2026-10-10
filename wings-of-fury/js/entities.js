@@ -136,7 +136,7 @@ function dropOrd(P){
     P.ordCool=0.22; SFX.rocket();
   } else {
     const alt = groundY(P.x) - P.y;
-    G.drops.push({kind:'torpedo', x:P.x, y:P.y+8, vx:v.vx*0.8, vy:Math.max(v.vy,0)+10, team:'p', dmg:ORD.torpedo.dmg, r:ORD.torpedo.radius, run:false, dir:P.f, ok:alt<70 && Math.abs(P.p)<0.5});
+    G.drops.push({kind:'torpedo', x:P.x, y:P.y+8, vx:v.vx*0.8, vy:Math.max(v.vy,0)+10, team:'p', dmg:ORD.torpedo.dmg, r:ORD.torpedo.radius, run:false, dir:P.f, ok:alt<160});
     P.ordCool=0.8; SFX.drop();
   }
 }
@@ -182,15 +182,16 @@ function updateProjectiles(dt){
         d.vy += 300*dt; d.x+=d.vx*dt; d.y+=d.vy*dt;
         if(d.y >= groundY(d.x)-2){
           if(!overSea(d.x)) detonate(d);
-          else if(!d.ok){ splash(d.x); d.dead=true; say('הטורפדו נשבר – הטל נמוך יותר ובטיסה ישרה',3); }
-          else { d.run=true; d.y=SEA+5; d.vx=d.dir*270; d.life=7; splash(d.x); }
+          else if(!d.ok){ splash(d.x); d.dead=true; say('הטורפדו נשבר – הטל אותו נמוך יותר',3); }
+          else { d.run=true; d.y=SEA+9; d.vx=d.dir*270; d.vy=0; splash(d.x); }
         }
       } else {
-        d.x += d.vx*dt; d.life -= dt;
-        if(Math.random()<0.5) G.fx.push({type:'wake', x:d.x, y:SEA+2, t:0, max:1.2});
+        // running submerged in a straight line until it strikes a ship or a shore, or leaves the area
+        d.x += d.vx*dt;
+        if(Math.random()<0.6) G.fx.push({type:'wake', x:d.x - Math.sign(d.vx)*10, y:SEA+2, t:0, max:1.4});
         if(!overSea(d.x)) detonate(d);
-        for(const sh of G.ships) if(!sh.dead && Math.abs(d.x-sh.x)<sh.w/2) { detonate(d); break; }
-        if(d.life<=0) d.dead=true;
+        for(const sh of G.ships) if(!sh.dead && Math.abs(d.x-sh.x)<sh.w/2) { d.target = sh; detonate(d); break; }
+        if(d.x < -400 || d.x > G.L+400) d.dead=true;
       }
     }
   }
@@ -230,6 +231,13 @@ function hitsEnemyPlane(x,y,r){
 
 function detonate(d){
   d.dead=true;
+  if(d.kind==='torpedo' && d.target){
+    // a torpedo hit is decided per ship class (see hitShip) and throws up a tall column of water
+    const sh = d.target;
+    G.fx.push({type:'column', x:d.x, y:SEA, t:0, max:1.6}); splash(d.x); boom(d.x, SEA-6, 60, true);
+    hitShip(sh, 0, 'torpedo', d.x);
+    return;
+  }
   if(d.y>SEA-6 && overSea(d.x)) splash(d.x);
   explode(d.x, Math.min(d.y, groundY(d.x)), d.r, d.dmg, d.team, d.kind);
 }
@@ -301,13 +309,18 @@ function hitStruct(s, d, kind){
 
 function hitShip(sh, d, kind, x){
   if(sh.dead) return;
-  if(kind!=='torpedo'){
+  if(kind==='torpedo'){
+    // one torpedo sinks a destroyer; capital ships (carrier, battleship) need two
+    const hits = (sh.type==='jcarrier' || sh.type==='battleship') ? 2 : 1;
+    sh.hp -= sh.max/hits + 1; sh.flash=0.2;
+    if(sh.hp>0) say(sh.type==='jcarrier' ? 'פגיעת טורפדו! עוד טורפדו אחד יטביע את הנושאת' : 'פגיעת טורפדו! עוד טורפדו אחד יטביע אותה', 3);
+  } else {
     const t = sh.turrets.find(t=>!t.dead && Math.abs(sh.x+t.dx-x)<45);
-    if(t){ t.hp -= kind==='gun'? d*0.35 : d; if(t.hp<=0){ t.dead=true; boom(sh.x+t.dx, SEA-sh.h-8, 40, false); earn('turret', sh.x+t.dx, SEA-sh.h); } return; }
+    if(t){ t.hp -= kind==='gun'? d*0.35 : d; if(t.hp<=0){ t.dead=true; boom(sh.x+t.dx, SEA-sh.h*0.5-8, 40, false); earn('turret', sh.x+t.dx, SEA-sh.h); } return; }
+    let mul = kind==='gun'?0.1 : 0.6;
+    if(sh.type==='battleship' && sh.turrets.some(t=>!t.dead)) mul *= 0.3;
+    sh.hp -= d*mul; sh.flash=0.1;
   }
-  let mul = kind==='gun'?0.1 : kind==='torpedo'?1 : 0.6;
-  if(sh.type==='battleship' && sh.turrets.some(t=>!t.dead)) mul *= kind==='torpedo'?0.5:0.3;
-  sh.hp -= d*mul; sh.flash=0.1;
   if(sh.hp<=0){
     sh.dead=true; sh.sink=0.001; earn(sh.type, sh.x, SEA-sh.h);
     for(let i=0;i<5;i++) setTimeout(()=>G && boom(sh.x+rnd(-sh.w/2,sh.w/2), SEA-sh.h, 50, true), i*220);
