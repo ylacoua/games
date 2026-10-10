@@ -142,25 +142,6 @@ function drawIsland(ctx, is){
   }
 }
 
-function drawCarrier(ctx, C){
-  const x=C.x, L=C.len;
-  ctx.fillStyle='#59616b';
-  ctx.beginPath(); ctx.moveTo(x-20,DECK_Y+4); ctx.lineTo(x+L+40,DECK_Y+4); ctx.lineTo(x+L-10,SEA+14); ctx.lineTo(x+10,SEA+14); ctx.closePath(); ctx.fill();
-  ctx.fillStyle='#454c55'; ctx.fillRect(x-10,DECK_Y+10,L+30,6);
-  ctx.fillStyle='#6d6a5c'; ctx.fillRect(x-24,DECK_Y-2,L+70,7);
-  ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1; ctx.setLineDash([10,8]);
-  ctx.beginPath(); ctx.moveTo(x,DECK_Y+1.5); ctx.lineTo(x+L,DECK_Y+1.5); ctx.stroke(); ctx.setLineDash([]);
-  ctx.strokeStyle='#222'; for(let i=0;i<4;i++){ ctx.beginPath(); ctx.moveTo(x+40+i*22,DECK_Y-3); ctx.lineTo(x+40+i*22,DECK_Y-1); ctx.stroke(); }
-  const ix=x+L*0.66;
-  ctx.fillStyle='#4e5560'; ctx.fillRect(ix,DECK_Y-46,46,44); ctx.fillRect(ix+8,DECK_Y-62,26,16);
-  ctx.fillStyle='#9fc4db'; ctx.fillRect(ix+10,DECK_Y-58,22,4);
-  ctx.strokeStyle='#3a3f46'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(ix+21,DECK_Y-62); ctx.lineTo(ix+21,DECK_Y-92); ctx.moveTo(ix+12,DECK_Y-82); ctx.lineTo(ix+30,DECK_Y-82); ctx.stroke();
-  ctx.fillStyle='#e8e2c8'; ctx.font='bold 16px Rubik, sans-serif'; ctx.textAlign='center'; ctx.fillText('9', ix+23, DECK_Y-20);
-  ctx.fillStyle = G.time%1<0.5 ? '#ff5a3a' : '#7a2a1a'; ctx.fillRect(ix+19,DECK_Y-95,4,4);
-  if(C.hit>0){ C.hit-=1/60; ctx.fillStyle='rgba(255,120,60,.4)'; ctx.fillRect(x-20,DECK_Y-2,L+60,SEA-DECK_Y+14); }
-  if(C.hp < C.max*0.6 && Math.random()<0.2) puff(x+rnd(0,L), DECK_Y-4, '#333', 10, 1.4);
-}
-
 function drawStruct(ctx, s){
   const x=s.x, y=s.y, w=s.w, h=s.h;
   if(s.dead){

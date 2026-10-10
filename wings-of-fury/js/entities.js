@@ -199,6 +199,15 @@ function updateProjectiles(dt){
   for(const f of G.flak){
     f.x+=f.vx*dt; f.y+=f.vy*dt; f.fuse-=dt;
     const P=G.player;
+    if(f.team==='p'){
+      // the carrier's proximity shells burst near enemy aircraft
+      const near = G.enemies.some(e=>!e.dead && dist2(f.x,f.y,e.x,e.y) < ((e.size||16)+12)**2);
+      if(f.fuse<=0 || near){
+        f.dead=true; G.fx.push({type:'flak', x:f.x, y:f.y, t:0, max:0.7, r:26});
+        for(const e of G.enemies) if(!e.dead && dist2(f.x,f.y,e.x,e.y) < ((e.size||16)+40)**2) hurtEnemy(e, f.dmg);
+      }
+      continue;
+    }
     const near = !P.dead && dist2(f.x,f.y,P.x,P.y) < 30*30;
     if(f.fuse<=0 || near){
       f.dead=true; G.fx.push({type:'flak', x:f.x, y:f.y, t:0, max:0.7, r:f.big?34:24}); SFX.flak();

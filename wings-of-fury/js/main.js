@@ -48,6 +48,7 @@ function update(dt, vw){
   updateWingmen(dt);
   updateEnemies(dt);
   updateGround(dt);
+  updateCarrierAA(dt);
   updateProjectiles(dt);
   updateFx(dt);
   updateSpawns(dt, vw);
