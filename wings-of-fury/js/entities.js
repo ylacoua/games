@@ -45,7 +45,7 @@ function updatePlayer(dt){
     else if((K.ArrowRight && P.f>0) || (K.ArrowLeft && P.f<0)) P.throttle = Math.min(1, P.throttle+dt*0.8);
   }
   // pitch stays available during the turn
-  const tr = st.turn*(P.stall?0.4:1)*(P.loop?0.5:1);
+  const tr = st.turn*0.5*(P.stall?0.4:1)*(P.loop?0.5:1);   // pitch rate: gentler than the turn-around
   if(K.ArrowUp) P.p += tr*dt;
   if(K.ArrowDown) P.p -= tr*dt;
   P.p = clamp(P.p, -1.35, 1.35);
@@ -67,8 +67,8 @@ function updatePlayer(dt){
 
   const a = heading(P);
   const target = (outOfFuel ? 0 : P.throttle*st.speed) * (1 - 0.12*P.gear);
-  P.speed += (target-P.speed)*0.55*dt - 145*Math.sin(a)*dt;
-  P.speed = clamp(P.speed, 0, st.speed*1.4);
+  P.speed += (target-P.speed)*0.55*dt - (Math.sin(a)>0 ? 145 : 70)*Math.sin(a)*dt;   // dives gain speed more slowly than climbs lose it
+  P.speed = clamp(P.speed, 0, st.speed*1.2);
   P.stall = P.speed < 100 && !P.loop;
   if(P.stall) P.p = Math.max(-1.3, P.p - 1.1*dt);
   const v = playerVel(P);
