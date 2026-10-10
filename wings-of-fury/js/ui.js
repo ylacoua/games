@@ -34,7 +34,7 @@ const UI = {
         <small>${({day:'יום',dawn:'שחר',dusk:'שקיעה',night:'לילה'})[L.time]}${L.rain?' · גשם':''}${L.wind?' · רוח':''}${SAVE.best[i]?' · ✓ הושלם':''}</small>
       </button>`;}).join('');
     this.show(`
-      <div class="spread"><div><h1>WINGS OF FURY</h1><p class="sub">האוקיינוס השקט, 1944. טייס מנושאת מטוסים מול איים מבוצרים, ספינות ובוסים.</p></div>${this.money()}</div>
+      <div class="spread"><div><h1>כנפי הרעם</h1><p class="sub">WINGS OF FURY · האוקיינוס השקט, 1944. טייס מנושאת מטוסים מול איים מבוצרים, ספינות ובוסים.</p></div>${this.money()}</div>
       <div class="row"><button class="primary" data-act="level" data-v="${Math.min(SAVE.unlocked, LEVELS.length)-1}">המשך למשימה ${Math.min(SAVE.unlocked, LEVELS.length)}</button>
       <button data-act="training">משימת אימון (הכול חינם)</button>
       <button data-act="reset">איפוס התקדמות</button></div>
