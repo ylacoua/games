@@ -115,40 +115,97 @@ function shootFrom(e, team, dmg, spd=760){
   G.shots.push({x:e.x+Math.cos(e.a)*18, y:e.y+Math.sin(e.a)*18, vx:Math.cos(a)*spd+Math.cos(e.a)*e.speed*0.5, vy:Math.sin(a)*spd+Math.sin(e.a)*e.speed*0.5, team, dmg, life:0.8});
 }
 
-// ---- spawning ----
+// ---- spawning: enemy aircraft take off from somewhere real ----
+// Launch sites: an island airstrip while at least one building on that island still stands,
+// and every Japanese carrier still afloat. With no sites left, no more fighters appear.
+function launchSites(){
+  const sites = [];
+  G.islands.forEach((is,i)=>{
+    if(is.strip && G.structures.some(s=>s.island===i && !s.dead)) sites.push({kind:'island', x:(is.strip.x0+is.strip.x1)/2, is});
+  });
+  for(const sh of G.ships) if(sh.type==='jcarrier' && !sh.dead) sites.push({kind:'carrier', x:sh.x, sh});
+  return sites;
+}
+function nearestSite(sites, x){ return sites.reduce((b,s)=>!b || Math.abs(s.x-x)<Math.abs(b.x-x) ? s : b, null); }
+
+// Put an aircraft at the start of its take-off run; `delay` staggers a second plane behind the first.
+function launchFrom(site, type, delay=0){
+  const P = G.player;
+  let x, y, dir;
+  if(site.kind==='carrier'){
+    const sh = site.sh; dir = sh.dir; x = sh.x - dir*sh.w*0.35; y = SEA - JDECK - 5;
+  } else {
+    const s = site.is.strip; dir = P.x > (s.x0+s.x1)/2 ? 1 : -1;
+    x = dir>0 ? s.x0+15 : s.x1-15; y = groundY(x) - 5;
+  }
+  const full = type==='betty' ? 145 : rnd(215,250) + G.idx*8;
+  const e = type==='betty'
+    ? {type:'betty', x, y, a:dir>0?0:Math.PI, speed:0, full, hp:90, size:24, cool:0, bombs:3, dead:false}
+    : {type:'zero',  x, y, a:dir>0?0:Math.PI, speed:0, full, hp:28+G.idx*4, size:16, cool:1, burst:0, evade:0, dead:false};
+  e.takeoff = {t:-delay, ground:y, deck: site.kind==='carrier' ? site.sh : null};
+  G.enemies.push(e);
+  return e;
+}
+
+// Take-off roll and initial climb. Aircraft are vulnerable on the ground but do not attack until airborne.
+function takeoffStep(e, dt){
+  const k = e.takeoff, dir = Math.cos(e.a) >= 0 ? 1 : -1;
+  const carry = k.deck ? k.deck.dir*k.deck.speed*dt : 0;
+  k.t += dt;
+  if(k.t < 0){ e.x += carry; return; }                               // waiting its turn on the runway
+  if(k.deck && k.deck.dead){ e.hp = 0; hurtEnemy(e, 1); return; }    // carrier sank under it
+  const accel = e.type==='emily' ? 0.22 : e.type==='betty' ? 0.4 : 0.6;
+  e.speed = Math.min(e.full, e.speed + e.full*accel*dt);
+  const rotate = e.full * (e.type==='emily' ? 0.75 : 0.6);
+  if(e.speed < rotate){
+    e.x += dir*e.speed*dt + carry; e.a = dir>0 ? 0 : Math.PI;
+    e.y = k.deck ? SEA-JDECK-5 : k.water ? SEA-12 : groundY(e.x)-5;
+    if(k.water && Math.random()<0.5) G.fx.push({type:'wake', x:e.x - dir*30, y:SEA+2, t:0, max:1.4});
+    else if(!k.deck && !k.water && Math.random()<0.25) puff(e.x - dir*14, e.y+3, 'rgba(170,150,110,.6)', 5, 0.8);
+  } else {
+    const climb = e.type==='zero' ? 0.32 : 0.16;
+    e.a = dir>0 ? -climb : -Math.PI+climb;
+    e.x += Math.cos(e.a)*e.speed*dt; e.y += Math.sin(e.a)*e.speed*dt;
+    if(k.ground - e.y > (e.type==='zero' ? 90 : 70)){ e.takeoff = null; e.speed = e.full; }
+  }
+}
+
 function updateSpawns(dt, viewW){
   const P = G.player, def = G.def, lvl = G.idx;
   const airborne = !P.dead && !P.onDeck;
   const alive = G.enemies.filter(e=>!e.dead && e.type==='zero').length;
   G.zeroT -= dt;
   if(G.zeroT<=0 && airborne && P.x>1200 && alive < 3+lvl){
-    const n = 1 + (Math.random()<0.25+lvl*0.1 ? 1 : 0);
-    for(let i=0;i<n;i++) spawnZero(P.x + (Math.random()<.5?-1:1)*(viewW*0.65+rnd(100,300)), clamp(P.y+rnd(-180,120), CEIL+60, 300));
-    say(n>1?'מטוסי זירו מתקרבים!':'מטוס זירו באופק!',2);
+    const site = nearestSite(launchSites(), P.x);
+    if(site){
+      const n = 1 + (Math.random()<0.25+lvl*0.1 ? 1 : 0);
+      for(let i=0;i<n;i++) launchFrom(site, 'zero', i*1.6);
+      say(site.kind==='carrier' ? 'מטוסי זירו ממריאים מהנושאת היפנית!' : (n>1 ? 'מטוסי זירו ממריאים מהאי!' : 'מטוס זירו ממריא מהאי!'), 2.5);
+    }
     G.zeroT = def.zeroEvery*rnd(0.8,1.2);
   }
   if(def.bombers){
     G.bomberT -= dt;
     if(G.bomberT<=0 && airborne){
-      G.enemies.push({type:'betty', x:Math.min(G.L, P.x+viewW+600), y:rnd(140,200), a:Math.PI, speed:145, hp:90, size:24, cool:0, bombs:3, dead:false});
-      say('מפציץ אויב בדרך לנושאת! יירט אותו',3); SFX.alarm();
+      // land-based bombers need an island airfield; the nearest one to our carrier sends them
+      const site = nearestSite(launchSites().filter(s=>s.kind==='island'), G.carrier.x);
+      if(site){ launchFrom(site, 'betty'); say('מפציץ אויב ממריא לעבר הנושאת! יירט אותו',3); SFX.alarm(); }
       G.bomberT = rnd(40,55)-lvl*3;
     }
   }
-  if(def.boss==='emily' && !G.bossSpawned && P.x > G.L*0.5){
+  if(def.boss==='emily' && !G.bossSpawned && P.x > G.L*0.4){
+    // the flying boat takes off from the water between the last two islands
     G.bossSpawned = true;
-    G.boss = {type:'emily', x:P.x+viewW*0.8, y:170, a:Math.PI, speed:100, hp:1300, max:1300, size:40, boxW:120, boxH:44, cool:0, guns:[{dx:-40,dy:-14},{dx:10,dy:16},{dx:52,dy:-6}], gcool:[0,0.4,0.8], dead:false, dir:-1};
+    const n = G.islands.length, x = n>1 ? (G.islands[n-2].x1 + G.islands[n-1].x0)/2 : G.islands[0].x1 + 700;
+    const dir = P.x < x ? -1 : 1;
+    G.boss = {type:'emily', x, y:SEA-12, a:dir>0?0:Math.PI, speed:0, full:100, hp:1300, max:1300, size:40, boxW:120, boxH:44, cool:0,
+      guns:[{dx:-40,dy:-14},{dx:10,dy:16},{dx:52,dy:-6}], gcool:[0,0.4,0.8], dead:false, dir, takeoff:{t:0, ground:SEA-12, water:true}};
     G.enemies.push(G.boss);
-    spawnZero(G.boss.x+120, 120); spawnZero(G.boss.x+160, 240);
-    say('סירה מעופפת "אמילי" באופק! הפל אותה',4); SFX.alarm();
+    const site = nearestSite(launchSites(), x);
+    if(site){ launchFrom(site, 'zero'); launchFrom(site, 'zero', 1.6); }
+    say('סירה מעופפת "אמילי" ממריאה מהמים! הפל אותה',4); SFX.alarm();
   }
 }
-
-function spawnZero(x, y){
-  x = clamp(x, -300, G.L+300);
-  G.enemies.push({type:'zero', x, y, a: x>G.player.x?Math.PI:0, speed:rnd(215,250)+G.idx*8, hp:28+G.idx*4, size:16, cool:1, burst:0, evade:0, dead:false});
-}
-
 function hurtEnemy(e, d){
   if(e.dead) return;
   e.hp -= d; e.flash=0.08;
@@ -165,6 +222,7 @@ function updateEnemies(dt){
   for(const e of G.enemies){
     if(e.dead) continue;
     e.flash = Math.max(0,(e.flash||0)-dt);
+    if(e.takeoff){ takeoffStep(e, dt); continue; }
     if(e.type==='zero') zeroAI(e, dt, lvl);
     else if(e.type==='betty') bettyAI(e, dt);
     else if(e.type==='emily') emilyAI(e, dt, lvl);

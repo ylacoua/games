@@ -135,6 +135,18 @@ function drawIsland(ctx, is){
   for(let x=is.x0+is.slope*0.6; x<=is.x1-is.slope*0.6; x+=8) ctx.lineTo(x, groundY(x)+1);
   for(let x=is.x1-is.slope*0.6; x>=is.x0+is.slope*0.6; x-=8) ctx.lineTo(x, groundY(x)+9);
   ctx.fillStyle = G.weather.time==='night' ? '#24331f' : '#5f8a3c'; ctx.fill();
+  // airstrip: enemy fighters take off from it while the island still has a working building; cratered once it is dead
+  if(is.strip){
+    const idx = G.islands.indexOf(is), active = G.structures.some(s=>s.island===idx && !s.dead);
+    const runway = ()=>{ ctx.beginPath(); for(let x=is.strip.x0; x<=is.strip.x1; x+=10) ctx.lineTo(x, groundY(x)-0.5); };
+    ctx.strokeStyle = G.weather.time==='night' ? '#2b2b27' : '#64625a'; ctx.lineWidth=4; ctx.lineCap='butt'; runway(); ctx.stroke();
+    ctx.strokeStyle='rgba(235,230,210,.55)'; ctx.lineWidth=0.8; ctx.setLineDash([8,8]); runway(); ctx.stroke(); ctx.setLineDash([]);
+    if(!active){
+      const len = is.strip.x1-is.strip.x0;
+      ctx.fillStyle='#2e2a22';
+      for(let k=0;k<6;k++){ const cx = is.strip.x0 + len*(k+0.5)/6 + Math.sin(k*7.3+is.seed)*20; ctx.beginPath(); ctx.ellipse(cx, groundY(cx)-1, 9, 2.6, 0, 0, 7); ctx.fill(); }
+    }
+  }
   for(const p of is.palms){
     const gy = groundY(p.x), s = p.s, sway = Math.sin(G.time*1.5+p.x)*2 + G.weather.wind*0.05;
     ctx.strokeStyle='#6b4f2c'; ctx.lineWidth=3*s; ctx.beginPath(); ctx.moveTo(p.x,gy); ctx.quadraticCurveTo(p.x+4*s,gy-18*s,p.x+2*s+sway,gy-34*s); ctx.stroke();
@@ -192,6 +204,29 @@ function drawShip(ctx, sh){
   if(sh.type==='battleship'){
     ctx.fillRect(x-60,SEA-h,120,h*0.5); ctx.fillRect(x-20,SEA-h-45,40,45); ctx.fillRect(x-10,SEA-h-70,20,25);
     ctx.fillStyle='#3d4247'; ctx.fillRect(x+30*-d,SEA-h-30,16,30);
+  } else if(sh.type==='jcarrier'){
+    // Japanese carrier: hangar sides under an overhanging wooden flight deck, small island, downturned funnel
+    const dy = SEA-JDECK;
+    ctx.fillStyle = sh.flash>0 ? '#ddd' : '#4d5358'; ctx.fillRect(x-w/2+10, dy+4, w-20, JDECK-4-h*0.5+2);
+    ctx.fillStyle='#24282c'; for(let i=0;i<7;i++) ctx.fillRect(x-w/2+26+i*42, dy+7, 22, 4);
+    ctx.fillStyle='#7a6a4c'; ctx.fillRect(x-w/2-8, dy, w+16, 4);
+    ctx.fillStyle='rgba(235,230,210,.8)'; ctx.fillRect(x-w/2-8, dy, w+16, 0.8);
+    ctx.fillStyle='#222'; ctx.beginPath(); ctx.ellipse(x - d*40, dy+12, 7, 4, 0, 0, Math.PI); ctx.fill();          // funnel venting down the side
+    const ix = x + d*w*0.2;
+    ctx.fillStyle='#4b5157'; ctx.fillRect(ix-9, dy-16, 18, 16); ctx.fillRect(ix-5, dy-22, 10, 6);
+    ctx.fillStyle='#9fc4db'; ctx.fillRect(ix-7, dy-13, 14, 2.5);
+    ctx.strokeStyle='#333'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(ix, dy-22); ctx.lineTo(ix, dy-40); ctx.stroke();
+    // rising-sun naval ensign
+    const fy = dy-40 + Math.sin(G.time*4)*0.4;
+    ctx.fillStyle='#f2efe6'; ctx.fillRect(ix, fy, 14, 9);
+    ctx.save(); ctx.beginPath(); ctx.rect(ix, fy, 14, 9); ctx.clip();
+    ctx.strokeStyle='#c4231c'; ctx.lineWidth=1.1;
+    for(let k=0;k<8;k++){ const a=k*Math.PI/4; ctx.beginPath(); ctx.moveTo(ix+5.5,fy+4.5); ctx.lineTo(ix+5.5+Math.cos(a)*14, fy+4.5+Math.sin(a)*14); ctx.stroke(); }
+    ctx.restore(); ctx.fillStyle='#c4231c'; ctx.beginPath(); ctx.arc(ix+5.5, fy+4.5, 2.6, 0, 7); ctx.fill();
+    // Zeros spotted on deck aft, ready to launch
+    if(!sh.dead) for(const px of [x - d*w*0.4, x - d*w*0.3, x - d*w*0.2]){
+      ctx.save(); ctx.translate(px, dy-4); ctx.scale(d*0.55, 0.55); drawPlane(ctx,'zero',null,null,1,false,false,1); ctx.restore();
+    }
   } else {
     ctx.fillRect(x-30,SEA-h,60,h*0.5); ctx.fillRect(x-12*d,SEA-h-14,18,14);
     ctx.fillStyle='#3d4247'; ctx.fillRect(x-35*d,SEA-h-6,10,10);

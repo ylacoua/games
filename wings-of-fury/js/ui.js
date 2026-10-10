@@ -87,7 +87,7 @@ const UI = {
   trainingHangar(){
     Music.start();
     if(!this.tr) this.tr = {plane:'hellcat', ord:'bomb', wing:[], up:{engine:3,armor:3,guns:3,payload:3,fuel:3},
-      time:'day', rain:false, storm:false, wind:0, boss:'', bombers:false, zeros:true};
+      time:'day', rain:false, storm:false, wind:0, boss:'', bombers:false, zeros:true, jcarrier:false};
     const t = this.tr, st = planeStats(t.plane, t.up);
     const opt = (act, v, on, label) => `<button class="${on?'on':''}" data-act="${act}" data-v="${v}">${label}</button>`;
     const planes = Object.keys(PLANES).map(k=>`<button class="card ${t.plane===k?'sel':''}" data-act="tplane" data-v="${k}" style="text-align:right">
@@ -106,7 +106,7 @@ const UI = {
       <h3>דרגות שדרוג</h3><div class="grid" style="margin:8px 0 16px">${ups}</div>
       <h3>סביבה ואויבים</h3>
       <div class="tabs">${[['day','יום'],['dawn','שחר'],['dusk','שקיעה'],['night','לילה']].map(([k,l])=>opt('ttime',k,t.time===k,l)).join('')}</div>
-      <div class="tabs">${opt('ttog','rain',t.rain,'גשם')}${opt('ttog','storm',t.storm,'ברקים')}${opt('ttog','zeros',t.zeros,'מטוסי זירו')}${opt('ttog','bombers',t.bombers,'מפציצי אויב')}</div>
+      <div class="tabs">${opt('ttog','rain',t.rain,'גשם')}${opt('ttog','storm',t.storm,'ברקים')}${opt('ttog','zeros',t.zeros,'מטוסי זירו')}${opt('ttog','bombers',t.bombers,'מפציצי אויב')}${opt('ttog','jcarrier',t.jcarrier,'נושאת יפנית')}</div>
       <div class="tabs"><span class="note" style="align-self:center">רוח:</span>${[[-45,'חזקה שמאלה'],[0,'ללא'],[45,'חזקה ימינה']].map(([k,l])=>opt('twind',k,t.wind===k,l)).join('')}</div>
       <div class="tabs"><span class="note" style="align-self:center">בוס:</span>${[['','ללא'],['battleship','אוניית מערכה'],['emily','"אמילי"'],['fortress','מבצר חוף']].map(([k,l])=>opt('tboss',k,t.boss===k,l)).join('')}</div>
       <div class="row" style="margin-top:14px"><button data-act="menu">חזרה</button><button class="primary" data-act="tlaunch">התחל אימון</button></div>`);

@@ -311,7 +311,7 @@ function hitShip(sh, d, kind, x){
   if(sh.hp<=0){
     sh.dead=true; sh.sink=0.001; earn(sh.type, sh.x, SEA-sh.h);
     for(let i=0;i<5;i++) setTimeout(()=>G && boom(sh.x+rnd(-sh.w/2,sh.w/2), SEA-sh.h, 50, true), i*220);
-    say(sh.type==='battleship'?'אוניית המערכה טובעת!':'משחתת אויב הוטבעה',3);
+    say(sh.type==='battleship'?'אוניית המערכה טובעת!':sh.type==='jcarrier'?'הנושאת היפנית הוטבעה! לא ימריאו ממנה עוד מטוסים':'משחתת אויב הוטבעה',3);
   }
 }
 

@@ -63,7 +63,8 @@ function newLevel(idx, loadout, def){
       types.sort(()=>Math.random()-0.5);
     }
     const step = (b-a)/types.length;
-    types.forEach((t,k)=>G.structures.push(makeStruct(t, a+step*(k+0.5)+rnd(-step*0.15,step*0.15))));
+    types.forEach((t,k)=>{ const s = makeStruct(t, a+step*(k+0.5)+rnd(-step*0.15,step*0.15)); s.island = i; G.structures.push(s); });
+    is.strip = {x0:a-30, x1:b+30};   // airstrip enemy fighters take off from while the island still has a working building
     for(let p=0;p<Math.floor((b-a)/180);p++) is.palms.push({x:rnd(a-60,b+60), s:rnd(0.8,1.3)});
   });
   // ships between islands
@@ -77,6 +78,12 @@ function newLevel(idx, loadout, def){
     const lastIs = G.islands[G.islands.length-1];
     G.L += 1400;
     G.ships.push(makeShip('battleship', lastIs.x1+900, lastIs.x1+500, G.L-500));
+  }
+  if(L.jcarrier){
+    // a Japanese carrier steaming beyond the last island; fighters launch from its deck while it floats
+    const lastIs = G.islands[G.islands.length-1];
+    G.L += 1500;
+    G.ships.push(makeShip('jcarrier', lastIs.x1+1000, lastIs.x1+600, G.L-500));
   }
   // clouds
   for(let i=0;i<Math.ceil(G.L/500);i++) G.clouds.push({x:rnd(-500,G.L+500), y:rnd(CEIL-100,280), s:rnd(0.6,1.6), par:rnd(0.06,0.2)});
@@ -92,7 +99,13 @@ function newLevel(idx, loadout, def){
   say('המטוס על הסיפון. הגבר מצערת (W / →) ומשוך ↑ כדי להמריא');
 }
 
+const JDECK = 26;   // height of the Japanese carrier's flight deck above the sea
+
 function makeShip(type, x, minX, maxX){
+  if(type==='jcarrier'){
+    return {type, x, minX, maxX, dir:-1, speed:10, w:330, h:34, hp:950, max:950, dead:false, sink:0, primary:true,
+      turrets:[-130,-60,120].map(dx=>({dx, hp:70, max:70, cool:rnd(1,3), dead:false}))};
+  }
   if(type==='battleship'){
     return {type, x, minX, maxX, dir:-1, speed:12, w:440, h:48, hp:1400, max:1400, dead:false, sink:0, primary:true,
       turrets:[-160,-80,90,170].map(dx=>({dx, hp:170, max:170, cool:rnd(1,3), dead:false}))};

@@ -35,21 +35,21 @@ const MAX_WINGMEN = 3;
 
 // time: day | dawn | dusk | night ; rain 0..1 ; wind px/s ; storm = lightning
 const LEVELS = [
-  {name:'איי מרשל',         brief:'פשיטה ראשונה על שני איים מבוצרים. השמד את הבונקרים ואת סוללות הנ"מ.',
+  {name:'איי מרשל',         brief:'פשיטה ראשונה על שני איים מבוצרים. השמד את הבונקרים ואת סוללות הנ"מ. כל עוד יש באי מבנים פעילים, מטוסי זירו ימריאו ממנו.',
    time:'day',  rain:0,   wind:0,   storm:false, islands:2, ships:1, zeroEvery:22, bombers:false, boss:null,         reward:1000},
-  {name:'שחר מעל סאיפן',     brief:'תקיפה עם עלות השחר. רוח צד חזקה מסיטה את הפצצות.',
-   time:'dawn', rain:0,   wind:35,  storm:false, islands:3, ships:1, zeroEvery:16, bombers:false, boss:null,         reward:1400},
+  {name:'שחר מעל סאיפן',     brief:'תקיפה עם עלות השחר. רוח צד חזקה מסיטה את הפצצות. נושאת מטוסים יפנית מאחורי האי האחרון משגרת מטוסי זירו.',
+   time:'dawn', rain:0,   wind:35,  storm:false, islands:3, ships:1, zeroEvery:16, bombers:false, boss:null, jcarrier:true,         reward:1400},
   {name:'סערה בים הפיליפינים', brief:'אוניית מערכה ענקית מסתתרת בסערה. השמד את הצריחים ואז הטבע אותה בטורפדו.',
    time:'day',  rain:0.9, wind:-45, storm:true,  islands:2, ships:2, zeroEvery:15, bombers:false, boss:'battleship', reward:2500},
   {name:'פשיטת לילה',        brief:'לילה ללא ירח. זרקורים מכוונים את הנ"מ, ומפציצי אויב מנסים לפגוע בנושאת.',
-   time:'night',rain:0,   wind:10,  storm:false, islands:3, ships:2, zeroEvery:14, bombers:true,  boss:null,         reward:2200},
+   time:'night',rain:0,   wind:10,  storm:false, islands:3, ships:2, zeroEvery:14, bombers:true,  boss:null, jcarrier:true,         reward:2200},
   {name:'שקיעה מעל איוו ג׳ימה', brief:'סירה מעופפת ענקית מסוג "אמילי" מובילה את הגנת האי. הפל אותה.',
-   time:'dusk', rain:0,   wind:25,  storm:false, islands:3, ships:1, zeroEvery:12, bombers:true,  boss:'emily',      reward:3200},
+   time:'dusk', rain:0,   wind:25,  storm:false, islands:3, ships:1, zeroEvery:12, bombers:true,  boss:'emily', jcarrier:true,      reward:3200},
   {name:'מבצר אוקינאווה',     brief:'המשימה האחרונה: מבצר החוף עם תותחי ענק, בלילה סוער.',
-   time:'night',rain:0.7, wind:-30, storm:true,  islands:3, ships:2, zeroEvery:10, bombers:true,  boss:'fortress',   reward:5000}
+   time:'night',rain:0.7, wind:-30, storm:true,  islands:3, ships:2, zeroEvery:10, bombers:true,  boss:'fortress', jcarrier:true,   reward:5000}
 ];
 
-const SCORE = {bunker:150, aa:120, barracks:100, fuel:80, light:60, soldier:10, zero:100, betty:150,
+const SCORE = {bunker:150, aa:120, barracks:100, fuel:80, light:60, soldier:10, zero:100, betty:150, jcarrier:1200,
   destroyer:300, battleship:1500, turret:200, emily:1500, biggun:300, core:2000};
 
 const SAVE_KEY = 'wof1944-save';
@@ -82,5 +82,5 @@ const dist2=(ax,ay,bx,by)=>(ax-bx)*(ax-bx)+(ay-by)*(ay-by);
 function trainingDef(t){
   return {name:'משימת אימון', brief:'אימון חופשי. כל המטוסים, השדרוגים והכנפיים זמינים ללא עלות, וההתקדמות לא נשמרת.',
     time:t.time, rain:t.rain?0.8:0, wind:t.wind, storm:t.storm, islands:3, ships:2, zeroEvery:t.zeros?16:9999,
-    bombers:t.bombers, boss:t.boss||null, reward:0, training:true};
+    bombers:t.bombers, boss:t.boss||null, jcarrier:t.jcarrier, reward:0, training:true};
 }
