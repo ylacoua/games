@@ -115,7 +115,7 @@ function drawCarrier(ctx, C){
   if(night){ for(let px=x; px<=x+L; px+=40){ ctx.fillStyle='#7fb8ff'; ctx.fillRect(px-1,DECK_Y-4,2,2); } }
   // parked aircraft on the bow, folded wings (kept forward of the landing area)
   for(const px of [x+L+4, x+L+30]){
-    ctx.save(); ctx.translate(px, DECK_Y-8); ctx.scale(-0.55,0.55); drawPlane(ctx,'fighter','#3d5c7c','us',1,false,false,1); ctx.restore();
+    ctx.save(); ctx.translate(px, DECK_Y-8); ctx.scale(-0.55,0.55); drawPlane(ctx,'hellcat',null,null,1,false,false,1); ctx.restore();
   }
 
   // --- island superstructure ---

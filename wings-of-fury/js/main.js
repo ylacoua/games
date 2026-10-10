@@ -98,7 +98,7 @@ function drawTitleBackdrop(t){
   ctx.fillStyle=s; ctx.fillRect(0,SEA,vw,H-SEA);
   for(let i=0;i<3;i++){
     const x = ((t*90 + i*vw/3) % (vw+200)) - 100, y = 200 + i*60 + Math.sin(t+i)*10;
-    ctx.save(); ctx.translate(x,y); ctx.rotate(Math.sin(t+i)*0.05); drawPlane(ctx, i===1?'corsair':'fighter', '#3d5c7c', 'us', 1.4, false, true); ctx.restore();
+    ctx.save(); ctx.translate(x,y); ctx.rotate(Math.sin(t+i)*0.05); drawPlane(ctx, ['hellcat','corsair','avenger'][i], null, null, 1.4, false, true); ctx.restore();
   }
 }
 

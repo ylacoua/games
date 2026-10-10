@@ -56,11 +56,15 @@ function shadeHex(hex, k){
   return `rgb(${r|0},${g|0},${b|0})`;
 }
 
-function drawPlane3D(ctx, shape, color, nation, yaw, roll, pitch, flash, prop){
+function drawPlane3D(ctx, type, color, nation, yaw, roll, pitch, flash, prop){
+  // per-type model family and the aircraft's real paint scheme
+  const shape = {corsair:'corsair', dauntless:'bomber', helldiver:'bomber', avenger:'heavy'}[type] || 'fighter';
+  const scheme = SCHEMES[(AIRCRAFT[type]||AIRCRAFT.hellcat).scheme];
+  color = scheme.top;
   const M = buildModel(shape);
   const cr=Math.cos(roll), sr=Math.sin(roll), cp=Math.cos(pitch), sp=Math.sin(pitch), cy=Math.cos(yaw), sy=Math.sin(yaw);
   const L = [-0.35,-0.8,0.5]; const ll = Math.hypot(...L); L[0]/=ll; L[1]/=ll; L[2]/=ll;
-  const under = nation==='us' ? '#c3ccd4' : '#b8b296';
+  const under = scheme.under;
   const list = [];
   for(const f of M.faces){
     const q = f.p.map(v=>xform(v,cr,sr,cp,sp,cy,sy));

@@ -52,10 +52,10 @@ function render(ctx, cw, ch){
   for(const f of G.flak){ ctx.fillStyle='#2a2a2a'; ctx.fillRect(f.x-2,f.y-2,4,4); }
   for(const d of G.drops) drawDrop(ctx, d);
   // aircraft
-  for(const w of G.wingmen) if(!w.dead && w.state==='fly') drawAI(ctx, w, w.role==='fighter'?'fighter':'bomber', w.color, 'us', 1, w.flash);
+  for(const w of G.wingmen) if(!w.dead && w.state==='fly') drawAI(ctx, w, w.kind, 1, w.flash);
   for(const e of G.enemies){
-    if(e.type==='zero') drawAI(ctx, e, 'zero', '#cdc6a6', 'jp', 1, e.flash);
-    else if(e.type==='betty') drawAI(ctx, e, 'heavy', '#5a6b4c', 'jp', 1.5, e.flash);
+    if(e.type==='zero') drawAI(ctx, e, 'zero', 1, e.flash);
+    else if(e.type==='betty') drawAI(ctx, e, 'betty', 1, e.flash);
     else if(e.type==='emily') drawEmily(ctx, e);
   }
   const P = G.player;
@@ -71,10 +71,10 @@ function render(ctx, cw, ch){
       const t = P.loop.t, ease = t*t*(3-2*t);
       const yaw = (P.f>0 ? 0 : Math.PI) + (P.f>0 ? -1 : 1)*Math.PI*ease;
       const roll = -Math.sin(Math.PI*t)*0.75;
-      drawPlane3D(ctx, G.stats.shape, G.stats.color, 'us', yaw, roll, a, P.hitT>0, true);
+      drawPlane3D(ctx, G.stats.type, null, 'us', yaw, roll, a, P.hitT>0, true);
     } else {
       ctx.scale(P.f,1); ctx.rotate(-a);
-      drawPlane(ctx, G.stats.shape, G.stats.color, 'us', 1, P.hitT>0, P.throttle>0.05||P.speed>40, P.gear);
+      drawPlane(ctx, G.stats.type, null, null, 1, P.hitT>0, P.throttle>0.05||P.speed>40, P.gear);
     }
     ctx.restore();
   }
@@ -221,57 +221,10 @@ function drawDrop(ctx, d){
   ctx.restore();
 }
 
-// Side-view aircraft, nose toward +x, centred on 0,0
-function drawPlane(ctx, shape, color, nation, s, flash, prop, gear=0){
-  ctx.save(); ctx.scale(s,s);
-  const body = flash ? '#fff' : color;
-  const dark = nation==='jp' ? '#8c8670' : '#1c2c40';
-  const heavy = shape==='heavy', bomber = shape==='bomber' || heavy;
-  const len = heavy?26:bomber?24:22, fat = heavy?7.5:6;
-  if(gear>0.02){
-    // main gear swings down and forward out of the belly; small tail wheel at the back
-    const g = gear, sx = 6, sy = fat-1;
-    const ex = sx + 3*g, ey = sy + 9*g;
-    ctx.strokeStyle='#2a2f36'; ctx.lineWidth=1.8; ctx.lineCap='round';
-    ctx.beginPath(); ctx.moveTo(sx,sy); ctx.lineTo(ex,ey); ctx.moveTo(-len+5,1); ctx.lineTo(-len+4,1+4*g); ctx.stroke();
-    ctx.fillStyle='#161a1f'; ctx.beginPath(); ctx.arc(ex,ey,3.4*g+0.4,0,7); ctx.fill();
-    ctx.fillStyle='#8a929c'; ctx.beginPath(); ctx.arc(ex,ey,1.2*g,0,7); ctx.fill();
-    ctx.fillStyle='#161a1f'; ctx.beginPath(); ctx.arc(-len+4,1+4*g,1.7*g,0,7); ctx.fill();
-  }
-  ctx.fillStyle = body;
-  ctx.beginPath(); ctx.moveTo(len,0); ctx.quadraticCurveTo(len-2,-fat,8,-fat); ctx.lineTo(-len+4,-2.5); ctx.lineTo(-len,-1); ctx.lineTo(-len+2,2); ctx.quadraticCurveTo(4,fat+1,len-3,fat*0.6); ctx.closePath(); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-len+8,-2); ctx.lineTo(-len-1,-13); ctx.lineTo(-len-3,-2); ctx.fill();
-  ctx.fillStyle=dark; ctx.fillRect(-len-4,-1,11,2.6);
-  ctx.fillStyle = flash?'#fff':(nation==='jp'?'#b3ad91':dark);
-  if(shape==='corsair'){ ctx.beginPath(); ctx.moveTo(-8,3); ctx.lineTo(2,7); ctx.lineTo(14,2); ctx.lineTo(13,4.5); ctx.lineTo(2,9); ctx.lineTo(-8,5); ctx.fill(); }
-  else { ctx.beginPath(); ctx.ellipse(1,3.5,heavy?15:13,2.6,0,0,7); ctx.fill(); }
-  ctx.fillStyle='rgba(170,215,240,.9)';
-  ctx.beginPath(); ctx.ellipse(bomber?0:3,-fat+0.5,bomber?10:5.5,3,0,Math.PI,0); ctx.fill();
-  if(bomber){ ctx.fillStyle='#222'; ctx.fillRect(-9,-fat-1,1.5,2); }
-  if(nation==='us'){ ctx.fillStyle='#f4f4f0'; ctx.beginPath(); ctx.arc(-9,0,3.4,0,7); ctx.fill(); ctx.fillStyle='#1d3a6e'; ctx.beginPath(); ctx.arc(-9,0,1.6,0,7); ctx.fill(); }
-  else { ctx.fillStyle='#c4231c'; ctx.beginPath(); ctx.arc(-8,0,3.5,0,7); ctx.fill(); }
-  if(prop){ ctx.fillStyle='rgba(30,30,30,.35)'; ctx.fillRect(len,-10,2.2,20); }
-  else { ctx.fillStyle='#222'; ctx.fillRect(len,-8,2,16); }
-  ctx.restore();
-}
-
-function drawAI(ctx, e, shape, color, nation, s, flash){
+function drawAI(ctx, e, type, s, flash){
   ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.a);
   if(Math.cos(e.a)<0) ctx.scale(1,-1);
-  drawPlane(ctx, shape==='zero'?'fighter':shape, color, nation, s, flash>0, true);
-  ctx.restore();
-}
-
-function drawEmily(ctx, e){
-  const right = Math.cos(e.a)>=0;
-  ctx.save(); ctx.translate(e.x,e.y); ctx.scale(right?1:-1,1); ctx.rotate(right?e.a:Math.PI-e.a);
-  ctx.fillStyle = e.flash>0?'#fff':'#59684f';
-  ctx.beginPath(); ctx.moveTo(62,2); ctx.quadraticCurveTo(58,-14,30,-15); ctx.lineTo(-50,-8); ctx.lineTo(-64,-6); ctx.lineTo(-62,2); ctx.quadraticCurveTo(-10,14,40,20); ctx.quadraticCurveTo(58,16,62,2); ctx.fill();
-  ctx.beginPath(); ctx.moveTo(-50,-7); ctx.lineTo(-66,-34); ctx.lineTo(-70,-6); ctx.fill();
-  ctx.fillStyle='#46523d'; ctx.fillRect(-40,-22,90,6);
-  for(const ex of [-14,22]){ ctx.fillStyle='#3e4836'; ctx.beginPath(); ctx.ellipse(ex,-17,10,4,0,0,7); ctx.fill(); ctx.fillStyle='rgba(30,30,30,.35)'; ctx.fillRect(ex+10,-27,2,20); }
-  ctx.fillStyle='#c4231c'; ctx.beginPath(); ctx.arc(-24,-1,6,0,7); ctx.fill();
-  ctx.fillStyle='rgba(170,215,240,.9)'; ctx.fillRect(36,-14,14,5);
+  drawPlane(ctx, type, null, null, s, flash>0, true);
   ctx.restore();
 }
 

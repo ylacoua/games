@@ -68,7 +68,7 @@ function planeStats(id, up){
     speed: b.speed*(1+0.08*u.engine), turn:b.turn, hp: Math.round(b.hp*(1+0.2*u.armor)),
     gun: b.gun*(1+0.25*u.guns), rate: b.rate*(1+0.1*u.guns), fuel: b.fuel*(1+0.25*u.fuel),
     ord: {bomb:b.ord.bomb+u.payload, rocket:b.ord.rocket+2*u.payload, torpedo:b.ord.torpedo},
-    gunner:b.gunner, color:b.color, shape:b.shape, name:b.name
+    gunner:b.gunner, color:b.color, shape:b.shape, type:id, name:b.name
   };
 }
 
