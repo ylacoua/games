@@ -35,7 +35,8 @@ function render(ctx, cw, ch){
   // distant clouds with horizontal parallax, spread through every altitude band
   for(const c of G.clouds){
     if(c.y < top-60) continue;
-    const span = vw+700, sx = ((c.x - camX*c.par)%span+span)%span - 350;
+    const drift = G.time*(4 + G.weather.wind*0.15)*c.s;   // slow wind drift, bigger clouds look closer
+    const span = vw+700, sx = ((c.x + drift - camX*c.par)%span+span)%span - 350;
     drawCloud(ctx, camX+sx, c.y, c.s, W);
   }
   ctx.save();

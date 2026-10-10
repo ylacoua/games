@@ -79,7 +79,7 @@ function newLevel(idx, loadout, def){
     G.ships.push(makeShip('battleship', lastIs.x1+900, lastIs.x1+500, G.L-500));
   }
   // clouds
-  for(let i=0;i<Math.ceil(G.L/500);i++) G.clouds.push({x:rnd(-500,G.L+500), y:rnd(CEIL-100,280), s:rnd(0.6,1.6), par:rnd(0.3,0.8)});
+  for(let i=0;i<Math.ceil(G.L/500);i++) G.clouds.push({x:rnd(-500,G.L+500), y:rnd(CEIL-100,280), s:rnd(0.6,1.6), par:rnd(0.06,0.2)});
   for(let i=0;i<220;i++) G.rain.push({x:Math.random(), y:Math.random(), v:rnd(0.8,1.2)});
   // wingmen
   loadout.wing.forEach((w,i)=>{
