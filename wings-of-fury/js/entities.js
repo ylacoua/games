@@ -153,7 +153,7 @@ function crashPlayer(reason){
 
 function damagePlayer(d){
   const P=G.player; if(P.dead || P.inv>0 || P.onDeck) return;
-  P.hp -= d; P.hitT=0.15; SFX.hit();
+  P.hp -= d*PLAYER_DAMAGE; P.hitT=0.15; SFX.hit();
   if(P.hp<=0){ P.hp=0; crashPlayer('המטוס הופל'); }
 }
 

@@ -2,7 +2,8 @@
 const H = 600;          // logical world height
 const SEA = 520;        // sea level (y grows downward)
 const DECK_Y = SEA - 34;
-const CEIL = -700;      // highest altitude the player can reach (world y)
+const CEIL = -700;
+const PLAYER_DAMAGE = 0.45;  // the player's aircraft takes less than half of incoming damage      // highest altitude the player can reach (world y)
 
 const PLANES = {
   hellcat:  {name:'F6F הלקט',   desc:'מטוס קרב מאוזן ואמין. נקודת הפתיחה של כל טייס.', price:0,    speed:280, turn:1.9,  hp:100, gun:1.0, rate:11, fuel:100, ord:{bomb:8,rocket:12,torpedo:1}, gunner:false, color:'#3d5c7c', shape:'fighter'},
