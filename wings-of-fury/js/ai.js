@@ -51,7 +51,17 @@ function updateGround(dt){
   P.lit = lit;
 
   for(const sh of G.ships){
-    if(sh.dead){ sh.sink += dt*0.12; continue; }
+    if(sh.dead){
+      // sinking: smoke from the break, foam and air bubbles boiling up, a few secondary explosions early on
+      sh.sink += dt*0.12;
+      if(sh.sink < 1.4){
+        if(Math.random() < dt*6) G.fx.push({type:'wake', x:sh.x + rnd(-sh.w/2, sh.w/2), y:SEA+2, t:0, max:1.6});
+        if(Math.random() < dt*4*(1.4-sh.sink)) puff(sh.x + rnd(-20,20), SEA - 20 - sh.h*(1-sh.sink), '#262626', 12, 2.2);
+        if(sh.sink < 0.5 && Math.random() < dt*1.2) boom(sh.x + rnd(-sh.w/3, sh.w/3), SEA-6, 30, false);
+        if(Math.random() < dt*1.5) splash(sh.x + rnd(-sh.w/2, sh.w/2));
+      }
+      continue;
+    }
     sh.flash = Math.max(0,(sh.flash||0)-dt);
     sh.x += sh.dir*sh.speed*dt;
     if(sh.x<sh.minX) sh.dir=1; if(sh.x>sh.maxX) sh.dir=-1;

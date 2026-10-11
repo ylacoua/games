@@ -37,15 +37,34 @@ function gunHouse(ctx, x, y, w, h, barrels, len, aim, dead){
 
 function drawShip(ctx, sh){
   const x=sh.x, w=sh.w, h=sh.h, d=sh.dir;
-  ctx.save();
-  if(sh.dead){ ctx.translate(0, sh.sink*h*1.6); ctx.rotate(sh.sink*0.08*d); if(sh.sink>1.2){ ctx.restore(); return; } }
-  ctx.beginPath(); ctx.rect(x-w, -2000, w*2, SEA+3+2000); ctx.clip();           // the sea hides what sinks below the waterline
-  ctx.translate(x, SEA); ctx.scale(d, 1);
+  if(sh.dead && sh.sink>1.4) return;
   const toLocal = a => d>0 ? a : Math.PI - a;                                     // world aim angle -> local frame
-  if(sh.type==='battleship') drawYamato(ctx, sh, toLocal);
-  else if(sh.type==='jcarrier') drawJCarrier(ctx, sh, toLocal);
-  else drawKagero(ctx, sh, toLocal);
-  if(sh.flash>0){ ctx.globalCompositeOperation='lighter'; ctx.fillStyle='rgba(255,255,255,.35)'; ctx.fillRect(-w/2-10,-h-60,w+30,h+70); ctx.globalCompositeOperation='source-over'; }
+  const body = ()=>{
+    if(sh.type==='battleship') drawYamato(ctx, sh, toLocal);
+    else if(sh.type==='jcarrier') drawJCarrier(ctx, sh, toLocal);
+    else drawKagero(ctx, sh, toLocal);
+  };
+  ctx.save();
+  // the sea hides whatever is below the waterline; this clip is in world space so a sinking hull disappears into it
+  ctx.beginPath(); ctx.rect(x-w*1.5, -3000, w*3, SEA+3+3000); ctx.clip();
+  if(!sh.dead){
+    ctx.translate(x, SEA); ctx.scale(d, 1);
+    body();
+    if(sh.flash>0){ ctx.globalCompositeOperation='lighter'; ctx.fillStyle='rgba(255,255,255,.35)'; ctx.fillRect(-w/2-10,-h-60,w+30,h+70); ctx.globalCompositeOperation='source-over'; }
+  } else {
+    // broken in two at midships: each half tilts its far end up, the halves drift apart and slide under, faster and faster
+    const s = sh.sink, depth = s*s*170, tilt = Math.min(s,0.7)*0.55, gap = s*12;
+    for(const half of [1,-1]){                                                   // +1 = bow half, -1 = stern half
+      ctx.save();
+      ctx.translate(x + half*d*gap, SEA + depth);
+      ctx.rotate(-half*d*tilt);                                                  // pivot at the break, not the world origin
+      ctx.scale(d, 1);
+      ctx.beginPath(); ctx.rect(half>0 ? 0 : -w, -500, w, 600); ctx.clip();
+      body();
+      ctx.fillStyle='rgba(15,15,15,.55)'; ctx.fillRect(half>0 ? 0 : -3, -h-120, 3, h+130);   // torn, burnt edge at the break
+      ctx.restore();
+    }
+  }
   ctx.restore();
   // bow wave and wake
   if(!sh.dead){
