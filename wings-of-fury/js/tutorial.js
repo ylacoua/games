@@ -131,13 +131,15 @@ function drawTutorial(ctx, vw){
   for(const wd of words){ const t2 = line ? line+' '+wd : wd; if(ctx.measureText(t2).width > w-28 && line){ lines.push(line); line = wd; } else line = t2; }
   if(line) lines.push(line);
   const hgt = 40 + lines.length*22;
-  ctx.fillStyle='rgba(8,16,28,.82)'; ctx.fillRect(x, y, w, hgt);
-  ctx.fillStyle='#e8b33a'; ctx.fillRect(x+w-4, y, 4, hgt);
+  // light, see-through panel so the game stays visible behind it; a soft text shadow keeps the words readable
+  ctx.fillStyle='rgba(20,34,52,.28)'; ctx.fillRect(x, y, w, hgt);
+  ctx.fillStyle='rgba(232,179,58,.7)'; ctx.fillRect(x+w-3, y, 3, hgt);
+  ctx.shadowColor='rgba(0,0,0,.75)'; ctx.shadowBlur=4; ctx.shadowOffsetY=1;
   ctx.font='13px Rubik, sans-serif'; ctx.fillStyle='#e8b33a';
   ctx.fillText(`הדרכה · ${T.lesson.name} · שלב ${Math.min(T.step+1, T.steps.length)} מתוך ${T.steps.length}`, x+w-14, y+10);
   ctx.font='16px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
   lines.forEach((l,i)=>ctx.fillText(l, x+w-14, y+32+i*22));
   // progress pips
-  for(let i=0;i<T.steps.length;i++){ ctx.fillStyle = i < T.step || T.done ? '#5fae6b' : i===T.step ? '#e8b33a' : '#3b4a60'; ctx.fillRect(x+14+i*16, y+12, 10, 4); }
+  for(let i=0;i<T.steps.length;i++){ ctx.fillStyle = i < T.step || T.done ? '#7fd08a' : i===T.step ? '#f2c75a' : 'rgba(255,255,255,.35)'; ctx.fillRect(x+14+i*16, y+12, 10, 4); }
   ctx.restore();
 }
