@@ -349,13 +349,17 @@ function updateWingmen(dt){
     if(w.dead) continue;
     w.flash = Math.max(0,(w.flash||0)-dt);
     w.cool -= dt;
-    if(w.state==='wait'){
-      if(!P.onDeck || G.state==='fly'){ if(!P.onDeck){ w.state='fly'; w.a=-0.25; } }
+    // carrier operations: take-off roll, landing glide, roll-out and rearming on deck
+    if(w.state==='launch'){ wingTakeoff(w, dt); continue; }
+    if(w.state==='landing'){ wingLandingGlide(w, dt); continue; }
+    if(w.state==='deck'){
+      w.speed = Math.max(0, w.speed - 170*dt); w.x -= w.speed*dt; w.y = DECK_Y-9; w.a = Math.PI;
+      if(w.speed<=0){ w.state='rearm'; w.t=5; }
       continue;
     }
     if(w.state==='rearm'){
       w.t -= dt;
-      if(w.t<=0){ w.state='fly'; w.bombs=4; w.hp=w.max; w.x=C.x+C.len*0.6; w.y=DECK_Y-70; w.a=-0.3; }
+      if(w.t<=0){ w.bombs=4; w.hp=w.max; startWingLaunch(w, 0); }
       continue;
     }
     const maxS = WINGMEN[w.kind].speed;
@@ -379,9 +383,10 @@ function updateWingmen(dt){
       } else followLeader(w, dt, maxS);
     } else { // bomber
       if(w.bombs<=0){
-        w.speed = maxS;
-        steer(w, C.x+C.len/2, DECK_Y-140, 1.4, dt);
-        if(Math.abs(w.x-(C.x+C.len/2))<120 && Math.abs(w.y-(DECK_Y-140))<80){ w.state='rearm'; w.t=6; }
+        // out of bombs: fly to a gate off the carrier's bow, then turn in and land to rearm
+        const gate = {x:C.x+C.len+300, y:DECK_Y-90};
+        w.speed = maxS; steer(w, gate.x, gate.y, 1.4, dt);
+        if(Math.hypot(w.x-gate.x, w.y-gate.y) < 110 && Math.cos(w.a) < 0.2){ w.state='landing'; }
         continue;
       }
       const g = attack ? nearestGroundTarget(w.x, 99999) : nearestGroundTarget(P.x, 950);
@@ -399,6 +404,40 @@ function updateWingmen(dt){
     }
     if(w.y >= groundY(w.x)-4){ w.hp=0; hurtWing(w,1); }
   }
+}
+
+// Wingmen never appear out of nowhere: they start parked on the carrier deck and launch in turn.
+function startWingLaunch(w, delay, x){
+  w.state='launch'; if(x!=null) w.x = x;
+  w.y = DECK_Y-9; w.a = 0; w.speed = 0; w.gear = 1; w.takeoff = {t:-delay};
+}
+function wingTakeoff(w, dt){
+  const k = w.takeoff, full = WINGMEN[w.kind].speed;
+  k.t += dt; if(k.t < 0) return;                                  // waiting its turn on deck
+  w.speed = Math.min(full, w.speed + full*0.55*dt);
+  if(w.speed < full*0.55){ w.x += w.speed*dt; w.y = DECK_Y-9; w.a = 0; }
+  else {
+    w.a = -0.25; w.x += Math.cos(w.a)*w.speed*dt; w.y += Math.sin(w.a)*w.speed*dt;
+    w.gear = Math.max(0, w.gear - dt);
+    if(DECK_Y-9 - w.y > 70){ w.state='fly'; w.takeoff=null; w.gear=0; }
+  }
+}
+function wingLandingGlide(w, dt){
+  const C = G.carrier, td = {x:C.x+C.len*0.55, y:DECK_Y-9};
+  w.speed = Math.max(120, w.speed - 60*dt); w.gear = Math.min(1, (w.gear||0) + dt);
+  const ang = Math.atan2(td.y-w.y, td.x-w.x); w.a = ang;
+  w.x += Math.cos(ang)*w.speed*dt; w.y += Math.sin(ang)*w.speed*dt;
+  if(Math.hypot(td.x-w.x, td.y-w.y) < 8){ w.state='deck'; w.y = DECK_Y-9; w.a = Math.PI; }
+}
+// After the player is shot down, lost wingmen are replaced too and launch with the new aircraft.
+function restoreWingmen(){
+  let k = 0;
+  for(const w of G.wingmen){
+    if(!w.dead) continue;
+    Object.assign(w, {dead:false, hp:w.max, bombs:4, flash:0, cool:0});
+    startWingLaunch(w, 0.6 + k*1.4, G.carrier.x + 170 + k*80); k++;
+  }
+  if(k) say(k>1 ? `${k} מטוסי כנף חלופיים ממריאים מהנושאת` : 'מטוס כנף חלופי ממריא מהנושאת', 3);
 }
 
 function followLeader(w, dt, maxS){

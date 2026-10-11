@@ -207,6 +207,7 @@ const UI = {
       case 'dplane': G.loadout.plane=v; this.openDeck(); break;
       case 'takeoff': {
         G.stats = planeStats(G.loadout.plane, G.loadout.up);
+        if(this.crashed) restoreWingmen();
         const lives=G.lives; resetPlayer(); G.lives=lives; this.crashed=false; this.hide();
         say(`${G.stats.name} מוכן להמראה. W / → להגברת מצערת`,3); break; }
       case 'finish': this.result(true); break;

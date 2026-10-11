@@ -53,7 +53,7 @@ function render(ctx, cw, ch){
   for(const f of G.flak){ ctx.fillStyle='#2a2a2a'; ctx.fillRect(f.x-2,f.y-2,4,4); }
   for(const d of G.drops) drawDrop(ctx, d);
   // aircraft
-  for(const w of G.wingmen) if(!w.dead && w.state==='fly') drawAI(ctx, w, w.kind, 1, w.flash);
+  for(const w of G.wingmen) if(!w.dead) drawAI(ctx, w, w.kind, 1, w.flash, w.gear||0);
   for(const e of G.enemies){
     if(e.type==='zero') drawAI(ctx, e, 'zero', 1, e.flash);
     else if(e.type==='betty') drawAI(ctx, e, 'betty', 1, e.flash);
@@ -190,10 +190,10 @@ function drawDrop(ctx, d){
   ctx.restore();
 }
 
-function drawAI(ctx, e, type, s, flash){
+function drawAI(ctx, e, type, s, flash, gear=0){
   ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.a);
   if(Math.cos(e.a)<0) ctx.scale(1,-1);
-  drawPlane(ctx, type, null, null, s, flash>0, true);
+  drawPlane(ctx, type, null, null, s, flash>0, !(e.takeoff && e.takeoff.t<0) && !(e.state==='rearm'), gear);
   ctx.restore();
 }
 

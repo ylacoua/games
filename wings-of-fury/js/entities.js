@@ -21,7 +21,11 @@ function updatePlayer(dt){
       P.x += P.f*P.speed*dt;
       if(P.speed<=0){ P.landing=false; G.state='rearm'; UI.openDeck(false); }
     } else {
-      if(K.KeyW||K.ArrowRight) P.throttle = Math.min(1, P.throttle+dt*0.7);
+      // the deck ahead must be clear: wingmen parked forward launch before the player can roll
+      const blocked = G.wingmen.some(w=>!w.dead && w.state==='launch' && w.y >= DECK_Y-10 && w.x > P.x);
+      if(blocked && (K.KeyW||K.ArrowRight) && !(P.waitMsg>0)){ say('המתן: מטוסי הכנף ממריאים לפניך',1.5); P.waitMsg = 1.6; }
+      P.waitMsg = (P.waitMsg||0) - dt;
+      if(!blocked && (K.KeyW||K.ArrowRight)) P.throttle = Math.min(1, P.throttle+dt*0.7);
       if(K.KeyS||K.ArrowLeft)  P.throttle = Math.max(0, P.throttle-dt*1.2);
       P.speed += (P.throttle*st.speed*0.85 - P.speed)*0.7*dt;
       P.x += P.speed*dt;

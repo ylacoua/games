@@ -91,8 +91,10 @@ function newLevel(idx, loadout, def){
   // wingmen
   loadout.wing.forEach((w,i)=>{
     const d = WINGMEN[w];
-    G.wingmen.push({kind:w, role:d.role, x:G.carrier.x+100+i*90, y:DECK_Y-60-i*40, a:0, speed:d.speed, hp:d.hp, max:d.hp,
-      cool:0, bombs:4, state:'wait', color:d.color, slot:i, dead:false, team:'p'});
+    const wm = {kind:w, role:d.role, x:0, y:0, a:0, speed:0, hp:d.hp, max:d.hp,
+      cool:0, bombs:4, state:'launch', color:d.color, slot:i, dead:false, team:'p'};
+    startWingLaunch(wm, 0.6 + (loadout.wing.length-1-i)*1.4, G.carrier.x + 170 + i*80);   // parked ahead of the player; the one furthest forward launches first
+    G.wingmen.push(wm);
   });
   Music.stop();
   resetPlayer();
