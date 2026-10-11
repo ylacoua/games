@@ -52,9 +52,10 @@ function update(dt, vw){
   updateProjectiles(dt);
   updateFx(dt);
   updateSpawns(dt, vw);
+  if(G.tutorial){ tutorialUpdate(dt); if(G.state==='over') return; }
   SFX.setEngine(!P.dead && (P.speed>5 || P.throttle>0), P.speed);
 
-  if(!G.complete && primariesLeft()===0){
+  if(!G.complete && !G.tutorial && primariesLeft()===0){
     G.complete = true; SFX.pickup();
     say('כל המטרות הושמדו! חזור לנושאת ונחת כדי לסיים', 6);
   }
@@ -62,7 +63,7 @@ function update(dt, vw){
   if(P.dead){
     G.endT -= dt;
     if(G.endT<=0){
-      if(G.lives>0){ G.state='rearm'; UI.openDeck(true); }
+      if(G.lives>0){ if(G.tutorial) tutorialRespawn(); else { G.state='rearm'; UI.openDeck(true); } }
       else UI.result(false, 'כל המטוסים אבדו.');
     }
   }

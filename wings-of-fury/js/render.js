@@ -49,7 +49,7 @@ function render(ctx, cw, ch){
   for(const so of G.soldiers) drawSoldier(ctx, so);
   // projectiles
   ctx.lineCap='round';
-  for(const s of G.shots){ ctx.strokeStyle = s.team==='p'?'#ffe58a':'#ff8f6b'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x-s.vx*0.012, s.y-s.vy*0.012); ctx.stroke(); }
+  for(const s of G.shots){ ctx.strokeStyle = s.team==='p'?'#ffe58a':'#ff8f6b'; ctx.lineWidth = s.small ? 1 : 2; ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x-s.vx*0.012, s.y-s.vy*0.012); ctx.stroke(); }
   for(const f of G.flak){ ctx.fillStyle='#2a2a2a'; ctx.fillRect(f.x-2,f.y-2,4,4); }
   for(const d of G.drops) drawDrop(ctx, d);
   // aircraft
@@ -104,6 +104,7 @@ function render(ctx, cw, ch){
   if(W.flash>0){ ctx.fillStyle=`rgba(230,235,255,${W.flash*0.6})`; ctx.fillRect(0,0,vw,H); }
   if(P.hitT>0){ ctx.fillStyle='rgba(200,40,30,.18)'; ctx.fillRect(0,0,vw,H); }
   drawHUD(ctx, vw, vw0);
+  drawTutorial(ctx, vw);
   }
 }
 
@@ -155,49 +156,29 @@ function drawIsland(ctx, is){
   }
 }
 
-function drawStruct(ctx, s){
-  const x=s.x, y=s.y, w=s.w, h=s.h;
-  if(s.dead){
-    ctx.fillStyle='#3d3a33'; ctx.beginPath(); ctx.moveTo(x-w/2,y); ctx.lineTo(x-w/3,y-6); ctx.lineTo(x,y-10); ctx.lineTo(x+w/4,y-5); ctx.lineTo(x+w/2,y); ctx.fill();
-    if(Math.random()<0.04) puff(x+rnd(-w/3,w/3), y-8, '#3a3a3a', 9, 1.6);
-    return;
-  }
-  const flash = s.flash>0;
-  switch(s.type){
-    case 'bunker':
-      ctx.fillStyle=flash?'#fff':'#77735f'; ctx.beginPath(); ctx.moveTo(x-w/2,y); ctx.lineTo(x-w/2+10,y-h); ctx.lineTo(x+w/2-10,y-h); ctx.lineTo(x+w/2,y); ctx.fill();
-      ctx.fillStyle='#1c1b17'; ctx.fillRect(x-14,y-h+9,28,5); break;
-    case 'aa':
-      ctx.fillStyle='#8a7a55'; ctx.beginPath(); ctx.ellipse(x,y,w/2,h/2,0,Math.PI,0); ctx.fill();
-      ctx.strokeStyle=flash?'#fff':'#2d2d2a'; ctx.lineWidth=4; ctx.beginPath(); ctx.moveTo(x,y-h/2); ctx.lineTo(x+Math.cos(s.aim)*26,y-h/2+Math.sin(s.aim)*26); ctx.stroke();
-      ctx.fillStyle='#4a4a40'; ctx.beginPath(); ctx.arc(x,y-h/2,6,0,7); ctx.fill(); break;
-    case 'barracks':
-      ctx.fillStyle=flash?'#fff':'#8c6a43'; ctx.fillRect(x-w/2,y-h+10,w,h-10);
-      ctx.fillStyle='#5a3f26'; ctx.beginPath(); ctx.moveTo(x-w/2-5,y-h+10); ctx.lineTo(x,y-h-4); ctx.lineTo(x+w/2+5,y-h+10); ctx.fill();
-      ctx.fillStyle='#2b2116'; ctx.fillRect(x-6,y-14,12,14); break;
-    case 'fuel':
-      ctx.fillStyle=flash?'#fff':'#6f7b5a'; ctx.fillRect(x-w/2,y-h,w,h); ctx.fillStyle='#4e573f'; ctx.fillRect(x-w/2,y-h,w,5); ctx.fillRect(x-w/2,y-h/2,w,3); break;
-    case 'light':
-      ctx.fillStyle='#4b4b45'; ctx.fillRect(x-4,y-h+6,8,h-6);
-      ctx.save(); ctx.translate(x,y-h); ctx.rotate(s.aim); ctx.fillStyle=flash?'#fff':'#666'; ctx.fillRect(-6,-7,14,14); ctx.fillStyle='#fffbe0'; ctx.fillRect(7,-6,3,12); ctx.restore(); break;
-    case 'biggun':
-      ctx.fillStyle=flash?'#fff':'#6c6a60'; ctx.fillRect(x-w/2,y-h,w,h);
-      ctx.strokeStyle='#34332e'; ctx.lineWidth=7; ctx.beginPath(); ctx.moveTo(x,y-h+12); ctx.lineTo(x+Math.cos(s.aim)*58,y-h+12+Math.sin(s.aim)*58); ctx.stroke(); break;
-    case 'core':
-      ctx.fillStyle=flash?'#fff':'#5f5d55'; ctx.fillRect(x-w/2,y-h,w,h);
-      ctx.fillStyle='#4b4a43'; for(let i=0;i<6;i++) ctx.fillRect(x-w/2+i*w/5-4,y-h-10,14,10);
-      ctx.fillStyle='#1d1c18'; for(let i=0;i<4;i++) ctx.fillRect(x-w/2+14+i*28,y-h+20,14,6);
-      ctx.strokeStyle='#333'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x,y-h-10); ctx.lineTo(x,y-h-50); ctx.stroke();
-      ctx.fillStyle='#fff'; ctx.fillRect(x,y-h-50,26,17); ctx.fillStyle='#c22'; ctx.beginPath(); ctx.arc(x+13,y-h-41.5,5,0,7); ctx.fill(); break;
-  }
-  if(s.max>100 && s.hp<s.max){ ctx.fillStyle='#000a'; ctx.fillRect(x-w/2,y-h-8,w,3); ctx.fillStyle='#e8b33a'; ctx.fillRect(x-w/2,y-h-8,w*s.hp/s.max,3); }
-}
-
+// infantryman in khaki with a helmet and rifle: runs while nothing is in reach, kneels and fires at low aircraft
 function drawSoldier(ctx, so){
-  const x=so.x, y=so.y, leg=Math.sin(so.t*14)*3;
-  ctx.strokeStyle='#4e4a2c'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+leg,y); ctx.moveTo(x,y-6); ctx.lineTo(x-leg,y); ctx.moveTo(x,y-6); ctx.lineTo(x,y-13); ctx.stroke();
-  ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x,y-15,2.4,0,7); ctx.fill();
+  const x=so.x, y=so.y, aiming = so.aim != null;
+  ctx.lineCap='round';
+  ctx.strokeStyle='#5a5330'; ctx.lineWidth=2;
+  if(aiming){
+    ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+3,y-2); ctx.lineTo(x+3,y); ctx.moveTo(x,y-6); ctx.lineTo(x-4,y); ctx.stroke();        // kneeling
+    ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y-11); ctx.stroke();
+    const ca=Math.cos(so.aim), sa=Math.sin(so.aim);
+    ctx.strokeStyle='#3b2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-ca*3, y-10-sa*3); ctx.lineTo(x+ca*8, y-10+sa*8); ctx.stroke();   // rifle
+    ctx.strokeStyle='#5a5330'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(x,y-10); ctx.lineTo(x+ca*4, y-10+sa*4); ctx.stroke();               // arms
+    if(so.fireT>0){ ctx.fillStyle='rgba(255,220,120,.95)'; ctx.beginPath(); ctx.arc(x+ca*9.5, y-10+sa*9.5, 1.8, 0, 7); ctx.fill(); }
+    ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x,y-13,2.1,0,7); ctx.fill();
+    ctx.fillStyle='#4b4a2c'; ctx.beginPath(); ctx.arc(x,y-13.6,2.4,Math.PI,0); ctx.fill();
+  } else {
+    const leg=Math.sin(so.t*14)*3, arm=Math.sin(so.t*14)*2;
+    ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+leg,y); ctx.moveTo(x,y-6); ctx.lineTo(x-leg,y); ctx.stroke();
+    ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y-12); ctx.stroke();
+    ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(x,y-11); ctx.lineTo(x-arm,y-7.5); ctx.stroke();
+    ctx.strokeStyle='#3b2a1a'; ctx.lineWidth=1.1; ctx.beginPath(); ctx.moveTo(x-3*so.dir,y-6); ctx.lineTo(x+4*so.dir,y-15); ctx.stroke();      // rifle at port arms
+    ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x,y-14,2.1,0,7); ctx.fill();
+    ctx.fillStyle='#4b4a2c'; ctx.beginPath(); ctx.arc(x,y-14.6,2.4,Math.PI,0); ctx.fill();
+  }
 }
 
 function drawDrop(ctx, d){

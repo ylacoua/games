@@ -23,7 +23,7 @@ function updateGround(dt){
   let lit = false;
   for(const s of G.structures){
     if(s.dead) continue;
-    s.flash = Math.max(0,(s.flash||0)-dt);
+    s.flash = Math.max(0,(s.flash||0)-dt); s.muzzle = Math.max(0,(s.muzzle||0)-dt);
     if(s.type==='light'){
       const dx = P.x-s.x;
       if(night && !P.dead && Math.abs(dx)<950 && !P.onDeck){   // searchlights only lock on in the dark
@@ -44,7 +44,7 @@ function updateGround(dt){
       let err = night ? 95 : 55;
       if(tg.isP && P.lit) err = 18;
       err *= G.weather.rain>0.5 ? 1.25 : 1;
-      fireFlak(s.x, s.y-s.h, tg.x, tg.y, tg.vx, tg.vy, err, big?18:8+lvl, big);
+      fireFlak(s.x, s.y-s.h, tg.x, tg.y, tg.vx, tg.vy, err, big?18:8+lvl, big); s.muzzle = 0.1;
       s.cool = big ? rnd(2.2,2.9) : rnd(1.5,2.3) - lvl*0.12;
     }
   }
@@ -80,22 +80,35 @@ function updateGround(dt){
     }
   }
 
+  // Survivors of wrecked buildings run about the island and fire rifles and light machine guns, but only at
+  // aircraft passing very low over them; small-arms rounds have a short reach and do little damage.
+  const fliers = [];
+  if(!P.dead && !P.onDeck) fliers.push({x:P.x, y:P.y});
+  for(const w of G.wingmen) if(!w.dead && w.state==='fly') fliers.push({x:w.x, y:w.y});
   for(const so of G.soldiers){
     if(so.dead) continue;
-    so.t += dt; so.x += so.dir*so.speed*dt; so.y = groundY(so.x);
-    if(groundY(so.x+so.dir*12) > SEA-14) so.dir = -so.dir;
-    so.cool -= dt;
-    if(so.cool<=0 && !P.dead && !P.onDeck && dist2(so.x,so.y,P.x,P.y)<280*280){
-      const a = Math.atan2(P.y-so.y, P.x-so.x)+rnd(-0.12,0.12);
-      G.shots.push({x:so.x, y:so.y-12, vx:Math.cos(a)*600, vy:Math.sin(a)*600, team:'e', dmg:1.5, life:0.6});
-      so.cool = rnd(1.5,3);
+    so.t += dt; so.cool -= dt; so.fireT = Math.max(0, (so.fireT||0) - dt); so.safe = Math.max(0, (so.safe||0) - dt);
+    let tg = null;
+    for(const f of fliers){ if(groundY(f.x) - f.y < SMALL_ARMS_ALT && Math.abs(f.x-so.x) < 230){ tg = f; break; } }
+    if(tg){
+      so.aim = Math.atan2(tg.y-(so.y-11), tg.x-so.x);           // stop, kneel and fire
+      if(so.cool<=0){
+        const a = so.aim + rnd(-0.1,0.1);
+        G.shots.push({x:so.x+Math.cos(so.aim)*7, y:so.y-11, vx:Math.cos(a)*650, vy:Math.sin(a)*650, team:'e', dmg:1, life:0.38, small:true});
+        so.cool = rnd(0.7,1.5); so.fireT = 0.07;
+        if(Math.random()<0.4) SFX.noise(0.04, 2600, 0.04, 'bandpass', 3);
+      }
+    } else {
+      so.aim = null;
+      so.x += so.dir*so.speed*dt; so.y = groundY(so.x);
+      if(groundY(so.x+so.dir*12) > SEA-14) so.dir = -so.dir;
     }
   }
   G.soldiers = G.soldiers.filter(s=>!s.dead);
 }
 
 function spawnSoldier(x){
-  G.soldiers.push({x, y:groundY(x), dir:Math.random()<.5?-1:1, speed:rnd(26,42), t:rnd(0,1), cool:rnd(1,3), dead:false});
+  G.soldiers.push({x, y:groundY(x), dir:Math.random()<.5?-1:1, speed:rnd(26,42), t:rnd(0,1), cool:rnd(1,3), dead:false, safe:0.8});   // safe: they just ran out of the blast
 }
 function killSoldier(so){
   so.dead=true; earn('soldier', so.x, so.y-10);

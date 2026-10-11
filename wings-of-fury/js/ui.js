@@ -36,6 +36,7 @@ const UI = {
     this.show(`
       <div class="spread"><div><h1>כנפי הרעם</h1><p class="sub">WINGS OF FURY · האוקיינוס השקט, 1944. טייס מנושאת מטוסים מול איים מבוצרים, ספינות ובוסים.</p></div>${this.money()}</div>
       <div class="row"><button class="primary" data-act="level" data-v="${Math.min(SAVE.unlocked, LEVELS.length)-1}">המשך למשימה ${Math.min(SAVE.unlocked, LEVELS.length)}</button>
+      <button data-act="tutorial">הדרכה</button>
       <button data-act="training">משימת אימון (הכול חינם)</button>
       <button data-act="reset">איפוס התקדמות</button></div>
       <h3 style="margin-top:18px">משימות</h3><div class="levels">${lv}</div>
@@ -112,10 +113,27 @@ const UI = {
       <div class="row" style="margin-top:14px"><button data-act="menu">חזרה</button><button class="primary" data-act="tlaunch">התחל אימון</button></div>`);
   },
 
+  // flight-school lesson list
+  tutorialMenu(){
+    Music.start();
+    const cards = LESSONS.map((L,i)=>`<div class="card"><div class="spread"><b>${i+1}. ${L.name}</b><span class="pill">${PLANES[L.plane].name}</span></div>
+      <p>${L.desc}</p><button class="primary" data-act="lesson" data-v="${i}">התחל שיעור</button></div>`).join('');
+    this.show(`<h2>הדרכה</h2><p class="sub">ארבעה שיעורים קצרים. ההוראות מופיעות בראש המסך ומתקדמות לבד כשאתה מבצע כל שלב. התרסקות מחזירה אותך לתחילת השיעור.</p>
+      <div class="grid">${cards}</div><div class="row" style="margin-top:16px"><button data-act="menu">תפריט ראשי</button></div>`);
+  },
+  tutorialDone(){
+    const i = G.tutorial.i; G.state='over'; SFX.setEngine(false,0); SFX.pickup();
+    const next = i+1 < LESSONS.length;
+    this.show(`<h1 style="font-size:44px">השיעור הושלם</h1><p class="sub">${LESSONS[i].name}: כל הכבוד!</p>
+      <div class="row">${next?`<button class="primary" data-act="lesson" data-v="${i+1}">לשיעור הבא: ${LESSONS[i+1].name}</button>`:''}
+      <button data-act="lesson" data-v="${i}">שוב</button><button data-act="tutorial">רשימת השיעורים</button><button data-act="menu">תפריט ראשי</button></div>`);
+  },
+
   // Carrier deck panel: after a landing, or with a replacement aircraft after a crash.
   // The pilot may switch to any plane they own (any plane in training) before taking off.
   openDeck(crashed){
     SFX.setEngine(false,0);
+    if(G.tutorial && G.tutorial.lesson.id==='landing' && crashed===false){ G.tutorial.landed = true; this.tutorialDone(); return; }
     if(crashed !== undefined) this.crashed = crashed;
     const lo = G.loadout, st = planeStats(lo.plane, lo.up), done = G.complete, left = primariesLeft();
     const avail = Object.keys(PLANES).filter(k=>G.training || SAVE.owned[k]);
@@ -142,6 +160,7 @@ const UI = {
 
   result(win, reason){
     G.state='over'; SFX.setEngine(false,0);
+    if(G.tutorial){ this.tutorialMenu(); return; }
     if(G.training){
       this.show(`<h1 style="font-size:44px">${win?'האימון הושלם':'סוף האימון'}</h1><p class="sub">${win?'כל המטרות הושמדו.':reason}</p>
         <div class="stats" style="font-size:15px;margin-bottom:16px"><span>השמדות</span><span>${G.kills}</span><span>ניקוד</span><span>$${G.earned} (לא נשמר)</span></div>
@@ -194,6 +213,8 @@ const UI = {
       case 'abort': this.result(false, 'נטשת את המשימה.'); break;
       case 'resume': G.paused=false; this.hide(); break;
       case 'training': G=null; this.trainingHangar(); break;
+      case 'tutorial': G=null; this.tutorialMenu(); break;
+      case 'lesson': this.hide(); startLesson(+v); break;
       case 'tplane': this.tr.plane=v; this.trainingHangar(); break;
       case 'tord': this.tr.ord=v; this.trainingHangar(); break;
       case 'twadd': if(this.tr.wing.length<MAX_WINGMEN) this.tr.wing.push(v); this.trainingHangar(); break;

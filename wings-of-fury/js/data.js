@@ -3,6 +3,8 @@ const H = 600;          // logical world height
 const SEA = 520;        // sea level (y grows downward)
 const DECK_Y = SEA - 34;
 const CEIL = -700;
+const SMALL_ARMS_ALT = 110;   // soldiers can only hit aircraft flying lower than this above the ground (about 330 ft)
+const TORPEDO_ARM = 170;      // a torpedo must run this far through the water before it arms
 const PLAYER_DAMAGE = 0.45;  // the player's aircraft takes less than half of incoming damage      // highest altitude the player can reach (world y)
 
 const PLANES = {

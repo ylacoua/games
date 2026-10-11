@@ -180,17 +180,29 @@ function updateProjectiles(dt){
     } else if(d.kind==='torpedo'){
       if(!d.run){
         d.vy += 300*dt; d.x+=d.vx*dt; d.y+=d.vy*dt;
+        // dropped straight onto a ship: it strikes the hull or deck unarmed and does nothing
+        const struck = G.ships.find(sh=>!sh.dead && Math.abs(d.x-sh.x)<sh.w/2 && d.y > SEA - sh.h*0.6);
+        if(struck){
+          d.dead=true; spark(d.x, d.y); SFX.tone(700,500,0.12,0.06,'square');
+          say('הטורפדו נחת על גוף הספינה ולא התפוצץ. הטל אותו למים, לפני הספינה',3); continue;
+        }
         if(d.y >= groundY(d.x)-2){
           if(!overSea(d.x)) detonate(d);
           else if(!d.ok){ splash(d.x); d.dead=true; say('הטורפדו נשבר – הטל אותו נמוך יותר',3); }
-          else { d.run=true; d.y=SEA+9; d.vx=d.dir*270; d.vy=0; splash(d.x); }
+          else { d.run=true; d.y=SEA+9; d.spd=80; d.dist=0; d.vx=d.dir*d.spd; d.vy=0; splash(d.x); }
         }
       } else {
-        // running submerged in a straight line until it strikes a ship or a shore, or leaves the area
-        d.x += d.vx*dt;
+        // running submerged in a straight line: it starts slowly, accelerates, and only arms after TORPEDO_ARM of run
+        d.spd = Math.min(280, d.spd + 170*dt); d.vx = d.dir*d.spd;
+        d.x += d.vx*dt; d.dist += d.spd*dt;
         if(Math.random()<0.6) G.fx.push({type:'wake', x:d.x - Math.sign(d.vx)*10, y:SEA+2, t:0, max:1.4});
         if(!overSea(d.x)) detonate(d);
-        for(const sh of G.ships) if(!sh.dead && Math.abs(d.x-sh.x)<sh.w/2) { d.target = sh; detonate(d); break; }
+        const sh = G.ships.find(sh=>!sh.dead && Math.abs(d.x-sh.x)<sh.w/2);
+        if(sh){
+          if(d.dist >= TORPEDO_ARM){ d.target = sh; detonate(d); }
+          else { d.dead=true; G.fx.push({type:'wake', x:d.x, y:SEA+2, t:0, max:1}); SFX.tone(500,350,0.1,0.05,'square');
+            say('הטורפדו הוטל קרוב מדי ולא הספיק להתחמש. הטל אותו רחוק יותר מהספינה',3); }
+        }
         if(d.x < -400 || d.x > G.L+400) d.dead=true;
       }
     }
@@ -256,7 +268,7 @@ function explode(x, y, r, dmg, team, kind){
       if(sh.dead) continue;
       if(Math.abs(x-sh.x) < sh.w/2 + r && y > SEA - sh.h - r) hitShip(sh, dmg, kind, x);
     }
-    for(const so of G.soldiers) if(!so.dead && Math.abs(so.x-x)<r && y>so.y-40) killSoldier(so);
+    for(const so of G.soldiers) if(!so.dead && !(so.safe>0) && Math.abs(so.x-x)<r && y>so.y-40) killSoldier(so);
     for(const e of G.enemies) if(!e.dead && dist2(x,y,e.x,e.y) < (r+(e.size||16))**2) hurtEnemy(e, dmg*0.8);
   } else {
     const P=G.player;
