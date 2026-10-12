@@ -108,6 +108,7 @@ UI.init();
 // Title screen: any key, click or tap continues to the main menu
 (function(){
   const t = document.getElementById('title');
+  document.getElementById('ver').textContent = 'גרסה ' + GAME_VERSION;
   t.focus();
   const go = e => {
     if(!t.isConnected) return;

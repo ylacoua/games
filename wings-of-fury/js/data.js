@@ -1,4 +1,7 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
+// Game version: bumped with every requested change (shown on the title screen)
+const GAME_VERSION = '1.23';
+
 const H = 600;          // logical world height
 const SEA = 520;        // sea level (y grows downward)
 const DECK_Y = SEA - 34;
