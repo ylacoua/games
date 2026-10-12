@@ -22,6 +22,7 @@ function drawStruct(ctx, s){
   const x=s.x, y=s.y, w=s.w, h=s.h, night = G.weather.time==='night';
   if(s.dead){ drawRubble(ctx, s); return; }
   ctx.save();
+  if(s.flash>0) ctx.filter = 'brightness(1.8)';      // hit flash on the building only, not a box around it
   switch(s.type){
     case 'bunker': {                                   // reinforced-concrete pillbox under camouflage netting
       sandbags(ctx, x-w/2-6, x+w/2+6, y, 2);
@@ -113,7 +114,6 @@ function drawStruct(ctx, s){
       sandbags(ctx, x-w/2-8, x-w/2+30, y, 2); sandbags(ctx, x+w/2-30, x+w/2+8, y, 2);
       break; }
   }
-  if(s.flash>0){ ctx.globalCompositeOperation='lighter'; ctx.fillStyle='rgba(255,255,255,.5)'; ctx.fillRect(x-w/2-6, y-h-8, w+12, h+8); ctx.globalCompositeOperation='source-over'; }
   ctx.restore();
   if(s.max>100 && s.hp<s.max){ ctx.fillStyle='#000a'; ctx.fillRect(x-w/2,y-h-12,w,3); ctx.fillStyle='#e8b33a'; ctx.fillRect(x-w/2,y-h-12,w*s.hp/s.max,3); }
 }

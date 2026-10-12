@@ -366,9 +366,12 @@ function hurtWing(w, d){
   if(w.hp<=0){ w.dead=true; boom(w.x, w.y, 34, false); say(`איבדנו את ${WINGMEN[w.kind].name}`,3); }
 }
 
+// Wingmen only go after targets inside the playable area: not aircraft still on their take-off run beyond
+// the map edge, nor ships that are out of reach (the carrier task force during the defense phase).
+const inPlay = x => x > -300 && x < G.L + 150;
 function nearestEnemyPlane(x, y, range){
   let best=null, bd=range*range;
-  for(const e of G.enemies){ if(e.dead) continue; const d=dist2(x,y,e.x,e.y); if(d<bd){bd=d;best=e;} }
+  for(const e of G.enemies){ if(e.dead || e.takeoff || !inPlay(e.x)) continue; const d=dist2(x,y,e.x,e.y); if(d<bd){bd=d;best=e;} }
   return best;
 }
 function nearestGroundTarget(x, range, preferAA){
@@ -379,7 +382,7 @@ function nearestGroundTarget(x, range, preferAA){
     if(d<bd){ bd=d; best={x:s.x, y:s.y-s.h/2, gy:s.y, obj:s}; }
   }
   for(const sh of G.ships){
-    if(sh.dead) continue; const d=Math.abs(sh.x-x);
+    if(sh.dead || !inPlay(sh.x)) continue; const d=Math.abs(sh.x-x);
     if(d<bd){ bd=d; best={x:sh.x, y:SEA-sh.h/2, gy:SEA-sh.h, obj:sh}; }
   }
   return best;
@@ -411,6 +414,12 @@ function updateWingmen(dt){
       continue;
     }
     const maxS = WINGMEN[w.kind].speed;
+    // never stray beyond the edges of the map: turn back toward the action
+    if(w.x > G.L + 200 || w.x < -400){
+      w.speed += (maxS - w.speed)*Math.min(1, dt*2);
+      steer(w, w.x > 0 ? G.L - 400 : 400, clamp(w.y, 120, DECK_Y-150), 1.8, dt);
+      continue;
+    }
     if(w.role==='fighter'){
       const tgt = attack ? nearestEnemyPlane(w.x, w.y, 1600) : nearestEnemyPlane(P.x, P.y, 650);
       if(tgt){

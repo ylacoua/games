@@ -49,8 +49,10 @@ function drawShip(ctx, sh){
   ctx.beginPath(); ctx.rect(x-w*1.5, -3000, w*3, SEA+3+3000); ctx.clip();
   if(!sh.dead){
     ctx.translate(x, SEA); ctx.scale(d, 1);
+    // a hit makes the ship itself flash brighter (not a white box over the sky behind it)
+    if(sh.flash>0) ctx.filter = 'brightness(1.8)';
     body();
-    if(sh.flash>0){ ctx.globalCompositeOperation='lighter'; ctx.fillStyle='rgba(255,255,255,.35)'; ctx.fillRect(-w/2-10,-h-60,w+30,h+70); ctx.globalCompositeOperation='source-over'; }
+    ctx.filter = 'none';
   } else {
     // broken in two at midships: each half tilts its far end up, the halves drift apart and slide under, faster and faster
     const s = sh.sink, depth = s*s*170, tilt = Math.min(s,0.7)*0.55, gap = s*12;
