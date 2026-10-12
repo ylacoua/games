@@ -10,7 +10,7 @@ let darkCv = null;
 // Camera framing: the sea stays at the bottom of the screen; as the player climbs the view's top edge
 // rises with them, so the whole picture zooms out.
 function viewMetrics(cw, ch){
-  const top = G ? G.cam.top : 0, viewH = H - top, scale = ch/viewH;
+  const top = G ? G.cam.top : 0, viewH = Math.min(H - top, H*2.2), scale = ch/viewH;
   return {top, viewH, scale, vw: cw/scale};
 }
 

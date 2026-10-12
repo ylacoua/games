@@ -270,7 +270,7 @@ function updateEnemies(dt){
     else if(e.type==='val') valAI(e, dt);
     else if(e.type==='emily') emilyAI(e, dt, lvl);
     if(e.y >= groundY(e.x)-4){ e.hp=0; hurtEnemy(e, 1); }
-    if(!P.dead && !P.onDeck && P.inv<=0 && dist2(e.x,e.y,P.x,P.y) < ((e.size||16)+10)**2){ damagePlayer(35); hurtEnemy(e, 60); }
+    // aircraft pass each other without colliding: damage comes only from guns, rockets, bombs and flak
   }
   G.enemies = G.enemies.filter(e=>!e.dead && e.x>-1200 && e.x<G.L+1200);
 }
@@ -348,9 +348,11 @@ function zeroAI(e, dt, lvl){
 
 function bettyAI(e, dt){
   const C = G.carrier;
-  steer(e, e.x>C.x ? C.x-2000 : -2000, 170, 0.6, dt);
+  if(e.cruiseY == null) e.cruiseY = Math.random() < 0.45 ? CEIL + rnd(150, 350) : 170;   // some bomb from high altitude
+  steer(e, e.x>C.x ? C.x-2000 : -2000, e.cruiseY, 0.6, dt);
   e.cool -= dt;
-  if(e.bombs>0 && e.cool<=0 && e.x > C.x+40 && e.x < C.x+C.len-20){
+  const carry = Math.cos(e.a)*e.speed*Math.sqrt(2*Math.max(0, DECK_Y-e.y)/320);   // a falling bomb keeps the bomber's forward speed
+  if(e.bombs>0 && e.cool<=0 && e.x+carry > C.x+40 && e.x+carry < C.x+C.len-20){
     G.drops.push({kind:'bomb', x:e.x, y:e.y+10, vx:Math.cos(e.a)*e.speed, vy:30, team:'e', dmg:60, r:50});
     e.bombs--; e.cool = 0.45; SFX.drop();
   }

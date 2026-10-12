@@ -30,7 +30,7 @@ function startWave(n){
   // each group is a pair of Vals (spaced out on the deck), three Zeros flying close escort on them,
   // and two Zeros sweeping ahead for fighters.
   for(let g=0; g<n; g++){
-    const grp = {vals:[]};
+    const grp = {vals:[], high: g%2===1};                    // every other group comes in at high altitude
     q.push({type:'val',  grp, vIdx:0, next:1.6});
     q.push({type:'val',  grp, vIdx:1, next:1.0});
     for(let k=0;k<3;k++) q.push({type:'zero', grp, escortOf:k%2, slot:k, next:0.8});
@@ -50,7 +50,10 @@ function defenseUpdate(dt){
       if(D.spawnT<=0 && D.queue.length){
         const it = D.queue.shift();
         const e = launchFrom({kind:'carrier', sh:G.jc, x:G.jc.x}, it.type);
-        if(it.type==='val'){ it.grp.vals[it.vIdx] = e; e.cruiseY = DECK_Y - 300 - it.vIdx*45; }   // the pair flies stepped up
+        if(it.type==='val'){                                  // the pair flies stepped up, low or high
+          it.grp.vals[it.vIdx] = e;
+          e.cruiseY = it.grp.high ? CEIL + 220 + it.vIdx*45 : DECK_Y - 300 - it.vIdx*45;
+        }
         else if(it.grp){ e.escort = it.grp.vals[it.escortOf] || it.grp.vals[0]; e.eslot = it.slot; }
         D.live.push(e); D.spawnT = it.next;
       }
