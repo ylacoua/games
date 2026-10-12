@@ -184,6 +184,7 @@ function launchFrom(site, type, delay=0){
     : type==='betty'
     ? {type:'betty', x, y, a:dir>0?0:Math.PI, speed:0, full, hp:90, size:24, cool:0, bombs:3, dead:false}
     : {type:'zero',  x, y, a:dir>0?0:Math.PI, speed:0, full, hp:28+G.idx*4, size:16, cool:1, burst:0, evade:0, dead:false};
+  e.max = e.hp;
   e.takeoff = {t:-delay, ground:y, deck: site.kind==='carrier' ? site.sh : null};
   G.enemies.push(e);
   return e;
@@ -292,6 +293,21 @@ function zeroAI(e, dt, lvl){
   // The Zero was light and agile: it weaves on approach, breaks hard when someone gets on its tail or hits it,
   // zooms up or dives away, and extends after overshooting before turning back in.
   if(e.base == null){ e.base = e.speed; e.phase = rnd(0, 6.28); e.man = null; e.mt = 0; }
+  // Badly damaged (20% or less) and within reach of our carrier: a suicide dive onto its deck.
+  const C = G.carrier, cmid = C.x + C.len/2;
+  if(e.max && e.hp <= e.max*0.2 && Math.abs(e.x - cmid) < 3500){
+    if(!e.kamikaze){ e.kamikaze = true; e.escort = null; say('מטוס זירו פגוע צולל בקמיקזה על הנושאת!', 2.5); SFX.alarm(); }
+    e.speed += (e.base*1.25 - e.speed)*Math.min(1, dt*2);
+    const want = Math.atan2(DECK_Y-4 - e.y, cmid - e.x), d = wrapA(want - e.a);
+    e.a = wrapA(e.a + clamp(d, -2.2*dt, 2.2*dt));                     // no terrain avoidance: it means to hit
+    e.x += Math.cos(e.a)*e.speed*dt; e.y += Math.sin(e.a)*e.speed*dt;
+    if(Math.random() < 0.5) puff(e.x, e.y, '#2a2a2a', 7, 1.2);        // trailing smoke
+    if(e.x > C.x && e.x < C.x+C.len && e.y >= DECK_Y-10){
+      e.dead = true; explode(e.x, DECK_Y-4, 55, 90, 'e', 'kamikaze');   // as much damage as a bomb
+      say('פגיעת קמיקזה בנושאת!', 2.5);
+    }
+    return;
+  }
   // Close escort: stay in formation on an assigned bomber until an American aircraft comes near it (or us),
   // or the bomber is gone or has started its dive; then fight like any other Zero.
   if(e.escort){
@@ -315,6 +331,9 @@ function zeroAI(e, dt, lvl){
       return;
     }
   }
+  // Strike-role Zeros (about half of each flight) go for the carrier itself, even when fighters are about;
+  // they still break and jink if someone gets on their tail.
+  if(e.role==='strike' && G.def.mode==='defense') tg = {x:cmid, y:DECK_Y-12, vx:0, vy:0, d:Math.hypot(cmid-e.x, DECK_Y-12-e.y)};
   const turn = 2.3 + lvl*0.12;
   e.mt -= dt; e.cool -= dt;
   if(e.mt <= 0) e.man = null;

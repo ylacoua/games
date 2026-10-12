@@ -52,7 +52,10 @@ function defenseUpdate(dt){
           it.grp.vals[it.vIdx] = e;
           e.cruiseY = it.grp.high ? CEIL + 220 + it.vIdx*45 : DECK_Y - 300 - it.vIdx*45;
         }
-        else if(it.grp){ e.escort = it.grp.vals[it.escortOf] || it.grp.vals[0]; e.eslot = it.slot; }
+        else if(it.grp){
+          e.escort = it.grp.vals[it.escortOf] || it.grp.vals[0]; e.eslot = it.slot;
+          e.role = it.slot%2===0 ? 'strike' : 'fighter';   // about half of each flight goes for the carrier, half fights in the air
+        }
         D.live.push(e); D.spawnT = it.next;
       }
       if(!D.queue.length) D.state = 'fighting';

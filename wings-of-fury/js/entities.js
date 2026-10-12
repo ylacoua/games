@@ -55,8 +55,8 @@ function updatePlayer(dt){
     if(K.ArrowDown) P.p -= tr*dt;
     P.p = clamp(P.p, -1.35, 1.35);
     // keep pulling with the nose already pointing up, with enough speed: go over the top into a full loop
-    P.upHold = (K.ArrowUp && P.p >= 1.3 && !P.loop) ? (P.upHold||0) + dt : 0;
-    if(P.upHold > 0.25 && P.speed > 190){ P.vl = {ang:P.p}; P.upHold = 0; }
+    P.upHold = (K.ArrowUp && P.p >= 0.95 && !P.loop) ? (P.upHold||0) + dt : 0;
+    if(P.upHold > 0.15 && P.speed > 140){ P.vl = {ang:P.p}; P.upHold = 0; say('לופ!',1); }
   } else {
     // vertical loop: the nose keeps coming round, over the top inverted and down the back, back to level flight
     P.vl.ang += st.turn*0.8*dt;

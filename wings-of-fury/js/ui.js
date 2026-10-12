@@ -273,7 +273,12 @@ function drawHUD(ctx, vw, worldVW){
   ctx.fillText(G.training ? 'אימון · מטוסים: ∞' : `מטוסים: ${'✈'.repeat(Math.max(0,G.lives))}`, 178, 44);
   ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
   if(G.wingmen.length){ const alive=G.wingmen.filter(w=>!w.dead).length; ctx.fillText(`כנפיים ${alive}/${G.wingmen.length}: ${G.wingMode==='escort'?'ליווי':'תקיפה'} (C)`, 178, 80); }
-  ctx.fillText(`נושאת ${Math.round(G.carrier.hp/G.carrier.max*100)}%`, 178, 98);
+  { // carrier strength gauge: green, amber below 60%, red below 30%
+    const k = clamp(G.carrier.hp/G.carrier.max, 0, 1);
+    bar(178, 98, 'נושאת', k, k < 0.3 ? '#c8402f' : k < 0.6 ? '#e8b33a' : '#5fae6b');
+    ctx.textAlign='left'; ctx.direction='ltr'; ctx.font='11px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
+    ctx.fillText(Math.round(k*100)+'%', 14, 98); ctx.textAlign='right'; ctx.direction='rtl';
+  }
   // minimap
   const mw = Math.min(380, vw-400), mx = (vw-mw)/2, my = 10, mh = 30;
   if(mw>120){

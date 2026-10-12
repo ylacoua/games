@@ -172,4 +172,10 @@ function drawCarrier(ctx, C){
   const dmg = 1 - C.hp/C.max;
   if(dmg>0.25 && Math.random()<dmg*0.4) puff(x+rnd(0,L), DECK_Y-4, '#333', 10, 1.6);
   if(dmg>0.5){ ctx.fillStyle=`rgba(255,${120+Math.random()*80|0},40,.85)`; ctx.beginPath(); ctx.arc(x+L*0.4+Math.sin(t*9)*2, DECK_Y-5, 4+Math.random()*2, 0, 7); ctx.fill(); }
+  // strength gauge above the ship once it has taken damage
+  if(C.hp < C.max){
+    const k = clamp(C.hp/C.max, 0, 1), bw = 160, bx = x + L/2 - bw/2, by = DECK_Y - 140;
+    ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(bx-1, by-1, bw+2, 7);
+    ctx.fillStyle = k < 0.3 ? '#c8402f' : k < 0.6 ? '#e8b33a' : '#5fae6b'; ctx.fillRect(bx, by, bw*k, 5);
+  }
 }
