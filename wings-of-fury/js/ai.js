@@ -254,7 +254,7 @@ function hurtEnemy(e, d){
   e.hp -= d; e.flash=0.08;
   if(e.hp<=0){
     e.dead = true; earn(e.type, e.x, e.y);
-    boom(e.x, e.y, e.type==='emily'?90:34, e.type!=='zero');
+    boom(e.x, e.y, e.type==='emily'?90:34, e.type!=='zero', true); SFX.planeBoom();
     for(let i=0;i<(e.type==='emily'?14:6);i++) G.debris.push({x:e.x,y:e.y,vx:Math.cos(e.a)*e.speed*0.6+rnd(-90,90),vy:rnd(-150,40),r:0,vr:rnd(-8,8),life:2.2,c:e.type==='zero'?'#c9c3a8':'#556b4a',smoke:true});
     if(e.type==='emily') say('"אמילי" הופלה!',4);
   }
@@ -296,7 +296,7 @@ function zeroAI(e, dt, lvl){
   // Badly damaged (20% or less) and within reach of our carrier: a suicide dive onto its deck.
   const C = G.carrier, cmid = C.x + C.len/2;
   if(e.max && e.hp <= e.max*0.2 && Math.abs(e.x - cmid) < 3500){
-    if(!e.kamikaze){ e.kamikaze = true; e.escort = null; say('מטוס זירו פגוע צולל בקמיקזה על הנושאת!', 2.5); SFX.alarm(); }
+    if(!e.kamikaze){ e.kamikaze = true; e.escort = null; say('מטוס זירו פגוע צולל בקמיקזה על הנושאת! בנזאי!', 2.5); SFX.banzai(); }
     e.speed += (e.base*1.25 - e.speed)*Math.min(1, dt*2);
     const want = Math.atan2(DECK_Y-4 - e.y, cmid - e.x), d = wrapA(want - e.a);
     e.a = wrapA(e.a + clamp(d, -2.2*dt, 2.2*dt));                     // no terrain avoidance: it means to hit
@@ -408,7 +408,7 @@ function hurtWing(w, d){
   if(w.dead) return;
   w.hp -= d; w.flash = 0.08;
   if(w.hp<=0){
-    w.dead=true; boom(w.x, w.y, 34, false);
+    w.dead=true; boom(w.x, w.y, 34, false, true); SFX.planeBoom();
     if(G.def.mode==='defense'){ w.respawnT = 10; say(`איבדנו את ${WINGMEN[w.kind].name} – מטוס חלופי ימריא מהנושאת בעוד 10 שניות`,3); }
     else say(`איבדנו את ${WINGMEN[w.kind].name}`,3);
   }

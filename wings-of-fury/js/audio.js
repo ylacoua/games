@@ -20,6 +20,7 @@ const SFX = {
       const len = this.ctx.sampleRate; this.noiseBuf = this.ctx.createBuffer(1,len,this.ctx.sampleRate);
       const d = this.noiseBuf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
       this.buildEngine();
+      try{ window.speechSynthesis && window.speechSynthesis.getVoices(); }catch(e){}   // starts loading the voice list early
     }catch(e){ this.ctx=null; }
   },
   // engine: sawtooth + sub-octave square -> lowpass -> tremolo (cylinder throb) -> output gain
@@ -69,12 +70,86 @@ const SFX = {
     g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
     o.connect(g); g.connect(this.master); o.start(t); o.stop(t+dur+0.02);
   },
-  gun(){ this.noise(0.06, 2500, 0.18, 'bandpass', 2); },
-  enemyGun(){ this.noise(0.05, 1600, 0.07, 'bandpass', 2); },
+  // one shot from a battery of .50-cal guns: a sharp crack, a hard mid "bang" and a short low thump
+  shot(vol, pitch){
+    if(!this.ctx||this.muted) return;
+    const c=this.ctx, t=c.currentTime, out=c.createGain(); out.gain.value=vol; out.connect(this.master);
+    const s=c.createBufferSource(); s.buffer=this.noiseBuf;
+    const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=4500*pitch;
+    const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=1400*pitch; bp.Q.value=0.9;
+    const g1=c.createGain(); g1.gain.setValueAtTime(0.7,t); g1.gain.exponentialRampToValueAtTime(0.001,t+0.025);
+    const g2=c.createGain(); g2.gain.setValueAtTime(1,t); g2.gain.exponentialRampToValueAtTime(0.001,t+0.07);
+    s.connect(hp); hp.connect(g1); g1.connect(out); s.connect(bp); bp.connect(g2); g2.connect(out);
+    s.start(t, Math.random()*0.8); s.stop(t+0.09);
+    const o=c.createOscillator(), og=c.createGain(); o.type='triangle';
+    o.frequency.setValueAtTime(140*pitch,t); o.frequency.exponentialRampToValueAtTime(45,t+0.06);
+    og.gain.setValueAtTime(0.9,t); og.gain.exponentialRampToValueAtTime(0.001,t+0.07);
+    o.connect(og); og.connect(out); o.start(t); o.stop(t+0.08);
+  },
+  gun(){ this.shot(0.22, rnd(0.92,1.08)); },
+  enemyGun(){ this.shot(0.08, rnd(0.75,0.85)); },          // the Zero's lighter guns, heard from further off
+  // aircraft blowing up: a sharp blast, a deep rumble, and a long tail that fades away
+  planeBoom(){
+    if(!this.ctx||this.muted) return;
+    const c=this.ctx, t=c.currentTime;
+    const s=c.createBufferSource(); s.buffer=this.noiseBuf; s.loop=true;
+    const lp=c.createBiquadFilter(); lp.type='lowpass'; lp.frequency.setValueAtTime(2600,t); lp.frequency.exponentialRampToValueAtTime(160,t+2.6);
+    const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.85,t+0.02);
+    g.gain.setTargetAtTime(0.35,t+0.05,0.18); g.gain.setTargetAtTime(0.0001,t+0.6,0.7);       // fade out over ~2.5 s
+    s.connect(lp); lp.connect(g); g.connect(this.master); s.start(t); s.stop(t+3.4);
+    const o=c.createOscillator(), og=c.createGain(); o.type='sine';
+    o.frequency.setValueAtTime(85,t); o.frequency.exponentialRampToValueAtTime(32,t+1.6);
+    og.gain.setValueAtTime(0.6,t); og.gain.setTargetAtTime(0.0001,t+0.15,0.45);
+    o.connect(og); og.connect(this.master); o.start(t); o.stop(t+2.5);
+    for(let i=0;i<5;i++) setTimeout(()=>this.noise(0.12, rnd(1500,3500), 0.05, 'bandpass', 3), 200+i*rnd(120,260));  // debris crackle
+  },
+  // "Banzai!" from a pilot diving onto the carrier: a Japanese voice where the browser has one,
+  // otherwise a synthesized shout (formant-filtered buzz for "ban-zai")
+  banzai(){
+    if(this.muted) return;
+    const now = performance.now(); if(now - (this.lastBanzai||0) < 1800) return; this.lastBanzai = now;
+    try{
+      const ss = window.speechSynthesis;
+      if(ss && window.SpeechSynthesisUtterance){
+        const jp = ss.getVoices().find(v=>/^ja/i.test(v.lang));
+        // a Japanese voice says it natively; otherwise the browser's own voice still says "Banzai!"
+        const u = new SpeechSynthesisUtterance(jp ? 'バンザイ！' : 'Banzaaai!');
+        if(jp){ u.voice = jp; u.lang = jp.lang; }
+        u.rate = 0.85; u.pitch = 0.6; u.volume = 1; ss.cancel(); ss.speak(u); return;
+      }
+    }catch(e){}
+    this.shout();
+  },
+  shout(){
+    if(!this.ctx) return;
+    const c=this.ctx, t=c.currentTime, out=c.createGain(); out.gain.value=0.35; out.connect(this.master);
+    const o=c.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(150,t); o.frequency.linearRampToValueAtTime(175,t+0.25); o.frequency.linearRampToValueAtTime(140,t+0.95);
+    const env=c.createGain(); env.gain.setValueAtTime(0,t);
+    env.gain.linearRampToValueAtTime(1,t+0.04); env.gain.linearRampToValueAtTime(0.25,t+0.3); env.gain.linearRampToValueAtTime(1,t+0.38); env.gain.linearRampToValueAtTime(0,t+1.0);
+    o.connect(env);
+    // two formants sliding from "a" (ban) to "a-i" (zai)
+    for(const [f0,f1,q] of [[750,800,6],[1150,2200,8]]){
+      const f=c.createBiquadFilter(); f.type='bandpass'; f.Q.value=q;
+      f.frequency.setValueAtTime(f0,t); f.frequency.setValueAtTime(f0,t+0.55); f.frequency.linearRampToValueAtTime(f1,t+0.95);
+      env.connect(f); f.connect(out);
+    }
+    o.start(t); o.stop(t+1.05);
+  },
   boom(big){ this.noise(big?1.4:0.7, big?900:1400, big?0.9:0.55); },
   flak(){ this.noise(0.35, 1100, 0.22); },
   drop(){ this.tone(900,300,0.5,0.05,'sine'); },
-  rocket(){ this.noise(0.5, 3000, 0.2, 'highpass'); },
+  // rocket launch: an ignition pop, then a rushing whoosh that rises in pitch as the motor burns
+  rocket(){
+    if(!this.ctx||this.muted) return;
+    const c=this.ctx, t=c.currentTime;
+    const s=c.createBufferSource(); s.buffer=this.noiseBuf;
+    const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=1.4;
+    bp.frequency.setValueAtTime(600,t); bp.frequency.exponentialRampToValueAtTime(3200,t+0.55);
+    const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.32,t+0.06); g.gain.setTargetAtTime(0.0001,t+0.25,0.18);
+    s.connect(bp); bp.connect(g); g.connect(this.master); s.start(t, Math.random()*0.5); s.stop(t+0.9);
+    this.tone(220, 70, 0.08, 0.18, 'square');                          // ignition pop
+  },
   splash(){ this.noise(0.6, 600, 0.3); },
   thunder(){ this.noise(2.5, 300, 0.8); },
   hit(){ this.tone(220,90,0.12,0.15,'square'); },

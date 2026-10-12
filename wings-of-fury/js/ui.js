@@ -57,17 +57,19 @@ const UI = {
       const st = planeStats(this.lo.plane);
       const ords = Object.keys(ORD).map(k=>`<button class="card ${this.lo.ord===k?'sel':''}" data-act="ord" data-v="${k}" style="text-align:right">
         <b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
-      const wcost = this.lo.wing.reduce((s,w)=>s+WINGMEN[w].cost,0);
+      // in Carrier Defense the wingmen are free
+      const wprice = k => def ? 0 : WINGMEN[k].cost;
+      const wcost = this.lo.wing.reduce((s,w)=>s+wprice(w),0);
       const wings = Object.keys(WINGMEN).map(k=>{const d=WINGMEN[k], n=this.lo.wing.filter(x=>x===k).length;
-        return `<div class="card"><div class="spread"><b>${d.name}</b><span class="pill">$${d.cost}</span></div><p>${d.desc}</p>
-        <div class="row"><button data-act="wadd" data-v="${k}" ${this.lo.wing.length>=MAX_WINGMEN||SAVE.money<wcost+d.cost?'disabled':''}>+ הוסף</button>
+        return `<div class="card"><div class="spread"><b>${d.name}</b><span class="pill">${def ? 'חינם' : '$'+d.cost}</span></div><p>${d.desc}</p>
+        <div class="row"><button data-act="wadd" data-v="${k}" ${this.lo.wing.length>=MAX_WINGMEN||SAVE.money<wcost+wprice(k)?'disabled':''}>+ הוסף</button>
         <button data-act="wdel" data-v="${k}" ${n?'':'disabled'}>− הסר</button><span class="note">בטייסת: ${n}</span></div></div>`;}).join('');
       body = `<h2>${def ? L.name : (i+1)+'. '+L.name}</h2><p class="sub">${L.brief}</p>
         <div class="row" style="margin-bottom:12px">${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${L.reward}</span>
         <span class="pill">מטוס: ${PLANES[this.lo.plane].name}</span>${L.bombers?'<span class="pill">מפציצי אויב</span>':''}</div>
         <h3>חימוש לגיחה הראשונה</h3><p class="note">אפשר להחליף חימוש בכל נחיתה על הנושאת.</p><div class="grid">${ords}</div>
         <h3 style="margin-top:16px">כנפיים (עד ${MAX_WINGMEN} מטוסים בשליטת המחשב)</h3><div class="grid">${wings}</div>
-        <div class="spread" style="margin-top:18px"><span class="note">עלות הכנפיים למשימה: $${wcost}</span>
+        <div class="spread" style="margin-top:18px"><span class="note">${def ? 'במשימת ההגנה מטוסי הכנף ניתנים בחינם' : 'עלות הכנפיים למשימה: $'+wcost}</span>
         <div class="row"><button data-act="menu">חזרה</button><button class="primary" data-act="launch">יציאה למשימה</button></div></div>`;
     } else if(tab==='planes'){
       const maxS = 480, maxH = 200;
@@ -213,7 +215,7 @@ const UI = {
       case 'buy': { const p=PLANES[v]; if(SAVE.money>=p.price){ SAVE.money-=p.price; SAVE.owned[v]=true; lo.plane=v; SAVE.plane=v; storeSave(); SFX.pickup(); } this.hangar(this.level); break; }
       case 'up': { const c=UPGRADES[v].costs[SAVE.up[v]]; if(c && SAVE.money>=c){ SAVE.money-=c; SAVE.up[v]++; storeSave(); SFX.pickup(); } this.hangar(this.level); break; }
       case 'launch': {
-        const cost = lo.wing.reduce((s,w)=>s+WINGMEN[w].cost,0);
+        const cost = this.level==='def' ? 0 : lo.wing.reduce((s,w)=>s+WINGMEN[w].cost,0);   // free in Carrier Defense
         if(cost>SAVE.money) return;
         SAVE.money -= cost; storeSave();
         if(this.level==='def'){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, {...DEFENSE}); defenseSetup(); }

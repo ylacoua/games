@@ -158,7 +158,7 @@ function dropOrd(P){
 function crashPlayer(reason){
   const P = G.player; if(P.dead) return;
   P.dead=true; P.loop=null; P.vl=null; G.lives--;
-  boom(P.x, Math.min(P.y, groundY(P.x)-4), 50, true);
+  boom(P.x, Math.min(P.y, groundY(P.x)-4), 50, true, true); SFX.planeBoom();
   if(overSea(P.x) && P.y>SEA-20) splash(P.x);
   for(let i=0;i<10;i++) G.debris.push({x:P.x,y:P.y,vx:rnd(-160,160),vy:rnd(-260,-40),r:rnd(0,6),vr:rnd(-8,8),life:2.5,c:G.stats.color});
   say(reason + (G.lives>0 ? ` · נותרו ${G.lives} מטוסים` : ''), 4);
@@ -357,14 +357,14 @@ function hitShip(sh, d, kind, x){
 }
 
 // ---- effects ----
-function boom(x,y,r,big){
+function boom(x,y,r,big,quiet){   // quiet: the caller plays its own sound (aircraft explosions)
   G.fx.push({type:'boom', x, y, r, t:0, max:big?0.9:0.6});
   for(let i=0;i<(big?18:9);i++){
     const a=rnd(0,Math.PI*2), s=rnd(40,big?260:150);
     G.debris.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-80,r:0,vr:0,life:rnd(0.4,1),c:Math.random()<.5?'#ffcf5a':'#ff7a2a',spark:true});
   }
   for(let i=0;i<(big?6:3);i++) puff(x+rnd(-r/3,r/3), y+rnd(-r/3,r/3), '#2b2b2b', rnd(10,18), 1.6);
-  SFX.boom(big);
+  if(!quiet) SFX.boom(big);
 }
 function splash(x){ G.fx.push({type:'splash', x, y:SEA, t:0, max:0.9}); SFX.splash(); }
 function spark(x,y){ G.debris.push({x,y,vx:rnd(-60,60),vy:rnd(-80,0),r:0,vr:0,life:0.2,c:'#ffe7a0',spark:true}); }
