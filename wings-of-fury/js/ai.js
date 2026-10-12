@@ -407,7 +407,11 @@ function emilyAI(e, dt, lvl){
 function hurtWing(w, d){
   if(w.dead) return;
   w.hp -= d; w.flash = 0.08;
-  if(w.hp<=0){ w.dead=true; boom(w.x, w.y, 34, false); say(`איבדנו את ${WINGMEN[w.kind].name}`,3); }
+  if(w.hp<=0){
+    w.dead=true; boom(w.x, w.y, 34, false);
+    if(G.def.mode==='defense'){ w.respawnT = 10; say(`איבדנו את ${WINGMEN[w.kind].name} – מטוס חלופי ימריא מהנושאת בעוד 10 שניות`,3); }
+    else say(`איבדנו את ${WINGMEN[w.kind].name}`,3);
+  }
 }
 
 // Wingmen only go after targets inside the playable area: not aircraft still on their take-off run beyond
@@ -441,7 +445,20 @@ function formationPoint(w){
 function updateWingmen(dt){
   const P = G.player, C = G.carrier, attack = G.wingMode==='attack';
   for(const w of G.wingmen){
-    if(w.dead) continue;
+    if(w.dead){
+      // Carrier Defense: a lost wingman is replaced by a fresh aircraft launched from its carrier 10 s later
+      if(w.respawnT != null){
+        w.respawnT -= dt;
+        if(w.respawnT <= 0){
+          w.respawnT = null;
+          Object.assign(w, {dead:false, hp:w.max, bombs:4, flash:0, cool:0, off:null, face:null, av:0});
+          const home = (w.home==='c2' && G.carrier2) ? G.carrier2 : C;
+          startWingLaunch(w, 0, home.x + 330);
+          say(`${WINGMEN[w.kind].name} חלופי ממריא מהנושאת`, 2.5);
+        }
+      }
+      continue;
+    }
     w.flash = Math.max(0,(w.flash||0)-dt);
     w.cool -= dt;
     // carrier operations: take-off roll, landing glide, roll-out and rearming on deck
@@ -535,7 +552,7 @@ function restoreWingmen(){
   let k = 0;
   for(const w of G.wingmen){
     if(!w.dead) continue;
-    Object.assign(w, {dead:false, hp:w.max, bombs:4, flash:0, cool:0});
+    Object.assign(w, {dead:false, hp:w.max, bombs:4, flash:0, cool:0, respawnT:null});
     startWingLaunch(w, 0.6 + k*1.4, G.carrier.x + 170 + k*80); k++;
   }
   if(k) say(k>1 ? `${k} מטוסי כנף חלופיים ממריאים מהנושאת` : 'מטוס כנף חלופי ממריא מהנושאת', 3);

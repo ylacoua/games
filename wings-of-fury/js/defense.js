@@ -12,7 +12,7 @@ const DEFENSE = {
 };
 
 function defenseSetup(){
-  G.L = 5000;                                              // a wide stretch of ocean: raids take a while to arrive
+  G.L = 6250;                                              // a wide stretch of ocean: raids take a while to arrive
   G.carrier.hp = G.carrier.max = 1200;
   // the enemy task force waits beyond the edge of the map (out of reach) until the strike phase
   const jc = makeShip('jcarrier', G.L+900, G.L+900, G.L+900); jc.speed = 0; jc.dir = -1;
@@ -85,7 +85,7 @@ function startStrike(){
   const n0 = G.wingmen.length;
   ['wildcat','helldiver','wildcat','helldiver'].forEach((k,i)=>{
     const d = WINGMEN[k];
-    const wm = {kind:k, role:d.role, x:0, y:0, a:0, speed:0, hp:d.hp, max:d.hp, cool:0, bombs:4, state:'launch', color:d.color, slot:n0+i, dead:false, team:'p'};
+    const wm = {kind:k, role:d.role, x:0, y:0, a:0, speed:0, hp:d.hp, max:d.hp, cool:0, bombs:4, state:'launch', color:d.color, slot:n0+i, dead:false, team:'p', home:'c2'};
     startWingLaunch(wm, 0.6 + (3-i)*1.4, G.carrier2.x + 170 + i*80);
     G.wingmen.push(wm);
   });
@@ -103,8 +103,8 @@ function drawDefenseHUD(ctx, vw){
   else { const left = D.live.filter(e=>!e.dead && G.enemies.includes(e)).length + D.queue.length; text = `גל ${D.wave} מתוך ${DEFENSE_WAVES} · נותרו ${left} מטוסי אויב`; }
   ctx.save(); ctx.direction='rtl'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.font='15px Rubik, sans-serif';
-  const w = ctx.measureText(text).width + 30, y = 76;
-  ctx.fillStyle='rgba(20,34,52,.45)'; ctx.fillRect(vw/2-w/2, y-13, w, 26);
+  const w = ctx.measureText(text).width + 30, y = 66;
+  ctx.fillStyle='rgba(20,34,52,.18)'; ctx.fillRect(vw/2-w/2, y-13, w, 26);   // see-through, so it does not hide the action
   ctx.shadowColor='rgba(0,0,0,.7)'; ctx.shadowBlur=3; ctx.fillStyle='#f2d58a'; ctx.fillText(text, vw/2, y);
   ctx.restore();
 }
