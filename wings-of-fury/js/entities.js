@@ -301,6 +301,8 @@ function bulletVsEnemy(s){
 function bulletVsFriend(s){
   const P=G.player;
   if(!P.dead && !P.onDeck && dist2(s.x,s.y,P.x,P.y)<16*16){ s.life=0; damagePlayer(s.dmg); spark(s.x,s.y); return; }
+  const C = G.carrier;
+  if(s.x>C.x && s.x<C.x+C.len && s.y>DECK_Y-8 && s.y<SEA){ s.life=0; C.hp -= s.dmg*0.6; C.hit=0.1; spark(s.x,s.y); return; }
   for(const w of G.wingmen) if(!w.dead && w.state!=='wait' && dist2(s.x,s.y,w.x,w.y)<15*15){ s.life=0; hurtWing(w, s.dmg); return; }
 }
 

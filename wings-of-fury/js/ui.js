@@ -37,6 +37,7 @@ const UI = {
       <div class="spread"><div><h1>כנפי הרעם</h1><p class="sub">WINGS OF FURY · האוקיינוס השקט, 1944. טייס מנושאת מטוסים מול איים מבוצרים, ספינות ובוסים.</p></div>${this.money()}</div>
       <div class="row"><button class="primary" data-act="level" data-v="${Math.min(SAVE.unlocked, LEVELS.length)-1}">המשך למשימה ${Math.min(SAVE.unlocked, LEVELS.length)}</button>
       <button data-act="tutorial">הדרכה</button>
+      <button data-act="defense">הגנה על הנושאת</button>
       <button data-act="training">משימת אימון (הכול חינם)</button>
       <button data-act="reset">איפוס התקדמות</button></div>
       <h3 style="margin-top:18px">משימות</h3><div class="levels">${lv}</div>
@@ -47,7 +48,7 @@ const UI = {
     this.level = i; Music.start();
     if(!this.lo) this.lo = {plane:SAVE.plane, ord:'bomb', wing:[]};
     if(!SAVE.owned[this.lo.plane]) this.lo.plane='hellcat';
-    const L = LEVELS[i], tab=this.tab;
+    const def = i==='def', L = def ? DEFENSE : LEVELS[i], tab=this.tab;
     const tabs = [['mission','תדריך וחימוש'],['planes','מטוסים'],['upgrades','שדרוגים']]
       .map(([k,t])=>`<button class="${tab===k?'on':''}" data-act="tab" data-v="${k}">${t}</button>`).join('');
     let body='';
@@ -60,7 +61,7 @@ const UI = {
         return `<div class="card"><div class="spread"><b>${d.name}</b><span class="pill">$${d.cost}</span></div><p>${d.desc}</p>
         <div class="row"><button data-act="wadd" data-v="${k}" ${this.lo.wing.length>=MAX_WINGMEN||SAVE.money<wcost+d.cost?'disabled':''}>+ הוסף</button>
         <button data-act="wdel" data-v="${k}" ${n?'':'disabled'}>− הסר</button><span class="note">בטייסת: ${n}</span></div></div>`;}).join('');
-      body = `<h2>${i+1}. ${L.name}</h2><p class="sub">${L.brief}</p>
+      body = `<h2>${def ? L.name : (i+1)+'. '+L.name}</h2><p class="sub">${L.brief}</p>
         <div class="row" style="margin-bottom:12px">${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${L.reward}</span>
         <span class="pill">מטוס: ${PLANES[this.lo.plane].name}</span>${L.bombers?'<span class="pill">מפציצי אויב</span>':''}</div>
         <h3>חימוש לגיחה הראשונה</h3><p class="note">אפשר להחליף חימוש בכל נחיתה על הנושאת.</p><div class="grid">${ords}</div>
@@ -111,6 +112,19 @@ const UI = {
       <div class="tabs"><span class="note" style="align-self:center">רוח:</span>${[[-45,'חזקה שמאלה'],[0,'ללא'],[45,'חזקה ימינה']].map(([k,l])=>opt('twind',k,t.wind===k,l)).join('')}</div>
       <div class="tabs"><span class="note" style="align-self:center">בוס:</span>${[['','ללא'],['battleship','אוניית מערכה'],['emily','"אמילי"'],['fortress','מבצר חוף']].map(([k,l])=>opt('tboss',k,t.boss===k,l)).join('')}</div>
       <div class="row" style="margin-top:14px"><button data-act="menu">חזרה</button><button class="primary" data-act="tlaunch">התחל אימון</button></div>`);
+  },
+
+  // end of a Carrier Defense game: all money earned is kept (wave bonuses are part of it)
+  defenseResult(win, reason){
+    const D = G.defense, gain = G.earned + (win ? DEFENSE.reward : 0);
+    SAVE.money += gain; storeSave();
+    const waves = D.phase===2 ? DEFENSE_WAVES : Math.max(0, D.state==='between' ? D.wave : D.wave-1);
+    this.show(`<h1 style="font-size:40px">${win ? 'ניצחון! כוח המשימה היפני הושמד' : 'המשימה הסתיימה'}</h1>
+      <p class="sub">${win ? 'שרדת עשרה גלים והטבעת את הנושאת היפנית ואת משחתות הליווי שלה.' : reason}</p>
+      <div class="stats" style="font-size:15px;margin-bottom:16px"><span>גלים ששרדת</span><span>${waves} מתוך ${DEFENSE_WAVES}</span>
+      <span>בונוסי גלים</span><span>$${D.bonus}</span><span>השמדות</span><span>${G.kills}</span>
+      ${win ? `<span>תגמול ניצחון</span><span>$${DEFENSE.reward}</span>` : ''}<span>סה"כ הרווחת</span><span>$${gain}</span></div>
+      <div class="row"><button class="primary" data-act="defense">שחק שוב</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
   // flight-school lesson list
@@ -167,6 +181,7 @@ const UI = {
         <div class="row"><button class="primary" data-act="training">אימון נוסף</button><button data-act="menu">תפריט ראשי</button></div>`);
       return;
     }
+    if(G.defense){ this.defenseResult(win, reason); return; }
     const L = G.def, gain = win ? G.earned + L.reward : Math.round(G.earned*0.5);
     SAVE.money += gain;
     if(win){ SAVE.best[G.idx]=true; SAVE.unlocked = Math.max(SAVE.unlocked, Math.min(LEVELS.length, G.idx+2)); }
@@ -200,7 +215,8 @@ const UI = {
         const cost = lo.wing.reduce((s,w)=>s+WINGMEN[w].cost,0);
         if(cost>SAVE.money) return;
         SAVE.money -= cost; storeSave();
-        newLevel(this.level, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()});
+        if(this.level==='def'){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, {...DEFENSE}); defenseSetup(); }
+        else newLevel(this.level, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()});
         this.hide(); break;
       }
       case 'dord': G.loadout.ord=v; this.openDeck(); break;
@@ -215,6 +231,7 @@ const UI = {
       case 'resume': G.paused=false; this.hide(); break;
       case 'training': G=null; this.trainingHangar(); break;
       case 'tutorial': G=null; this.tutorialMenu(); break;
+      case 'defense': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar('def'); break;
       case 'lesson': this.hide(); startLesson(+v); break;
       case 'tplane': this.tr.plane=v; this.trainingHangar(); break;
       case 'tord': this.tr.ord=v; this.trainingHangar(); break;
@@ -253,7 +270,7 @@ function drawHUD(ctx, vw, worldVW){
   ctx.textAlign='left'; ctx.direction='ltr'; ctx.fillStyle='#e8b33a'; ctx.font='18px "Secular One", Rubik, sans-serif'; ctx.fillText('$'+G.earned, 18, 24);
   ctx.textAlign='right'; ctx.direction='rtl'; ctx.font='13px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
   ctx.fillText(G.training ? 'אימון · מטוסים: ∞' : `מטוסים: ${'✈'.repeat(Math.max(0,G.lives))}`, 178, 44);
-  ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
+  ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
   if(G.wingmen.length){ const alive=G.wingmen.filter(w=>!w.dead).length; ctx.fillText(`כנפיים ${alive}/${G.wingmen.length}: ${G.wingMode==='escort'?'ליווי':'תקיפה'} (C)`, 178, 80); }
   ctx.fillText(`נושאת ${Math.round(G.carrier.hp/G.carrier.max*100)}%`, 178, 98);
   // minimap

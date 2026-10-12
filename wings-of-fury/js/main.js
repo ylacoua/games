@@ -52,6 +52,7 @@ function update(dt, vw){
   updateProjectiles(dt);
   updateFx(dt);
   updateSpawns(dt, vw);
+  if(G.defense) defenseUpdate(dt);
   if(G.tutorial){ tutorialUpdate(dt); if(G.state==='over') return; }
   SFX.setEngine(!P.dead && (P.speed>5 || P.throttle>0), P.speed);
 

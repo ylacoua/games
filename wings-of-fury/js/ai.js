@@ -178,8 +178,10 @@ function launchFrom(site, type, delay=0){
     const s = site.is.strip; dir = P.x > (s.x0+s.x1)/2 ? 1 : -1;
     x = dir>0 ? s.x0+15 : s.x1-15; y = groundY(x) - 5;
   }
-  const full = type==='betty' ? 145 : rnd(215,250) + G.idx*8;
-  const e = type==='betty'
+  const full = type==='betty' ? 145 : type==='val' ? 185 : rnd(215,250) + G.idx*8;
+  const e = type==='val'
+    ? {type:'val', x, y, a:dir>0?0:Math.PI, speed:0, full, hp:45, size:18, cool:0, dead:false}
+    : type==='betty'
     ? {type:'betty', x, y, a:dir>0?0:Math.PI, speed:0, full, hp:90, size:24, cool:0, bombs:3, dead:false}
     : {type:'zero',  x, y, a:dir>0?0:Math.PI, speed:0, full, hp:28+G.idx*4, size:16, cool:1, burst:0, evade:0, dead:false};
   e.takeoff = {t:-delay, ground:y, deck: site.kind==='carrier' ? site.sh : null};
@@ -265,6 +267,7 @@ function updateEnemies(dt){
     if(e.takeoff){ takeoffStep(e, dt); continue; }
     if(e.type==='zero') zeroAI(e, dt, lvl);
     else if(e.type==='betty') bettyAI(e, dt);
+    else if(e.type==='val') valAI(e, dt);
     else if(e.type==='emily') emilyAI(e, dt, lvl);
     if(e.y >= groundY(e.x)-4){ e.hp=0; hurtEnemy(e, 1); }
     if(!P.dead && !P.onDeck && P.inv<=0 && dist2(e.x,e.y,P.x,P.y) < ((e.size||16)+10)**2){ damagePlayer(35); hurtEnemy(e, 60); }
@@ -280,6 +283,10 @@ function zeroAI(e, dt, lvl){
     if(w.dead || w.state!=='fly') continue;
     const d = Math.hypot(w.x-e.x, w.y-e.y);
     if(!tg || d*1.3 < tg.d) tg = {x:w.x, y:w.y, vx:Math.cos(w.a)*w.speed, vy:Math.sin(w.a)*w.speed, d};
+  }
+  if(!tg && G.def.mode==='defense'){                      // nothing in the air: strafe the carrier
+    const C = G.carrier, cx = C.x + C.len/2;
+    tg = {x:cx, y:DECK_Y-12, vx:0, vy:0, d:Math.hypot(cx-e.x, DECK_Y-12-e.y)};
   }
   if(!tg){ steer(e, e.x + Math.cos(e.a)*300, 180, 1.2, dt); return; }
   // The Zero was light and agile: it weaves on approach, breaks hard when someone gets on its tail or hits it,

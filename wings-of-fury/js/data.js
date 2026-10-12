@@ -51,7 +51,7 @@ const LEVELS = [
    time:'night',rain:0.7, wind:-30, storm:true,  islands:3, ships:2, zeroEvery:10, bombers:true,  boss:'fortress', jcarrier:true,   reward:5000}
 ];
 
-const SCORE = {bunker:150, aa:120, barracks:100, fuel:80, light:60, soldier:10, zero:100, betty:150, jcarrier:1200,
+const SCORE = {bunker:150, aa:120, barracks:100, fuel:80, light:60, soldier:10, zero:100, betty:150, val:150, jcarrier:1200,
   destroyer:300, battleship:1500, turret:200, emily:1500, biggun:300, core:2000};
 
 const SAVE_KEY = 'wof1944-save';

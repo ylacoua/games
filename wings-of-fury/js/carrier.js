@@ -15,7 +15,10 @@ function makeCarrierGuns(L){
 }
 
 function updateCarrierAA(dt){
-  const C = G.carrier; if(C.hp<=0) return;
+  for(const C of [G.carrier, G.carrier2]) if(C) carrierAA(C, dt);
+}
+function carrierAA(C, dt){
+  if(C.hp<=0) return;
   if(!C.guns) C.guns = makeCarrierGuns(C.len);
   for(const g of C.guns){
     g.cool -= dt; g.flash = Math.max(0, g.flash-dt);

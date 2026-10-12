@@ -44,6 +44,7 @@ function render(ctx, cw, ch){
   drawSea(ctx, x0, x1, sky, W);
   for(const is of G.islands) if(is.x1>x0 && is.x0<x1) drawIsland(ctx, is);
   drawCarrier(ctx, G.carrier);
+  if(G.carrier2) drawCarrier(ctx, G.carrier2);
   for(const s of G.structures) if(s.x>x0-100 && s.x<x1+100) drawStruct(ctx, s);
   for(const sh of G.ships) if(sh.x+sh.w>x0 && sh.x-sh.w<x1) drawShip(ctx, sh);
   for(const so of G.soldiers) drawSoldier(ctx, so);
@@ -57,6 +58,7 @@ function render(ctx, cw, ch){
   for(const e of G.enemies){
     if(e.type==='zero') drawAI(ctx, e, 'zero', 1, e.flash);
     else if(e.type==='betty') drawAI(ctx, e, 'betty', 1, e.flash);
+    else if(e.type==='val') drawAI(ctx, e, 'val', 1, e.flash, 1);   // the D3A had fixed, spatted landing gear
     else if(e.type==='emily') drawEmily(ctx, e);
   }
   const P = G.player;
@@ -105,6 +107,7 @@ function render(ctx, cw, ch){
   if(P.hitT>0){ ctx.fillStyle='rgba(200,40,30,.18)'; ctx.fillRect(0,0,vw,H); }
   drawHUD(ctx, vw, vw0);
   drawTutorial(ctx, vw);
+  drawDefenseHUD(ctx, vw);
   }
 }
 
