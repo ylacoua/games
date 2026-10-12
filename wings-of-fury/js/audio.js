@@ -21,6 +21,7 @@ const SFX = {
       const d = this.noiseBuf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
       this.buildEngine();
       try{ window.speechSynthesis && window.speechSynthesis.getVoices(); }catch(e){}   // starts loading the voice list early
+      this.loadBanzai();
     }catch(e){ this.ctx=null; }
   },
   // engine: sawtooth + sub-octave square -> lowpass -> tremolo (cylinder throb) -> output gain
@@ -103,25 +104,55 @@ const SFX = {
     o.connect(og); og.connect(this.master); o.start(t); o.stop(t+2.5);
     for(let i=0;i<5;i++) setTimeout(()=>this.noise(0.12, rnd(1500,3500), 0.05, 'bandpass', 3), 200+i*rnd(120,260));  // debris crackle
   },
-  // "Banzaiiiiiii!" from a pilot diving onto the carrier: a long, furious battle cry.
-  // A Japanese voice (where the browser has one) shouts it with the final "i" drawn out; otherwise a
-  // synthesized shouting voice does.
+  // "Banzaiiiiiii!" from a pilot diving onto the carrier.
+  // 1) a real recorded battle cry, if the game ships one (sfx/banzai.mp3): the only way to get a truly furious shout;
+  // 2) otherwise the browser's own voice says it clearly (Japanese voice if available, final "i" drawn out);
+  // 3) only with no speech support at all, the synthesized shout.
+  loadBanzai(){
+    if(this.banzaiTried || !this.ctx) return; this.banzaiTried = true;
+    try{
+      fetch('sfx/banzai.mp3').then(r=>r.ok ? r.arrayBuffer() : null)
+        .then(a=>a && this.ctx.decodeAudioData(a)).then(b=>{ if(b) this.banzaiBuf = b; }).catch(()=>{});
+    }catch(e){}
+  },
   banzai(){
     if(this.muted) return;
     const now = performance.now(); if(now - (this.lastBanzai||0) < 2600) return; this.lastBanzai = now;
+    if(this.banzaiBuf && this.ctx){
+      const s=this.ctx.createBufferSource(), g=this.ctx.createGain(); s.buffer=this.banzaiBuf; g.gain.value=1.6;
+      s.connect(g); g.connect(this.master); s.start(); return;
+    }
     try{
       const ss = window.speechSynthesis;
-      const jp = ss && window.SpeechSynthesisUtterance && ss.getVoices().find(v=>/^ja/i.test(v.lang));
-      if(jp){
-        // ー stretches the vowel before it in Japanese, so this is "ban-za-iiiiiii"
-        const u = new SpeechSynthesisUtterance('バンザイーーーーーーー！');
-        u.voice = jp; u.lang = jp.lang; u.rate = 0.8; u.pitch = 1.5; u.volume = 1;
+      if(ss && window.SpeechSynthesisUtterance){
+        const voices = ss.getVoices(), jp = voices.find(v=>/^ja/i.test(v.lang));
+        // in Japanese, ー stretches the vowel before it: "ban-za-iiiiii"
+        const u = new SpeechSynthesisUtterance(jp ? 'バンザイーーーーー！' : 'Banzai!');
+        if(jp){ u.voice = jp; u.lang = jp.lang; }
+        u.rate = jp ? 0.85 : 0.75; u.pitch = 1.6; u.volume = 1;
         ss.cancel(); ss.speak(u);
-        this.shout(0.35);                      // a rough shouting layer under the voice
         return;
       }
     }catch(e){}
     this.shout(1);
+  },
+  // falling-bomb whistle: a descending, slightly wavering tone with an airy edge that grows louder as the bomb
+  // falls; the caller stops it at impact
+  whistle(vol=0.06){
+    if(!this.ctx||this.muted) return null;
+    const c=this.ctx, t=c.currentTime, T=8;
+    const o=c.createOscillator(); o.type='sine';
+    o.frequency.setValueAtTime(1700,t); o.frequency.exponentialRampToValueAtTime(420,t+5);
+    const lfo=c.createOscillator(), lg=c.createGain(); lfo.frequency.value=8; lg.gain.value=14; lfo.connect(lg); lg.connect(o.frequency);
+    const n=c.createBufferSource(); n.buffer=this.noiseBuf; n.loop=true;
+    const nf=c.createBiquadFilter(); nf.type='bandpass'; nf.Q.value=14;
+    nf.frequency.setValueAtTime(1700,t); nf.frequency.exponentialRampToValueAtTime(420,t+5);
+    const ng=c.createGain(); ng.gain.value=0.7;
+    const g=c.createGain(); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(vol,t+0.3); g.gain.linearRampToValueAtTime(vol*1.8,t+3.5);
+    o.connect(g); n.connect(nf); nf.connect(ng); ng.connect(g); g.connect(this.master);
+    o.start(t); lfo.start(t); n.start(t); o.stop(t+T); lfo.stop(t+T); n.stop(t+T);
+    return { stop(){ const tt=c.currentTime; try{ g.gain.cancelScheduledValues(tt); g.gain.setValueAtTime(g.gain.value, tt); g.gain.linearRampToValueAtTime(0, tt+0.03);
+      o.stop(tt+0.05); lfo.stop(tt+0.05); n.stop(tt+0.05); }catch(e){} } };
   },
   // Synthesized shout: a strained, high, raspy voice (sawtooth with jitter and breath noise, hard-clipped),
   // shaped by three formant filters through B-a-n-z-a then a long rising, trembling "iiiiiii" that tails off.

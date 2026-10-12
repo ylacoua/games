@@ -125,7 +125,7 @@ function valAI(e, dt){
     e.x += Math.cos(e.a)*e.speed*dt; e.y += Math.sin(e.a)*e.speed*dt;
     if(DECK_Y - e.y < 170){
       G.drops.push({kind:'bomb', x:e.x, y:e.y+8, vx:Math.cos(e.a)*e.speed*0.9, vy:Math.sin(e.a)*e.speed*0.9, team:'e', dmg:90, r:55});
-      SFX.drop(); e.ph = 'pull'; e.t = 1.3;
+      e.ph = 'pull'; e.t = 1.3;
     }
   } else if(e.ph==='pull'){
     const want = Math.cos(e.a) >= 0 ? -0.9 : -Math.PI+0.9, d = wrapA(want - e.a);

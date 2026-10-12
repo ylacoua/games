@@ -143,7 +143,7 @@ function rearGunner(P){
 function dropOrd(P){
   const v = playerVel(P), a = heading(P), t = P.ordType;
   P.ord--;
-  if(t==='bomb'){ G.drops.push({kind:'bomb', x:P.x, y:P.y+8, vx:v.vx*0.9, vy:v.vy*0.9+20, team:'p', dmg:ORD.bomb.dmg, r:ORD.bomb.radius}); P.ordCool=0.3; SFX.drop(); }
+  if(t==='bomb'){ G.drops.push({kind:'bomb', x:P.x, y:P.y+8, vx:v.vx*0.9, vy:v.vy*0.9+20, team:'p', dmg:ORD.bomb.dmg, r:ORD.bomb.radius}); P.ordCool=0.3; }
   else if(t==='rocket'){
     const dx=P.f*Math.cos(a), dy=-Math.sin(a);
     G.drops.push({kind:'rocket', x:P.x+dx*10, y:P.y+6, vx:dx*640+v.vx*0.5, vy:dy*640+v.vy*0.5, team:'p', dmg:ORD.rocket.dmg, r:ORD.rocket.radius, life:2.4});
@@ -184,6 +184,7 @@ function updateProjectiles(dt){
   // bombs / rockets / torpedoes
   for(const d of G.drops){
     if(d.kind==='bomb'){
+      if(!d.sndTried){ d.sndTried = true; d.snd = SFX.whistle(d.team==='p' ? 0.06 : 0.04); }   // whistles all the way down
       d.vy += 320*dt; d.vx += W*0.25*dt; d.x+=d.vx*dt; d.y+=d.vy*dt;
       if(hitsSolid(d.x,d.y) || d.y>=groundY(d.x)-2){ detonate(d); }
       else if(d.team==='e' && d.x>G.carrier.x && d.x<G.carrier.x+G.carrier.len && d.y>DECK_Y-4){ detonate(d); }
@@ -257,6 +258,7 @@ function hitsEnemyPlane(x,y,r){
 
 function detonate(d){
   d.dead=true;
+  if(d.snd){ d.snd.stop(); d.snd = null; }     // the whistle stops at the moment of impact
   if(d.kind==='torpedo' && d.target){
     // a torpedo hit is decided per ship class (see hitShip) and throws up a tall column of water
     const sh = d.target;

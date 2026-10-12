@@ -376,7 +376,7 @@ function bettyAI(e, dt){
   const carry = Math.cos(e.a)*e.speed*Math.sqrt(2*Math.max(0, DECK_Y-e.y)/320);   // a falling bomb keeps the bomber's forward speed
   if(e.bombs>0 && e.cool<=0 && e.x+carry > C.x+40 && e.x+carry < C.x+C.len-20){
     G.drops.push({kind:'bomb', x:e.x, y:e.y+10, vx:Math.cos(e.a)*e.speed, vy:30, team:'e', dmg:60, r:50});
-    e.bombs--; e.cool = 0.45; SFX.drop();
+    e.bombs--; e.cool = 0.45;
   }
   // tail gunner shoots at the player when close
   const P = G.player;
@@ -517,7 +517,7 @@ function updateWingmen(dt){
       steer(w, approach.x, approach.y, 1.3, dt);
       if(w.cool<=0 && Math.abs(impact-g.x)<22 && Math.abs(w.y-ty)<70 && Math.abs(Math.sin(w.a))<0.35){
         G.drops.push({kind:'bomb', x:w.x, y:w.y+8, vx:vx, vy:Math.sin(w.a)*w.speed, team:'p', dmg:65, r:52});
-        w.bombs--; w.cool=0.5; SFX.drop();
+        w.bombs--; w.cool=0.5;
       }
     }
     if(w.y >= groundY(w.x)-4){ w.hp=0; hurtWing(w,1); }
