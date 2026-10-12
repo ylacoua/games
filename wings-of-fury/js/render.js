@@ -192,7 +192,11 @@ function drawDrop(ctx, d){
 
 function drawAI(ctx, e, type, s, flash, gear=0){
   ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.a);
-  if(Math.cos(e.a)<0) ctx.scale(1,-1);
+  // keep the aircraft upright, but only roll it over once it is clearly heading the other way, so it does
+  // not flip back and forth while climbing or diving near the vertical
+  if(e.face == null) e.face = Math.cos(e.a) < 0 ? -1 : 1;
+  if(Math.cos(e.a) > 0.3) e.face = 1; else if(Math.cos(e.a) < -0.3) e.face = -1;
+  if(e.face < 0) ctx.scale(1,-1);
   drawPlane(ctx, type, null, null, s, flash>0, !(e.takeoff && e.takeoff.t<0) && !(e.state==='rearm'), gear);
   ctx.restore();
 }

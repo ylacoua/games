@@ -116,8 +116,11 @@ function killSoldier(so){
 }
 
 // ---- generic steering for AI aircraft (heading angle a, y-down) ----
-function steer(e, tx, ty, turn, dt){
-  let want = Math.atan2(ty-e.y, tx-e.x);
+function steer(e, tx, ty, turn, dt){ return steerAngle(e, Math.atan2(ty-e.y, tx-e.x), turn, dt); }
+
+// Fly toward a heading. The turn rate is proportional to the heading error and eases in and out (like rolling
+// into and out of a bank), so aircraft settle onto a heading instead of twitching around it.
+function steerAngle(e, want, turn, dt){
   const right = Math.cos(e.a) >= 0;
   const sink = Math.max(0, Math.sin(e.a))*e.speed*0.9;
   const gy = Math.min(groundY(e.x + Math.cos(e.a)*80), groundY(e.x + Math.cos(e.a)*180));
@@ -126,10 +129,24 @@ function steer(e, tx, ty, turn, dt){
   else if(e.y < CEIL+40) want = right ? 0.35 : Math.PI-0.35;
   if(avoid) turn *= 1.7;
   const d = wrapA(want-e.a);
-  e.a = wrapA(e.a + clamp(d, -turn*dt, turn*dt));
+  const rate = clamp(d*3.2, -turn, turn);
+  e.av = (e.av||0) + (rate - (e.av||0))*Math.min(1, dt*(avoid ? 12 : 6));
+  e.a = wrapA(e.a + e.av*dt);
   e.x += Math.cos(e.a)*e.speed*dt + G.weather.wind*0.3*dt;
   e.y += Math.sin(e.a)*e.speed*dt;
   return d;
+}
+
+// Is an American aircraft sitting behind `e` with its nose pointed at it?
+function chasedBy(e){
+  const P = G.player, list = [];
+  if(!P.dead && !P.onDeck){ const v = playerVel(P); list.push({x:P.x, y:P.y, a:Math.atan2(v.vy, v.vx)}); }
+  for(const w of G.wingmen) if(!w.dead && w.state==='fly') list.push({x:w.x, y:w.y, a:w.a});
+  for(const c of list){
+    const dx = e.x-c.x, dy = e.y-c.y, d = Math.hypot(dx,dy);
+    if(d < 400 && Math.abs(wrapA(Math.atan2(dy,dx) - c.a)) < 0.4) return c;
+  }
+  return null;
 }
 function aimedAt(e, tx, ty){ return Math.abs(wrapA(Math.atan2(ty-e.y, tx-e.x) - e.a)); }
 
@@ -265,13 +282,37 @@ function zeroAI(e, dt, lvl){
     if(!tg || d*1.3 < tg.d) tg = {x:w.x, y:w.y, vx:Math.cos(w.a)*w.speed, vy:Math.sin(w.a)*w.speed, d};
   }
   if(!tg){ steer(e, e.x + Math.cos(e.a)*300, 180, 1.2, dt); return; }
-  e.evade -= dt;
-  if(e.evade>0){ steer(e, e.x + Math.cos(e.a)*400, 60, 2.4, dt); return; }
+  // The Zero was light and agile: it weaves on approach, breaks hard when someone gets on its tail or hits it,
+  // zooms up or dives away, and extends after overshooting before turning back in.
+  if(e.base == null){ e.base = e.speed; e.phase = rnd(0, 6.28); e.man = null; e.mt = 0; }
+  const turn = 2.3 + lvl*0.12;
+  e.mt -= dt; e.cool -= dt;
+  if(e.mt <= 0) e.man = null;
+  if(!e.man){
+    const c = chasedBy(e);
+    if((c && Math.random() < dt*2.5) || (e.flash>0 && Math.random() < 0.5)){
+      const ref = c ? c.a : e.a + Math.PI;
+      e.man = ['break','break','zoom','dive'][Math.floor(Math.random()*4)];
+      e.turnDir = (wrapA(e.a - ref) >= 0 ? 1 : -1) * (Math.random()<0.25 ? -1 : 1);
+      e.mt = rnd(0.9, 1.6);
+    } else if(tg.d < 110){ e.man = 'extend'; e.mt = rnd(0.9, 1.4); e.extendA = e.a + rnd(-0.5, 0.5); }
+  }
+  if(e.man){
+    let want, sp = e.base;
+    if(e.man==='break'){ want = e.a + e.turnDir*1.4 + Math.sin(G.time*9 + e.phase)*0.25; sp = e.base*0.92; }   // hard turn with jinks
+    else if(e.man==='zoom'){ want = Math.cos(e.a) >= 0 ? -1.25 : -Math.PI+1.25; sp = e.base*0.85; }          // climb away
+    else if(e.man==='dive'){ want = Math.cos(e.a) >= 0 ? 0.9 : Math.PI-0.9; sp = e.base*1.15; }              // dive for speed
+    else { want = e.extendA - (Math.cos(e.extendA)>=0 ? 0.35 : -0.35); sp = e.base*1.05; }                   // extend, climbing slightly
+    e.speed += (sp - e.speed)*Math.min(1, dt*2);
+    steerAngle(e, want, turn*1.2, dt);
+    return;
+  }
+  e.speed += (e.base - e.speed)*Math.min(1, dt*1.5);
   const lead = tg.d/760;
   const tx = tg.x + tg.vx*lead, ty = tg.y + tg.vy*lead;
-  steer(e, tx, ty, 2.0+lvl*0.12, dt);
-  if(tg.d < 80) e.evade = rnd(0.8,1.4);
-  e.cool -= dt;
+  // weave while closing from range, tighten up when in firing range
+  const weave = tg.d > 420 ? Math.sin(G.time*2.2 + e.phase)*0.4 : 0;
+  steerAngle(e, Math.atan2(ty-e.y, tx-e.x) + weave, turn, dt);
   if(e.cool<=0 && tg.d<430 && aimedAt(e, tx, ty) < 0.14){
     shootFrom(e, 'e', 3+lvl*0.6); SFX.enemyGun();
     e.burst++; e.cool = e.burst%6===0 ? rnd(0.8,1.4) : 0.11;
@@ -440,12 +481,43 @@ function restoreWingmen(){
   if(k) say(k>1 ? `${k} מטוסי כנף חלופיים ממריאים מהנושאת` : 'מטוס כנף חלופי ממריא מהנושאת', 3);
 }
 
+// Formation keeping. The slot position eases toward its new place when the leader turns around (instead of
+// jumping), and once close the wingman matches the leader's heading and adjusts speed, rather than chasing the
+// slot point itself, which is what made it rock back and forth.
 function followLeader(w, dt, maxS){
   const P = G.player;
-  const pt = P.onDeck || P.dead ? {x:G.carrier.x+G.carrier.len/2 + Math.sin(G.time*0.5+w.slot)*500, y:200+w.slot*40} : formationPoint(w);
-  const d = Math.hypot(pt.x-w.x, pt.y-w.y);
-  w.speed = d>200 ? maxS*1.1 : clamp(P.speed, 170, maxS);
-  steer(w, pt.x, pt.y, 1.8, dt);
+  if(P.onDeck || P.dead){
+    // holding pattern: a wide, steady racetrack over the carrier
+    const C = G.carrier, cx = C.x + C.len/2, ang = G.time*0.35 + w.slot*2.1;
+    const hx = cx + Math.cos(ang)*520, hy = 210 + w.slot*45 + Math.sin(ang)*40;
+    w.speed += (clamp(maxS*0.8, 170, maxS) - w.speed)*Math.min(1, dt);
+    steer(w, hx, hy, 1.2, dt);
+    w.off = null;
+    return;
+  }
+  // smooth the slot's offset from the leader (it swaps sides when the leader turns around), not its absolute
+  // position, so the slot never lags behind a fast-moving leader
+  const want = formationPoint(w), ox = want.x - P.x, oy = want.y - P.y;
+  if(!w.off) w.off = {x:ox, y:oy};
+  const k = Math.min(1, dt*1.4);
+  w.off.x += (ox - w.off.x)*k; w.off.y += (oy - w.off.y)*k;
+  w.fp = {x:P.x + w.off.x, y:P.y + w.off.y};
+  const v = playerVel(P), pa = Math.atan2(v.vy, v.vx);
+  const dx = w.fp.x - w.x, dy = w.fp.y - w.y, d = Math.hypot(dx, dy);
+  if(d > 180){
+    // rejoining: head for a point ahead of the slot at full speed
+    // (an upgraded leader can out-run a stock wingman, so the escort may push past its normal top speed to keep up)
+    const boost = d > 400 ? 1.45 : 1.25;
+    w.speed += (Math.max(maxS*1.1, P.speed*boost) - w.speed)*Math.min(1, dt*2);
+    const lead = Math.min(1.5, d/300);                       // aim at where the slot will be, not where it is
+    steer(w, w.fp.x + v.vx*lead, w.fp.y + v.vy*lead, 1.8, dt);
+  } else {
+    // in formation: fly the leader's heading, nudged gently toward the slot
+    const along = dx*Math.cos(pa) + dy*Math.sin(pa), across = -dx*Math.sin(pa) + dy*Math.cos(pa);
+    const correct = clamp(across*0.012, -0.35, 0.35);
+    w.speed += (clamp(P.speed + along*0.9, 150, Math.max(maxS*1.15, P.speed*1.25)) - w.speed)*Math.min(1, dt*2.5);
+    steerAngle(w, pa + correct, 1.6, dt);
+  }
 }
 
 function updateWeather(dt){
