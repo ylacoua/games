@@ -292,6 +292,26 @@ function zeroAI(e, dt, lvl){
   // The Zero was light and agile: it weaves on approach, breaks hard when someone gets on its tail or hits it,
   // zooms up or dives away, and extends after overshooting before turning back in.
   if(e.base == null){ e.base = e.speed; e.phase = rnd(0, 6.28); e.man = null; e.mt = 0; }
+  // Close escort: stay in formation on an assigned bomber until an American aircraft comes near it (or us),
+  // or the bomber is gone or has started its dive; then fight like any other Zero.
+  if(e.escort){
+    const b = e.escort;
+    const near = (x,y,r)=>{ const P=G.player; if(!P.dead && !P.onDeck && dist2(x,y,P.x,P.y)<r*r) return true;
+      return G.wingmen.some(w=>!w.dead && w.state==='fly' && dist2(x,y,w.x,w.y)<r*r); };
+    if(b.dead || !G.enemies.includes(b) || (b.ph && b.ph!=='cruise') || near(b.x,b.y,520) || near(e.x,e.y,420)) e.escort = null;
+    else {
+      const side = e.eslot===1 ? 1 : -1, bdir = Math.cos(b.a) >= 0 ? 1 : -1;
+      const fx = b.x - bdir*(45 + e.eslot*35), fy = b.y + (e.eslot===2 ? -55 : side*35);   // two on the flanks, one high cover
+      const dx = fx - e.x, dy = fy - e.y, d = Math.hypot(dx, dy), ba = b.a;
+      if(d > 160){ e.speed += (e.base*1.1 - e.speed)*Math.min(1, dt*2); steer(e, fx + Math.cos(ba)*b.speed*0.8, fy + Math.sin(ba)*b.speed*0.8, 2.0, dt); }
+      else {
+        const along = dx*Math.cos(ba) + dy*Math.sin(ba), across = -dx*Math.sin(ba) + dy*Math.cos(ba);
+        e.speed += (clamp(b.speed + along*0.9, 130, e.base*1.15) - e.speed)*Math.min(1, dt*2.5);
+        steerAngle(e, ba + clamp(across*0.012, -0.35, 0.35), 1.8, dt);
+      }
+      return;
+    }
+  }
   const turn = 2.3 + lvl*0.12;
   e.mt -= dt; e.cool -= dt;
   if(e.mt <= 0) e.man = null;

@@ -26,9 +26,17 @@ function defenseSetup(){
 function startWave(n){
   const D = G.defense; D.wave = n; D.state = 'launching'; D.live = []; D.spawnT = 0;
   const zeros = 5*n, vals = 2*n, q = [];
-  // interleave: a bomber after every few fighters, so each group arrives escorted
-  for(let i=0, v=0; i<zeros; i++){ q.push('zero'); if(v<vals && (i+1) % Math.max(1, Math.floor(zeros/vals)) === 0){ q.push('val'); v++; } }
-  while(q.filter(t=>t==='val').length < vals) q.push('val');
+  // A wave is made of n strike groups, launched several seconds apart so they arrive one after another:
+  // each group is a pair of Vals (spaced out on the deck), three Zeros flying close escort on them,
+  // and two Zeros sweeping ahead for fighters.
+  for(let g=0; g<n; g++){
+    const grp = {vals:[]};
+    q.push({type:'val',  grp, vIdx:0, next:1.6});
+    q.push({type:'val',  grp, vIdx:1, next:1.0});
+    for(let k=0;k<3;k++) q.push({type:'zero', grp, escortOf:k%2, slot:k, next:0.8});
+    q.push({type:'zero', next:0.8});
+    q.push({type:'zero', next: g<n-1 ? 7 : 0});
+  }
   D.queue = q;
   say(`גל ${n} מתוך ${DEFENSE_WAVES}: ${zeros} מטוסי זירו ו-${vals} מפציצי צלילה ממריאים מהנושאת היפנית!`, 4); SFX.alarm();
 }
@@ -40,8 +48,11 @@ function defenseUpdate(dt){
     if(D.state==='launching'){
       D.spawnT -= dt;
       if(D.spawnT<=0 && D.queue.length){
-        const e = launchFrom({kind:'carrier', sh:G.jc, x:G.jc.x}, D.queue.shift());
-        D.live.push(e); D.spawnT = 0.6;
+        const it = D.queue.shift();
+        const e = launchFrom({kind:'carrier', sh:G.jc, x:G.jc.x}, it.type);
+        if(it.type==='val'){ it.grp.vals[it.vIdx] = e; e.cruiseY = DECK_Y - 300 - it.vIdx*45; }   // the pair flies stepped up
+        else if(it.grp){ e.escort = it.grp.vals[it.escortOf] || it.grp.vals[0]; e.eslot = it.slot; }
+        D.live.push(e); D.spawnT = it.next;
       }
       if(!D.queue.length) D.state = 'fighting';
     }
@@ -100,7 +111,7 @@ function valAI(e, dt){
   if(!e.ph) e.ph = 'cruise';
   if(e.ph==='cruise'){
     e.speed += (e.full - e.speed)*Math.min(1, dt);
-    steer(e, cx + 180, DECK_Y-300, 1.0, dt);
+    steer(e, cx + 180, e.cruiseY || DECK_Y-300, 1.0, dt);
     if(Math.abs(e.x - cx) < 240 && e.y < DECK_Y-200) e.ph = 'dive';
   } else if(e.ph==='dive'){
     // steep dive straight at the deck (no terrain avoidance: it is aiming for the ship)
