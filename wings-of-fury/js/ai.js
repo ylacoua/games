@@ -115,6 +115,33 @@ function killSoldier(so){
   for(let i=0;i<4;i++) G.debris.push({x:so.x,y:so.y-8,vx:rnd(-50,50),vy:rnd(-120,-40),r:0,vr:0,life:0.6,c:'#7a1f1a',spark:true});
 }
 
+// Wingmen fly with the same model as the player's aircraft: they face left or right (f), climb and dive with a
+// limited, eased pitch (p), reverse direction with the same flat turn-around (ft: 0..1), and can pull a full
+// vertical loop (vl: the loop angle). They never just roll onto their back.
+function pilotSteer(w, want, turn, dt){
+  if(w.f == null){ w.f = Math.cos(w.a) >= 0 ? 1 : -1; w.p = clamp(Math.atan2(-Math.sin(w.a), Math.abs(Math.cos(w.a))), -1.35, 1.35); w.pr = 0; }
+  if(w.vl != null){                                             // loop in progress
+    w.vl += turn*0.75*dt; w.speed = Math.max(w.speed, 130);
+    if(w.vl >= Math.PI*2){ w.p = 0; w.vl = null; }
+  } else if(w.ft != null){                                      // turn-around in progress
+    w.ft += dt*turn/1.3; w.speed -= 30*dt;
+    if(w.ft >= 1){ w.f = -w.f; w.ft = null; }
+  } else {
+    const c = Math.cos(want);
+    if((w.f > 0 && c < -0.35) || (w.f < 0 && c > 0.35)){ w.ft = 0; w.p *= 0.5; }    // the goal is behind: turn around
+    else {
+      const pd = clamp(Math.atan2(-Math.sin(want), Math.abs(c)), -1.35, 1.35);    // pitch that points at the goal
+      const rate = clamp((pd - w.p)*3, -turn*0.8, turn*0.8);
+      w.pr = (w.pr||0) + (rate - (w.pr||0))*Math.min(1, dt*6);
+      w.p = clamp(w.p + w.pr*dt, -1.35, 1.35);
+    }
+  }
+  const ang = w.vl != null ? w.vl : w.p, k = w.ft != null ? Math.cos(Math.PI*w.ft) : 1;
+  const vx = w.f*Math.cos(ang)*w.speed, vy = -Math.sin(ang)*w.speed;
+  w.x += vx*k*dt + G.weather.wind*0.3*dt; w.y += vy*dt;
+  w.a = Math.atan2(vy, vx);                                     // heading, for aiming and for other code
+}
+
 // ---- generic steering for AI aircraft (heading angle a, y-down) ----
 function steer(e, tx, ty, turn, dt){ return steerAngle(e, Math.atan2(ty-e.y, tx-e.x), turn, dt); }
 
@@ -128,6 +155,7 @@ function steerAngle(e, want, turn, dt){
   if(e.y + sink > gy - 70){ want = right ? -0.7 : -Math.PI+0.7; avoid = true; }
   else if(e.y < CEIL+40) want = right ? 0.35 : Math.PI-0.35;
   if(avoid) turn *= 1.7;
+  if(e.pilot && e.state==='fly'){ pilotSteer(e, want, turn, dt); return wrapA(want-e.a); }
   const d = wrapA(want-e.a);
   const rate = clamp(d*3.2, -turn, turn);
   e.av = (e.av||0) + (rate - (e.av||0))*Math.min(1, dt*(avoid ? 12 : 6));
@@ -422,15 +450,15 @@ function nearestEnemyPlane(x, y, range){
   for(const e of G.enemies){ if(e.dead || e.takeoff || !inPlay(e.x)) continue; const d=dist2(x,y,e.x,e.y); if(d<bd){bd=d;best=e;} }
   return best;
 }
-function nearestGroundTarget(x, range, preferAA){
+function nearestGroundTarget(x, range, preferAA, skip){   // skip: targets another wingman already took
   let best=null, bd=range;
   for(const s of G.structures){
-    if(s.dead || !s.primary) continue;
+    if(s.dead || !s.primary || (skip && skip.has(s))) continue;
     let d = Math.abs(s.x-x); if(preferAA && s.type!=='aa') d += 400;
     if(d<bd){ bd=d; best={x:s.x, y:s.y-s.h/2, gy:s.y, obj:s}; }
   }
   for(const sh of G.ships){
-    if(sh.dead || !inPlay(sh.x)) continue; const d=Math.abs(sh.x-x);
+    if(sh.dead || !inPlay(sh.x) || (skip && skip.has(sh))) continue; const d=Math.abs(sh.x-x);
     if(d<bd){ bd=d; best={x:sh.x, y:SEA-sh.h/2, gy:SEA-sh.h, obj:sh}; }
   }
   return best;
@@ -442,8 +470,39 @@ function formationPoint(w){
   return {x: P.x - P.f*(70 + w.slot*45), y: P.y + side*(40 + w.slot*18) - 20};
 }
 
+// nearest enemy aircraft nobody else has taken (falls back to any, when there are more wingmen than enemies);
+// with `around` set, only enemies near that x (the carrier) count
+function pickEnemy(w, claimed, around){
+  let best=null, bd=Infinity, any=null, ad=Infinity;
+  for(const e of G.enemies){
+    if(e.dead || e.takeoff || !inPlay(e.x)) continue;
+    if(around!=null && Math.abs(e.x-around) > 1400) continue;
+    const d = dist2(w.x,w.y,e.x,e.y);
+    if(d < ad){ ad=d; any=e; }
+    if(!claimed.has(e) && d < bd){ bd=d; best=e; }
+  }
+  if(!best && (around!=null || ad < 2600*2600)) best = any;
+  return best && (around!=null || bd < 2600*2600 || best===any) ? best : null;
+}
+// carrier defense patrol: a wide racetrack above our carrier, each wingman on its own lane
+function patrolCarrier(w, dt, maxS){
+  const C = G.carrier, cx = C.x + C.len/2, ang = G.time*0.3 + (w.slot||0)*2.1;
+  w.speed += (maxS*0.85 - w.speed)*Math.min(1, dt);
+  steer(w, cx + Math.cos(ang)*650, DECK_Y - 260 - (w.slot||0)*45, 1.4, dt);
+}
+// an enemy fighter sitting behind this wingman with its nose on it
+function enemyOnTail(w){
+  for(const e of G.enemies){
+    if(e.dead || e.type!=='zero') continue;
+    const dx = w.x-e.x, dy = w.y-e.y;
+    if(dx*dx+dy*dy < 320*320 && Math.abs(wrapA(Math.atan2(dy,dx) - e.a)) < 0.35) return true;
+  }
+  return false;
+}
+
 function updateWingmen(dt){
   const P = G.player, C = G.carrier, attack = G.wingMode==='attack';
+  const claimed = new Set();                                 // targets already taken by a wingman this frame
   for(const w of G.wingmen){
     if(w.dead){
       // Carrier Defense: a lost wingman is replaced by a fresh aircraft launched from its carrier 10 s later
@@ -481,16 +540,30 @@ function updateWingmen(dt){
       steer(w, w.x > 0 ? G.L - 400 : 400, clamp(w.y, 120, DECK_Y-150), 1.8, dt);
       continue;
     }
+    w.pilot = true;                                            // flies like the player's aircraft (see pilotSteer)
+    const mode = G.wingMode, cx = C.x + C.len/2;
+    // being shot at from behind with room to spare: pull up into a loop to get out of the line of fire
+    if(w.vl==null && w.ft==null && w.speed > 170 && groundY(w.x)-w.y > 260 && enemyOnTail(w) && Math.random() < dt*1.5) w.vl = w.p ?? 0;
     if(w.role==='fighter'){
-      const tgt = attack ? nearestEnemyPlane(w.x, w.y, 1600) : nearestEnemyPlane(P.x, P.y, 650);
-      if(tgt){
+      // Escort: engage whatever comes near the leader. Free attack / carrier defense: every wingman takes a
+      // different enemy (keeping it while it lives), defense only within reach of the carrier.
+      let tgt = null;
+      if(mode==='escort') tgt = nearestEnemyPlane(P.x, P.y, 650);
+      else {
+        const ok = e => e && !e.dead && !e.takeoff && inPlay(e.x) && G.enemies.includes(e) && !claimed.has(e) && (mode!=='defend' || Math.abs(e.x-cx) < 1400);
+        tgt = ok(w.tgt) ? w.tgt : pickEnemy(w, claimed, mode==='defend' ? cx : null);
+        w.tgt = tgt; if(tgt) claimed.add(tgt);
+      }
+      if(!tgt && mode==='defend'){ patrolCarrier(w, dt, maxS); }
+      else if(tgt){
         w.speed = maxS;
         const d = Math.hypot(tgt.x-w.x, tgt.y-w.y), lead = d/760;
         const tx = tgt.x+Math.cos(tgt.a)*tgt.speed*lead, ty = tgt.y+Math.sin(tgt.a)*tgt.speed*lead;
         steer(w, tx, ty, 2.0, dt);
         if(w.cool<=0 && d<420 && aimedAt(w,tx,ty)<0.13){ shootFrom(w,'p',4); w.cool=0.12; }
       } else if(attack){
-        const g = nearestGroundTarget(w.x, 3000, true);
+        const g = nearestGroundTarget(w.x, 3000, true, claimed);
+        if(g) claimed.add(g.obj);
         if(g){
           w.speed = maxS;
           const tx = g.x, ty = g.y;
@@ -507,8 +580,10 @@ function updateWingmen(dt){
         if(Math.hypot(w.x-gate.x, w.y-gate.y) < 110 && Math.cos(w.a) < 0.2){ w.state='landing'; }
         continue;
       }
-      const g = attack ? nearestGroundTarget(w.x, 99999) : nearestGroundTarget(P.x, 950);
-      if(!g){ followLeader(w, dt, maxS); continue; }
+      // bombers: each picks its own target in free attack; in carrier defense they stay on patrol over the carrier
+      const g = mode==='attack' ? nearestGroundTarget(w.x, 99999, false, claimed) : mode==='escort' ? nearestGroundTarget(P.x, 950) : null;
+      if(g) claimed.add(g.obj);
+      if(!g){ if(mode==='defend') patrolCarrier(w, dt, maxS); else followLeader(w, dt, maxS); continue; }
       w.speed = maxS;
       const alt = 220, ty = g.gy - alt, fall = Math.sqrt(2*alt/320);
       const vx = Math.cos(w.a)*w.speed, dir = Math.sign(g.x - w.x) || 1;
@@ -537,7 +612,7 @@ function wingTakeoff(w, dt){
   else {
     w.a = -0.25; w.x += Math.cos(w.a)*w.speed*dt; w.y += Math.sin(w.a)*w.speed*dt;
     w.gear = Math.max(0, w.gear - dt);
-    if(DECK_Y-9 - w.y > 70){ w.state='fly'; w.takeoff=null; w.gear=0; }
+    if(DECK_Y-9 - w.y > 70){ w.state='fly'; w.takeoff=null; w.gear=0; w.f=null; w.ft=null; w.vl=null; }
   }
 }
 function wingLandingGlide(w, dt){

@@ -20,7 +20,7 @@ const UI = {
       <b>W / S</b><span>הגברה / הורדה של המצערת</span>
       <b>רווח</b><span>מקלעים</span>
       <b>X</b><span>הטלת חימוש (פצצה / רקטה / טורפדו)</span>
-      <b>C</b><span>פקודה לכנפיים: ליווי ↔ תקיפה</span>
+      <b>C</b><span>פקודה לכנפיים: ליווי ← תקיפה חופשית ← הגנה על הנושאת</span>
       <b>Esc</b><span>עצירה · <b>M</b> השתקה</span>
     </div>
     <p class="note">נחיתה: התקרב לנושאת נמוך, במצערת נמוכה ובאף כמעט ישר. מהירות מתחת ל-225 וזווית קטנה.</p>`;
@@ -274,7 +274,7 @@ function drawHUD(ctx, vw, worldVW){
   ctx.textAlign='right'; ctx.direction='rtl'; ctx.font='13px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
   ctx.fillText(G.training ? 'אימון · מטוסים: ∞' : `מטוסים: ${'✈'.repeat(Math.max(0,G.lives))}`, 178, 44);
   ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
-  if(G.wingmen.length){ const alive=G.wingmen.filter(w=>!w.dead).length; ctx.fillText(`כנפיים ${alive}/${G.wingmen.length}: ${G.wingMode==='escort'?'ליווי':'תקיפה'} (C)`, 178, 80); }
+  if(G.wingmen.length){ const alive=G.wingmen.filter(w=>!w.dead).length; ctx.fillText(`כנפיים ${alive}/${G.wingmen.length}: ${({escort:'ליווי', attack:'תקיפה', defend:'הגנת נושאת'})[G.wingMode]} (C)`, 178, 80); }
   { // carrier strength gauge: green, amber below 60%, red below 30%
     const k = clamp(G.carrier.hp/G.carrier.max, 0, 1);
     bar(178, 98, 'נושאת', k, k < 0.3 ? '#c8402f' : k < 0.6 ? '#e8b33a' : '#5fae6b');

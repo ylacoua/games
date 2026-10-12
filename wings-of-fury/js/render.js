@@ -194,6 +194,18 @@ function drawDrop(ctx, d){
 }
 
 function drawAI(ctx, e, type, s, flash, gear=0){
+  if(e.pilot && e.state==='fly' && e.f != null){
+    // wingmen are drawn exactly like the player's aircraft: upright, the 3D model during a turn-around,
+    // and naturally upside down only at the top of a loop
+    const ang = e.vl != null ? e.vl : e.p;
+    ctx.save(); ctx.translate(e.x, e.y);
+    if(e.ft != null){
+      const t = e.ft, ease = t*t*(3-2*t);
+      drawPlane3D(ctx, type, null, 'us', (e.f>0 ? 0 : Math.PI) + (e.f>0 ? -1 : 1)*Math.PI*ease, -Math.sin(Math.PI*t)*0.75, ang, flash>0, true);
+    } else { ctx.scale(e.f, 1); ctx.rotate(-ang); drawPlane(ctx, type, null, null, s, flash>0, true, gear); }
+    ctx.restore();
+    return;
+  }
   ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.a);
   // keep the aircraft upright, but only roll it over once it is clearly heading the other way, so it does
   // not flip back and forth while climbing or diving near the vertical

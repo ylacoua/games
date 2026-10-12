@@ -27,8 +27,9 @@ window.addEventListener('blur', ()=>{ for(const k in keys) keys[k]=false; });
 
 function toggleWingMode(){
   if(!G || !G.wingmen.length) return;
-  G.wingMode = G.wingMode==='escort' ? 'attack' : 'escort';
-  say(G.wingMode==='escort' ? 'כנפיים: ליווי וחיפוי צמוד' : 'כנפיים: תקיפה עצמאית של מטרות', 2.5);
+  // C cycles the wingmen's orders: escort -> free attack -> defend the carrier
+  G.wingMode = {escort:'attack', attack:'defend', defend:'escort'}[G.wingMode] || 'escort';
+  say({escort:'כנפיים: ליווי וחיפוי צמוד', attack:'כנפיים: תקיפה חופשית – כל אחד בוחר יריב משלו', defend:'כנפיים: הגנה קרובה על נושאת המטוסים'}[G.wingMode], 2.5);
 }
 
 // touch pad
