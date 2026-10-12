@@ -12,7 +12,7 @@ const DEFENSE = {
 };
 
 function defenseSetup(){
-  G.L = 3000;
+  G.L = 5000;                                              // a wide stretch of ocean: raids take a while to arrive
   G.carrier.hp = G.carrier.max = 1200;
   // the enemy task force waits beyond the edge of the map (out of reach) until the strike phase
   const jc = makeShip('jcarrier', G.L+900, G.L+900, G.L+900); jc.speed = 0; jc.dir = -1;
@@ -33,9 +33,7 @@ function startWave(n){
     const grp = {vals:[], high: g%2===1};                    // every other group comes in at high altitude
     q.push({type:'val',  grp, vIdx:0, next:1.6});
     q.push({type:'val',  grp, vIdx:1, next:1.0});
-    for(let k=0;k<3;k++) q.push({type:'zero', grp, escortOf:k%2, slot:k, next:0.8});
-    q.push({type:'zero', next:0.8});
-    q.push({type:'zero', next: g<n-1 ? 7 : 0});
+    for(let k=0;k<5;k++) q.push({type:'zero', grp, escortOf:0, slot:k, next: k<4 ? 0.7 : (g<n-1 ? 10 : 0)});
   }
   D.queue = q;
   say(`גל ${n} מתוך ${DEFENSE_WAVES}: ${zeros} מטוסי זירו ו-${vals} מפציצי צלילה ממריאים מהנושאת היפנית!`, 4); SFX.alarm();

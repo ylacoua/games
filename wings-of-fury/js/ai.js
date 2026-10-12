@@ -300,8 +300,11 @@ function zeroAI(e, dt, lvl){
       return G.wingmen.some(w=>!w.dead && w.state==='fly' && dist2(x,y,w.x,w.y)<r*r); };
     if(b.dead || !G.enemies.includes(b) || (b.ph && b.ph!=='cruise') || near(b.x,b.y,520) || near(e.x,e.y,420)) e.escort = null;
     else {
-      const side = e.eslot===1 ? 1 : -1, bdir = Math.cos(b.a) >= 0 ? 1 : -1;
-      const fx = b.x - bdir*(45 + e.eslot*35), fy = b.y + (e.eslot===2 ? -55 : side*35);   // two on the flanks, one high cover
+      // a flight of five spread around the lead bomber: two close on the flanks, two wider and further back,
+      // one high above as top cover (offsets: behind the bomber, above/below it)
+      const ESC = [[60,-45],[60,45],[120,-95],[120,95],[180,-150]];
+      const bdir = Math.cos(b.a) >= 0 ? 1 : -1, [ox, oy] = ESC[(e.eslot||0) % 5];
+      const fx = b.x - bdir*ox, fy = b.y + oy;
       const dx = fx - e.x, dy = fy - e.y, d = Math.hypot(dx, dy), ba = b.a;
       if(d > 160){ e.speed += (e.base*1.1 - e.speed)*Math.min(1, dt*2); steer(e, fx + Math.cos(ba)*b.speed*0.8, fy + Math.sin(ba)*b.speed*0.8, 2.0, dt); }
       else {

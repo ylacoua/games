@@ -79,7 +79,7 @@ function update(dt, vw){
 
 let last = performance.now();
 function frame(now){
-  const dt = Math.min(0.033, (now-last)/1000); last = now;
+  const dt = Math.min(0.033, (now-last)/1000) * GAME_SPEED; last = now;
   if(G){
     const vw = viewMetrics(CW, CH).vw;
     const running = !G.paused && G.state!=='rearm' && G.state!=='over';

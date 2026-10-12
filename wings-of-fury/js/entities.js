@@ -3,7 +3,7 @@ const keys = {};
 
 // P.loop holds a flat turn-around in progress: {t: 0..1}. The plane keeps its altitude and pitch while
 // its horizontal motion slows, passes through zero and reverses.
-function heading(P){ return P.p; }
+function heading(P){ return P.vl ? P.vl.ang : P.p; }   // P.vl: a vertical loop in progress
 function turnK(P){ return P.loop ? Math.cos(Math.PI*P.loop.t) : 1; }
 function playerVel(P){ const a=heading(P); return {vx:P.f*Math.cos(a)*P.speed*turnK(P), vy:-Math.sin(a)*P.speed}; }
 
@@ -43,23 +43,33 @@ function updatePlayer(dt){
   const outOfFuel = P.fuel<=0;
   if(K.KeyW) P.throttle = Math.min(1, P.throttle+dt*0.8);
   if(K.KeyS) P.throttle = Math.max(0, P.throttle-dt*0.8);
-  if(!P.loop){
+  if(!P.loop && !P.vl){
     const wantTurn = (K.ArrowLeft && P.f>0) || (K.ArrowRight && P.f<0);
     if(wantTurn && P.speed>110){ P.loop = {t:0}; P.p *= 0.5; }
     else if((K.ArrowRight && P.f>0) || (K.ArrowLeft && P.f<0)) P.throttle = Math.min(1, P.throttle+dt*0.8);
   }
-  // pitch stays available during the turn
-  const tr = st.turn*0.5*(P.stall?0.4:1)*(P.loop?0.5:1);   // pitch rate: gentler than the turn-around
-  if(K.ArrowUp) P.p += tr*dt;
-  if(K.ArrowDown) P.p -= tr*dt;
-  P.p = clamp(P.p, -1.35, 1.35);
+  if(!P.vl){
+    // pitch stays available during the turn
+    const tr = st.turn*0.5*(P.stall?0.4:1)*(P.loop?0.5:1);   // pitch rate: gentler than the turn-around
+    if(K.ArrowUp) P.p += tr*dt;
+    if(K.ArrowDown) P.p -= tr*dt;
+    P.p = clamp(P.p, -1.35, 1.35);
+    // keep pulling with the nose already pointing up, with enough speed: go over the top into a full loop
+    P.upHold = (K.ArrowUp && P.p >= 1.3 && !P.loop) ? (P.upHold||0) + dt : 0;
+    if(P.upHold > 0.25 && P.speed > 190){ P.vl = {ang:P.p}; P.upHold = 0; }
+  } else {
+    // vertical loop: the nose keeps coming round, over the top inverted and down the back, back to level flight
+    P.vl.ang += st.turn*0.8*dt;
+    P.speed = Math.max(P.speed, 130);
+    if(P.vl.ang >= Math.PI*2){ P.p = 0; P.vl = null; }
+  }
   if(P.loop){
     P.loop.t += dt * st.turn/1.25;          // ~0.65s for a Hellcat, quicker for agile planes
     P.speed -= 40*dt;                       // a hard turn bleeds a little speed
     if(P.loop.t >= 1){ P.f = -P.f; P.loop = null; }
   }
   // boundaries: auto turn back
-  if(!P.loop && ((P.x < -350 && P.f<0) || (P.x > G.L+350 && P.f>0))){ P.loop={t:0}; P.speed=Math.max(P.speed,170); }
+  if(!P.loop && !P.vl && ((P.x < -350 && P.f<0) || (P.x > G.L+350 && P.f>0))){ P.loop={t:0}; P.speed=Math.max(P.speed,170); }
 
   // landing gear: retracts after take-off, lowers automatically on approach to the carrier
   const mid = C.x + C.len/2;
@@ -73,12 +83,12 @@ function updatePlayer(dt){
   const target = (outOfFuel ? 0 : P.throttle*st.speed) * (1 - 0.12*P.gear);
   P.speed += (target-P.speed)*0.55*dt - (Math.sin(a)>0 ? 145 : 70)*Math.sin(a)*dt;   // dives gain speed more slowly than climbs lose it
   P.speed = clamp(P.speed, 0, st.speed*1.2);
-  P.stall = P.speed < 100 && !P.loop;
+  P.stall = P.speed < 100 && !P.loop && !P.vl;
   if(P.stall) P.p = Math.max(-1.3, P.p - 1.1*dt);
   const v = playerVel(P);
   P.x += v.vx*dt + G.weather.wind*0.35*dt + G.weather.gust*dt;
   P.y += v.vy*dt + (P.stall ? 80*dt : 0);
-  if(P.y < CEIL){ P.y = CEIL; if(!P.loop) P.p = Math.min(P.p, 0); }
+  if(P.y < CEIL){ P.y = CEIL; if(!P.loop && !P.vl) P.p = Math.min(P.p, 0); }
   if(!outOfFuel){ P.fuel -= (0.32+0.5*P.throttle)*dt; if(P.fuel<=0){ P.fuel=0; say('אזל הדלק! גלוש לנושאת',4); SFX.alarm(); } }
   else if(Math.random()<dt*0.5) {}
   if(P.hp < P.max*0.35){ P.smoke -= dt; if(P.smoke<=0){ P.smoke=0.05; puff(P.x-v.vx*0.03, P.y, '#333', 8); } }
@@ -92,7 +102,7 @@ function updatePlayer(dt){
   P.airT = (P.airT||0) + dt;
   if(onCarrierX && P.y >= DECK_Y-9 && P.y < DECK_Y+12){
     if(P.airT < 1.2 && P.p >= 0){ P.y = DECK_Y-9; P.p = Math.max(P.p, 0.05); return; }  // just lifted off
-    if(!P.loop && Math.abs(P.p)<0.32 && P.speed<225){
+    if(!P.loop && !P.vl && Math.abs(P.p)<0.32 && P.speed<225){
       P.onDeck=true; P.landing=true; P.y=DECK_Y-9; P.p=0; P.throttle=0; G.state='landing';
       SFX.tone(200,120,0.3,0.1,'triangle'); say('נחיתה! וו הבלימה נתפס',2);
       return;
@@ -147,7 +157,7 @@ function dropOrd(P){
 
 function crashPlayer(reason){
   const P = G.player; if(P.dead) return;
-  P.dead=true; P.loop=null; G.lives--;
+  P.dead=true; P.loop=null; P.vl=null; G.lives--;
   boom(P.x, Math.min(P.y, groundY(P.x)-4), 50, true);
   if(overSea(P.x) && P.y>SEA-20) splash(P.x);
   for(let i=0;i<10;i++) G.debris.push({x:P.x,y:P.y,vx:rnd(-160,160),vy:rnd(-260,-40),r:rnd(0,6),vr:rnd(-8,8),life:2.5,c:G.stats.color});

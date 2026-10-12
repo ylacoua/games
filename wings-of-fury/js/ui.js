@@ -15,6 +15,7 @@ const UI = {
   keysHTML(){
     return `<div class="keys">
       <b>↑ ↓</b><span>טיפוס / צלילה</span>
+      <b>↑ ארוך</b><span>לופ: המשך למשוך כשהאף כבר פונה למעלה, ותגיע מאחורי מטוס שתוקף אותך</span>
       <b>← →</b><span>פנייה ימינה / שמאלה באותו גובה (לחיצה לכיוון הטיסה מגבירה מהירות)</span>
       <b>W / S</b><span>הגברה / הורדה של המצערת</span>
       <b>רווח</b><span>מקלעים</span>
@@ -313,7 +314,7 @@ function drawHUD(ctx, vw, worldVW){
   // messages
   ctx.font='16px Rubik, sans-serif';
   G.msg.forEach((m,i)=>{ m.t -= 1/60; ctx.globalAlpha=clamp(m.t,0,1); ctx.fillStyle='rgba(8,16,28,.6)';
-    const w = ctx.measureText(m.text).width+24; ctx.fillRect(vw/2-w/2, H-120+i*26-11, w, 22); ctx.fillStyle='#efe6cf'; ctx.fillText(m.text, vw/2, H-120+i*26); });
+    const w = ctx.measureText(m.text).width+24, my = H - 20 - (G.msg.length-1-i)*25; ctx.fillRect(vw/2-w/2, my-11, w, 22); ctx.fillStyle='#efe6cf'; ctx.fillText(m.text, vw/2, my); });
   ctx.globalAlpha=1;
   G.msg = G.msg.filter(m=>m.t>0);
   ctx.restore();
