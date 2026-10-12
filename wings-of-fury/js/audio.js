@@ -103,38 +103,67 @@ const SFX = {
     o.connect(og); og.connect(this.master); o.start(t); o.stop(t+2.5);
     for(let i=0;i<5;i++) setTimeout(()=>this.noise(0.12, rnd(1500,3500), 0.05, 'bandpass', 3), 200+i*rnd(120,260));  // debris crackle
   },
-  // "Banzai!" from a pilot diving onto the carrier: a Japanese voice where the browser has one,
-  // otherwise a synthesized shout (formant-filtered buzz for "ban-zai")
+  // "Banzaiiiiiii!" from a pilot diving onto the carrier: a long, furious battle cry.
+  // A Japanese voice (where the browser has one) shouts it with the final "i" drawn out; otherwise a
+  // synthesized shouting voice does.
   banzai(){
     if(this.muted) return;
-    const now = performance.now(); if(now - (this.lastBanzai||0) < 1800) return; this.lastBanzai = now;
+    const now = performance.now(); if(now - (this.lastBanzai||0) < 2600) return; this.lastBanzai = now;
     try{
       const ss = window.speechSynthesis;
-      if(ss && window.SpeechSynthesisUtterance){
-        const jp = ss.getVoices().find(v=>/^ja/i.test(v.lang));
-        // a Japanese voice says it natively; otherwise the browser's own voice still says "Banzai!"
-        const u = new SpeechSynthesisUtterance(jp ? 'バンザイ！' : 'Banzaaai!');
-        if(jp){ u.voice = jp; u.lang = jp.lang; }
-        u.rate = 0.85; u.pitch = 0.6; u.volume = 1; ss.cancel(); ss.speak(u); return;
+      const jp = ss && window.SpeechSynthesisUtterance && ss.getVoices().find(v=>/^ja/i.test(v.lang));
+      if(jp){
+        // ー stretches the vowel before it in Japanese, so this is "ban-za-iiiiiii"
+        const u = new SpeechSynthesisUtterance('バンザイーーーーーーー！');
+        u.voice = jp; u.lang = jp.lang; u.rate = 0.8; u.pitch = 1.5; u.volume = 1;
+        ss.cancel(); ss.speak(u);
+        this.shout(0.35);                      // a rough shouting layer under the voice
+        return;
       }
     }catch(e){}
-    this.shout();
+    this.shout(1);
   },
-  shout(){
+  // Synthesized shout: a strained, high, raspy voice (sawtooth with jitter and breath noise, hard-clipped),
+  // shaped by three formant filters through B-a-n-z-a then a long rising, trembling "iiiiiii" that tails off.
+  shout(level){
     if(!this.ctx) return;
-    const c=this.ctx, t=c.currentTime, out=c.createGain(); out.gain.value=0.35; out.connect(this.master);
-    const o=c.createOscillator(); o.type='sawtooth';
-    o.frequency.setValueAtTime(150,t); o.frequency.linearRampToValueAtTime(175,t+0.25); o.frequency.linearRampToValueAtTime(140,t+0.95);
-    const env=c.createGain(); env.gain.setValueAtTime(0,t);
-    env.gain.linearRampToValueAtTime(1,t+0.04); env.gain.linearRampToValueAtTime(0.25,t+0.3); env.gain.linearRampToValueAtTime(1,t+0.38); env.gain.linearRampToValueAtTime(0,t+1.0);
-    o.connect(env);
-    // two formants sliding from "a" (ban) to "a-i" (zai)
-    for(const [f0,f1,q] of [[750,800,6],[1150,2200,8]]){
-      const f=c.createBiquadFilter(); f.type='bandpass'; f.Q.value=q;
-      f.frequency.setValueAtTime(f0,t); f.frequency.setValueAtTime(f0,t+0.55); f.frequency.linearRampToValueAtTime(f1,t+0.95);
-      env.connect(f); f.connect(out);
-    }
-    o.start(t); o.stop(t+1.05);
+    const c=this.ctx, t=c.currentTime, T=2.1;
+    const out=c.createGain(); out.gain.value=0.5*level; out.connect(this.master);
+    // hard clipping makes it sound like a voice pushed to its limit
+    const clip=c.createWaveShaper(), curve=new Float32Array(1024);
+    for(let i=0;i<1024;i++){ const x=i/511.5-1; curve[i]=Math.tanh(x*4); }
+    clip.curve=curve; clip.connect(out);
+    // voice source: pitch jumps up on "zai" and keeps climbing in anger, with a fast tremble
+    const v=c.createOscillator(); v.type='sawtooth';
+    const f=v.frequency;
+    f.setValueAtTime(210,t); f.linearRampToValueAtTime(240,t+0.2); f.linearRampToValueAtTime(230,t+0.32);
+    f.linearRampToValueAtTime(285,t+0.5); f.linearRampToValueAtTime(330,t+1.6); f.linearRampToValueAtTime(300,t+T);
+    const vib=c.createOscillator(), vibG=c.createGain(); vib.frequency.value=7.5; vibG.gain.setValueAtTime(0,t); vibG.gain.linearRampToValueAtTime(14,t+0.9);
+    vib.connect(vibG); vibG.connect(f);
+    const voiced=c.createGain(); v.connect(voiced);
+    // breath / rasp noise, strongest on the consonants
+    const n=c.createBufferSource(); n.buffer=this.noiseBuf; n.loop=true;
+    const nf=c.createBiquadFilter(); nf.type='highpass'; nf.frequency.value=1800;
+    const breath=c.createGain(); n.connect(nf); nf.connect(breath);
+    // loudness through the syllables: B(burst) a n z a iiiiiii (fade)
+    const g=voiced.gain; g.setValueAtTime(0,t);
+    g.linearRampToValueAtTime(1,t+0.03); g.setValueAtTime(1,t+0.2);
+    g.linearRampToValueAtTime(0.35,t+0.24); g.setValueAtTime(0.35,t+0.3);          // "n"
+    g.linearRampToValueAtTime(0.5,t+0.34); g.linearRampToValueAtTime(1,t+0.42);    // "z" -> "a"
+    g.setValueAtTime(1,t+1.5); g.linearRampToValueAtTime(0,t+T);                    // long "iiii", tailing off
+    const b=breath.gain; b.setValueAtTime(0.9,t); b.linearRampToValueAtTime(0.1,t+0.05);   // the "B" burst
+    b.setValueAtTime(0.1,t+0.3); b.linearRampToValueAtTime(0.8,t+0.33); b.linearRampToValueAtTime(0.15,t+0.42);   // "z" hiss
+    b.setValueAtTime(0.15,t+1.5); b.linearRampToValueAtTime(0,t+T);
+    // formants: a (F1 800, F2 1250) -> nasal n -> a -> i (F1 300, F2 2300), plus a steady F3 for brightness
+    const F=[[800,250,800,330],[1250,1500,1250,2350],[2700,2600,2700,3100]], Q=[5,7,9];
+    F.forEach((fr,k)=>{
+      const bp=c.createBiquadFilter(); bp.type='bandpass'; bp.Q.value=Q[k];
+      const p=bp.frequency; p.setValueAtTime(fr[0],t); p.setValueAtTime(fr[0],t+0.2); p.linearRampToValueAtTime(fr[1],t+0.24);
+      p.setValueAtTime(fr[1],t+0.3); p.linearRampToValueAtTime(fr[2],t+0.42); p.setValueAtTime(fr[2],t+0.5); p.linearRampToValueAtTime(fr[3],t+0.75);
+      const gk=c.createGain(); gk.gain.value=[1,0.8,0.45][k]*3;
+      voiced.connect(bp); breath.connect(bp); bp.connect(gk); gk.connect(clip);
+    });
+    v.start(t); vib.start(t); n.start(t); v.stop(t+T+0.05); vib.stop(t+T+0.05); n.stop(t+T+0.05);
   },
   boom(big){ this.noise(big?1.4:0.7, big?900:1400, big?0.9:0.55); },
   flak(){ this.noise(0.35, 1100, 0.22); },

@@ -296,7 +296,7 @@ function zeroAI(e, dt, lvl){
   // Badly damaged (20% or less) and within reach of our carrier: a suicide dive onto its deck.
   const C = G.carrier, cmid = C.x + C.len/2;
   if(e.max && e.hp <= e.max*0.2 && Math.abs(e.x - cmid) < 3500){
-    if(!e.kamikaze){ e.kamikaze = true; e.escort = null; say('מטוס זירו פגוע צולל בקמיקזה על הנושאת! בנזאי!', 2.5); SFX.banzai(); }
+    if(!e.kamikaze){ e.kamikaze = true; e.escort = null; say('מטוס זירו פגוע צולל בקמיקזה על הנושאת! בנזאיייייייי!', 2.5); SFX.banzai(); }
     e.speed += (e.base*1.25 - e.speed)*Math.min(1, dt*2);
     const want = Math.atan2(DECK_Y-4 - e.y, cmid - e.x), d = wrapA(want - e.a);
     e.a = wrapA(e.a + clamp(d, -2.2*dt, 2.2*dt));                     // no terrain avoidance: it means to hit
