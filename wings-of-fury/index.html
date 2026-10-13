@@ -69,7 +69,46 @@ button:disabled{opacity:.45;cursor:not-allowed}
   font-family:var(--body);font-size:clamp(12px,1.4vw,15px);color:rgba(255,244,214,.85);text-shadow:0 1px 3px #000}
 #title .credits b{font-family:var(--display);font-weight:400;letter-spacing:.06em;color:var(--signal)}
 #musicBtn{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:14px;background:rgba(8,14,24,.7);border-color:rgba(232,179,58,.6);color:var(--signal);font-size:14px}
-@media (prefers-reduced-motion:reduce){*{transition:none!important} #title .press{animation:none}}
+/* Home screen: the canvas sunset with flying planes shows through; side menu on the right, its panel beside it */
+.home{position:fixed;inset:0;z-index:5;direction:rtl;display:grid;grid-template-columns:minmax(230px,280px) minmax(0,620px) 1fr;
+  grid-template-rows:auto minmax(0,1fr);gap:14px 22px;padding:clamp(14px,3vh,30px) clamp(16px,3vw,40px) 20px;
+  background:linear-gradient(to left,rgba(8,14,24,.82),rgba(8,14,24,.45) 55%,rgba(8,14,24,.15));overflow:hidden}
+.home-title{grid-column:1/-1;text-align:center;text-shadow:0 3px 0 #5a1d10,0 0 24px rgba(0,0,0,.6)}
+.home-title h1{font-size:clamp(44px,8vw,86px)}
+.welcome{margin:6px 0 0;font-family:var(--display);font-size:clamp(18px,2.6vw,28px);color:#fff4d6;letter-spacing:.03em}
+.home-nav{display:flex;flex-direction:column;gap:10px;align-self:start}
+.home-nav .money{text-align:center;margin-bottom:2px;text-shadow:0 2px 6px #000}
+.navbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:right;padding:13px 16px;
+  background:rgba(14,26,43,.86);border:1px solid #3b5679;border-right:4px solid #3b5679;transition:background .15s,border-color .15s}
+.navbtn b{font-family:var(--display);font-weight:400;font-size:20px;color:var(--paper)}
+.navbtn small{font-size:12.5px;color:var(--steel)}
+.navbtn.on{border-color:var(--signal);background:rgba(29,49,80,.95)}
+.navbtn.on b{color:var(--signal)}
+button.link{background:none;border:none;color:var(--steel);font-size:13px;text-decoration:underline;align-self:center;margin-top:6px}
+button.link:hover{background:none;color:var(--paper)}
+.home-panel{min-height:0;overflow-y:auto;align-self:start;max-height:100%;background:rgba(22,38,61,.94);border:2px solid #2c4262;
+  border-radius:6px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.45);animation:panelIn .18s ease-out}
+@keyframes panelIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.list{display:flex;flex-direction:column;gap:8px}
+.item{display:flex;align-items:center;gap:12px;text-align:right;padding:10px 12px;background:#0f1d30;border:1px solid #2c4262;border-radius:5px}
+.item:hover:not(:disabled){border-color:var(--signal);background:#14263f}
+.item.next{border-color:var(--signal);box-shadow:inset 0 0 0 1px var(--signal)}
+.item .num{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#22344d;color:var(--signal);font-family:var(--display);font-size:17px}
+.item .txt{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
+.item .txt small{color:var(--steel);font-size:12.5px;font-weight:400;line-height:1.4}
+.pill.ok{background:#24452c;color:#bfe6c6}
+.board:has(.goals){width:min(700px,100%)}
+.goals{margin:8px 0 6px;padding-right:22px;line-height:1.7;font-size:15px}
+.goals li::marker{color:var(--signal);font-family:var(--display)}
+.tip{margin:10px 0 0;padding:9px 12px;border-right:3px solid var(--signal);background:#0f1d30;font-size:14px;color:var(--paper);border-radius:3px}
+.tip b{color:var(--signal)}
+@media (max-width:760px){
+  .home{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr);overflow-y:auto;background:rgba(8,14,24,.6)}
+  .home-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .home-nav .money,.home-nav .link{grid-column:1/-1}
+  .navbtn{padding:10px 12px} .navbtn b{font-size:17px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important} #title .press{animation:none}}
 </style>
 </head>
 <body>

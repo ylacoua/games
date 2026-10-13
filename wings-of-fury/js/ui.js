@@ -26,24 +26,69 @@ const UI = {
     <p class="note">נחיתה: התקרב לנושאת נמוך, במצערת נמוכה ובאף כמעט ישר. מהירות מתחת ל-225 וזווית קטנה.</p>`;
   },
 
+  // Home screen: the sunset sky with flying planes stays visible behind it (drawn on the canvas);
+  // a side menu on the right opens one panel at a time next to it.
+  homePanel: null,
   mainMenu(){
     this.confirmReset=false; Music.start();
-    const lv = LEVELS.map((L,i)=>{
-      const locked = i >= SAVE.unlocked;
-      return `<button class="card lvl ${locked?'locked':''}" data-act="level" data-v="${i}" ${locked?'disabled':''}>
-        <span class="spread"><b>${i+1}. ${L.name}</b>${L.boss?'<span class="pill boss">בוס</span>':''}</span>
-        <small>${({day:'יום',dawn:'שחר',dusk:'שקיעה',night:'לילה'})[L.time]}${L.rain?' · גשם':''}${L.wind?' · רוח':''}${SAVE.best[i]?' · ✓ הושלם':''}</small>
-      </button>`;}).join('');
-    this.show(`
-      <div class="spread"><div><h1>כנפי הרעם</h1><p class="sub">WINGS OF FURY · האוקיינוס השקט, 1944. טייס מנושאת מטוסים מול איים מבוצרים, ספינות ובוסים.</p></div>${this.money()}</div>
-      <div class="row"><button class="primary" data-act="level" data-v="${Math.min(SAVE.unlocked, LEVELS.length)-1}">המשך למשימה ${Math.min(SAVE.unlocked, LEVELS.length)}</button>
-      <button data-act="tutorial">הדרכה</button>
-      <button data-act="defense">הגנה על הנושאת</button>
-      <button data-act="ground">סיוע לכוחות היבשה</button>
-      <button data-act="training">משימת אימון (הכול חינם)</button>
-      <button data-act="reset">איפוס התקדמות</button></div>
-      <h3 style="margin-top:18px">משימות</h3><div class="levels">${lv}</div>
-      <h3 style="margin:18px 0 8px">שליטה</h3>${this.keysHTML()}`);
+    const p = this.homePanel;
+    const nav = [['tut','משימות הדרכה','שיעורי טיסה ואימון חופשי'],['camp','משימות הקמפיין','משימות 1 עד 6'],
+                 ['extra','משימות נוספות','הגנה על הנושאת · סיוע ליבשה'],['keys','תפעול המשחק','מקשים ולחצנים']]
+      .map(([k,t,s])=>`<button class="navbtn ${p===k?'on':''}" data-act="home" data-v="${k}" aria-expanded="${p===k}"><b>${t}</b><small>${s}</small></button>`).join('');
+    const reset = `<button class="link" data-act="reset">איפוס התקדמות</button>`;
+    this.root.innerHTML = `<div class="home">
+      <header class="home-title"><h1>כנפי הרעם</h1><p class="welcome">ברוכים הבאים טייסים</p></header>
+      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${nav}${reset}</nav>
+      ${p ? `<section class="home-panel" aria-live="polite">${this.homePanelHTML(p)}</section>` : ''}
+    </div>`;
+    this.bind();
+  },
+  homePanelHTML(p){
+    const time = {day:'יום',dawn:'שחר',dusk:'שקיעה',night:'לילה'};
+    if(p==='tut'){
+      const rows = LESSONS.map((L,i)=>`<button class="item" data-act="lesson" data-v="${i}">
+        <span class="num">${i+1}</span><span class="txt"><b>${L.name}</b><small>${L.desc}</small></span><span class="pill">${PLANES[L.plane].name}</span></button>`).join('');
+      return `<h2>משימות הדרכה</h2><p class="sub">שיעורים קצרים. ההוראות מופיעות בראש המסך ומתקדמות לבד כשאתה מבצע כל שלב.</p>
+        <div class="list">${rows}
+        <button class="item" data-act="training"><span class="num">✦</span><span class="txt"><b>אימון חופשי</b><small>כל המטוסים, השדרוגים ותנאי מזג האוויר, ללא עלות. ההתקדמות לא נשמרת.</small></span></button></div>`;
+    }
+    if(p==='camp'){
+      const rows = LEVELS.map((L,i)=>{
+        const locked = i >= SAVE.unlocked, done = SAVE.best[i], next = !locked && !done;
+        return `<button class="item ${next?'next':''}" data-act="brief" data-v="${i}" ${locked?'disabled':''}>
+          <span class="num">${i+1}</span><span class="txt"><b>${L.name}</b>
+          <small>${time[L.time]}${L.rain?' · גשם':''}${L.wind?' · רוח':''}${L.storm?' · סערה':''} · תגמול $${L.reward}</small></span>
+          ${L.boss?'<span class="pill boss">בוס</span>':''}${done?'<span class="pill ok">✓ הושלמה</span>':locked?'<span class="pill">🔒 נעולה</span>':''}</button>`;}).join('');
+      return `<h2>משימות הקמפיין</h2><p class="sub">האוקיינוס השקט, 1944. כל משימה שמושלמת פותחת את הבאה.</p><div class="list">${rows}</div>`;
+    }
+    if(p==='extra'){
+      const row = (k, L, icon) => `<button class="item" data-act="brief" data-v="${k}"><span class="num">${icon}</span>
+        <span class="txt"><b>${L.name}</b><small>${L.goals[0]} · תגמול $${L.reward}</small></span></button>`;
+      return `<h2>משימות נוספות</h2><p class="sub">משימות מיוחדות שאפשר לשחק בכל שלב, וכל הכסף שמרוויחים בהן נשמר.</p>
+        <div class="list">${row('def', DEFENSE, '⚓')}${row('gnd', GROUND, '⚑')}</div>`;
+    }
+    return `<h2>תפעול המשחק</h2><p class="sub">מקלדת. במסך מגע מופיעים לחצנים בתחתית המסך.</p>${this.keysHTML()}
+      <h3 style="margin:16px 0 8px">לחצני מסך מגע</h3>
+      <div class="keys"><b>▲ ▼ ◀ ▶</b><span>כמו מקשי החיצים</span><b>⇧ / ⇩</b><span>הגברה / הורדה של המצערת</span>
+      <b>✸</b><span>מקלעים</span><b>💣</b><span>הטלת חימוש</span><b>⚑</b><span>פקודה לכנפיים</span><b>II</b><span>עצירה</span></div>`;
+  },
+
+  // Short mission briefing between choosing a mission and the hangar: the situation, what must be done, a tip
+  briefing(k){
+    Music.start();
+    const L = k==='def' ? DEFENSE : k==='gnd' ? GROUND : LEVELS[k];
+    const time = {day:'יום',dawn:'שחר',dusk:'שקיעה',night:'לילה'};
+    const tag = typeof k==='number' ? `משימה ${k+1} מתוך ${LEVELS.length}` : 'משימה נוספת';
+    const cond = typeof k==='number'
+      ? [time[L.time], L.rain?'גשם':'', L.storm?'סערה וברקים':'', L.wind?`רוח ${L.wind>0?'ימינה':'שמאלה'}`:'', L.bombers?'מפציצי אויב':''].filter(Boolean)
+      : [];
+    this.show(`<div class="spread"><span class="pill">${tag}</span>${this.money()}</div>
+      <h2 style="margin-top:8px">תדריך: ${L.name}</h2>
+      <div class="row" style="margin:8px 0">${cond.map(c=>`<span class="pill">${c}</span>`).join('')}${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${L.reward}</span></div>
+      <p class="sub">${L.brief}</p>
+      <h3>מה צריך לעשות</h3><ol class="goals">${L.goals.map(g=>`<li>${g}</li>`).join('')}</ol>
+      ${L.tip?`<p class="tip"><b>טיפ:</b> ${L.tip}</p>`:''}
+      <div class="row" style="margin-top:16px;justify-content:flex-end"><button data-act="menu">חזרה</button><button class="primary" data-act="hangar" data-v="${k}">המשך לחדר התדריכים</button></div>`);
   },
 
   hangar(i){
@@ -223,7 +268,10 @@ const UI = {
       case 'reset':
         if(!this.confirmReset){ this.confirmReset=true; const b=this.root.querySelector('[data-act="reset"]'); b.textContent='לחץ שוב לאישור המחיקה'; return; }
         SAVE = defaultSave(); storeSave(); this.lo=null; this.mainMenu(); break;
-      case 'level': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar(+v); break;
+      case 'home': this.homePanel = this.homePanel===v ? null : v; this.mainMenu(); break;
+      case 'brief': G=null; this.briefing(v==='def'||v==='gnd' ? v : +v); break;
+      case 'level': G=null; this.briefing(+v); break;          // e.g. "next mission" after a win: briefing first
+      case 'hangar': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar(v==='def'||v==='gnd' ? v : +v); break;
       case 'tab': this.tab=v; this.hangar(this.level); break;
       case 'ord': lo.ord=v; this.hangar(this.level); break;
       case 'wadd': if(lo.wing.length<MAX_WINGMEN) lo.wing.push(v); this.hangar(this.level); break;

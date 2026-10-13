@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.38';
+const GAME_VERSION = '1.39';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -43,16 +43,28 @@ const WING_AMMO = 260;       // rounds a wingman fighter carries before it must 
 // time: day | dawn | dusk | night ; rain 0..1 ; wind px/s ; storm = lightning
 const LEVELS = [
   {name:'איי מרשל',         brief:'פשיטה ראשונה על שני איים מבוצרים. השמד את הבונקרים ואת סוללות הנ"מ. כל עוד יש באי מבנים פעילים, מטוסי זירו ימריאו ממנו.',
+   goals:['השמד את כל הבונקרים וסוללות הנ"מ בשני האיים','הטבע את המשחתת היפנית שבין האיים','חזור לנושאת ונחת כדי לסיים את המשימה'],
+   tip:'פצצות הן הנשק הטוב ביותר נגד בונקרים. צריפים ומכלי דלק אינם חובה, אבל מזכים בכסף.',
    time:'day',  rain:0,   wind:0,   storm:false, islands:2, ships:1, zeroEvery:22, bombers:false, boss:null,         reward:1000},
   {name:'שחר מעל סאיפן',     brief:'תקיפה עם עלות השחר. רוח צד חזקה מסיטה את הפצצות. נושאת מטוסים יפנית מאחורי האי האחרון משגרת מטוסי זירו.',
+   goals:['השמד את הבונקרים וסוללות הנ"מ בשלושת האיים','הטבע את המשחתת ואת נושאת המטוסים היפנית','חזור לנושאת ונחת כדי לסיים את המשימה'],
+   tip:'הרוח מסיטה את הפצצות לכיוונה. שחרר אותן מוקדם או מאוחר יותר בהתאם.',
    time:'dawn', rain:0,   wind:35,  storm:false, islands:3, ships:1, zeroEvery:16, bombers:false, boss:null, jcarrier:true,         reward:1400},
   {name:'סערה בים הפיליפינים', brief:'אוניית מערכה ענקית מסתתרת בסערה. השמד את הצריחים ואז הטבע אותה בטורפדו.',
+   goals:['השמד את הבונקרים וסוללות הנ"מ בשני האיים','הטבע את שתי המשחתות','השמד את צריחי אוניית המערכה והטבע אותה','חזור לנושאת ונחת כדי לסיים את המשימה'],
+   tip:'טורפדו מוטל מעל הים מגובה נמוך. מטוס האוונג׳ר נושא שניים, ושניים מטביעים אוניית מערכה.',
    time:'day',  rain:0.9, wind:-45, storm:true,  islands:2, ships:2, zeroEvery:15, bombers:false, boss:'battleship', reward:2500},
   {name:'פשיטת לילה',        brief:'לילה ללא ירח. זרקורים מכוונים את הנ"מ, ומפציצי אויב מנסים לפגוע בנושאת.',
+   goals:['השמד את הבונקרים וסוללות הנ"מ בשלושת האיים','הטבע את המשחתות ואת נושאת המטוסים היפנית','יירט את מפציצי האויב לפני שיגיעו לנושאת שלך','חזור לנושאת ונחת כדי לסיים את המשימה'],
+   tip:'השמד קודם את הזרקורים: בלעדיהם הנ"מ כמעט עיוור בחושך.',
    time:'night',rain:0,   wind:10,  storm:false, islands:3, ships:2, zeroEvery:14, bombers:true,  boss:null, jcarrier:true,         reward:2200},
   {name:'שקיעה מעל איוו ג׳ימה', brief:'סירה מעופפת ענקית מסוג "אמילי" מובילה את הגנת האי. הפל אותה.',
+   goals:['הפל את הסירה המעופפת "אמילי"','השמד את הבונקרים וסוללות הנ"מ בשלושת האיים','הטבע את המשחתת ואת נושאת המטוסים היפנית','חזור לנושאת ונחת כדי לסיים את המשימה'],
+   tip:'"אמילי" עמידה מאוד. צרף מטוסי כנף מסוג ווילדקט שיעזרו לך להפיל אותה.',
    time:'dusk', rain:0,   wind:25,  storm:false, islands:3, ships:1, zeroEvery:12, bombers:true,  boss:'emily', jcarrier:true,      reward:3200},
   {name:'מבצר אוקינאווה',     brief:'המשימה האחרונה: מבצר החוף עם תותחי ענק, בלילה סוער.',
+   goals:['השמד את מבצר החוף: תותחי הענק והמפקדה המבוצרת','השמד את הבונקרים וסוללות הנ"מ בשאר האיים','הטבע את המשחתות ואת נושאת המטוסים היפנית','חזור לנושאת ונחת כדי לסיים את המשימה'],
+   tip:'תותחי הענק עמידים מאוד. קח את החימוש הכבד ביותר, ושדרג "מתלי חימוש" לפני המשימה.',
    time:'night',rain:0.7, wind:-30, storm:true,  islands:3, ships:2, zeroEvery:10, bombers:true,  boss:'fortress', jcarrier:true,   reward:5000}
 ];
 
