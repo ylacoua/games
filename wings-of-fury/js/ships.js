@@ -50,9 +50,7 @@ function drawShip(ctx, sh){
   if(!sh.dead){
     ctx.translate(x, SEA); ctx.scale(d, 1);
     // a hit makes the ship itself flash brighter (not a white box over the sky behind it)
-    if(sh.flash>0) ctx.filter = 'brightness(1.8)';
-    body();
-    ctx.filter = 'none';
+    withFlash(ctx, sh.flash>0, body);
   } else {
     // broken in two at midships: each half tilts its far end up, the halves drift apart and slide under, faster and faster
     const s = sh.sink, depth = s*s*170, tilt = Math.min(s,0.7)*0.55, gap = s*12;

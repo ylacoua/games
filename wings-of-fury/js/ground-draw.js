@@ -14,7 +14,7 @@ function drawGround(ctx){
 function drawLST(ctx, L, S){
   const x = L.x, y = SEA;
   ctx.save();
-  if(L.flash>0) ctx.filter = 'brightness(1.7)';
+  withFlash(ctx, L.flash>0, ()=>{
   ctx.fillStyle = '#5f6c78';
   ctx.beginPath(); ctx.moveTo(x-80, y-16); ctx.lineTo(x+62, y-16); ctx.quadraticCurveTo(x+80, y-14, x+78, y+4); ctx.lineTo(x-74, y+6); ctx.quadraticCurveTo(x-84, y-2, x-80, y-16); ctx.fill();
   ctx.fillStyle = '#3c454e'; ctx.fillRect(x-78, y-3, 154, 4);                                                  // boot topping
@@ -33,6 +33,7 @@ function drawLST(ctx, L, S){
   // bow ramp: raised at sea, lowered onto the beach when unloading
   ctx.save(); ctx.translate(x+70, y-14); ctx.rotate(L.ramp*1.1);
   ctx.fillStyle='#4f5a64'; ctx.fillRect(0, -2, 22, 4); ctx.restore();
+  });
   ctx.restore();
   // hull strength
   if(L.hp < L.max){ const k = clamp(L.hp/L.max,0,1); ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(x-50, y-74, 100, 5);
@@ -101,7 +102,7 @@ function drawGI(ctx, u){
 // ---- the fallen: bodies and burnt-out tanks stay on the ground for a while ----
 function addBody(x, side, dir){
   (G.bodies ||= []).push({x, side, dir: dir || 1, t:0});
-  if(G.bodies.length > 140) G.bodies.shift();
+  if(G.bodies.length > 90) G.bodies.shift();
 }
 function addWreck(x, kind, dir){
   (G.wrecks ||= []).push({x, kind, dir, t:0});

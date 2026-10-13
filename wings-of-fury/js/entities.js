@@ -361,9 +361,13 @@ function hitShip(sh, d, kind, x){
 }
 
 // ---- effects ----
+// Caps so a big battle can't pile up thousands of particles: purely cosmetic smoke and sparks are
+// thinned out first once the scene is busy.
+const FX_MAX = 320, DEBRIS_MAX = 260;
 function boom(x,y,r,big,quiet){   // quiet: the caller plays its own sound (aircraft explosions)
   G.fx.push({type:'boom', x, y, r, t:0, max:big?0.9:0.6});
-  for(let i=0;i<(big?18:9);i++){
+  const busy = G.debris.length > DEBRIS_MAX*0.6;
+  for(let i=0;i<(big?18:9)*(busy?0.4:1);i++){
     const a=rnd(0,Math.PI*2), s=rnd(40,big?260:150);
     G.debris.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-80,r:0,vr:0,life:rnd(0.4,1),c:Math.random()<.5?'#ffcf5a':'#ff7a2a',spark:true});
   }
@@ -371,12 +375,14 @@ function boom(x,y,r,big,quiet){   // quiet: the caller plays its own sound (airc
   if(!quiet) SFX.boom(big);
 }
 function splash(x){ G.fx.push({type:'splash', x, y:SEA, t:0, max:0.9}); SFX.splash(); }
-function spark(x,y){ G.debris.push({x,y,vx:rnd(-60,60),vy:rnd(-80,0),r:0,vr:0,life:0.2,c:'#ffe7a0',spark:true}); }
-function puff(x,y,c,s,life=1){ G.fx.push({type:'smoke', x, y, c, s, t:0, max:life, vx:rnd(-10,10), vy:rnd(-25,-8)}); }
+function spark(x,y){ if(G.debris.length > DEBRIS_MAX) return; G.debris.push({x,y,vx:rnd(-60,60),vy:rnd(-80,0),r:0,vr:0,life:0.2,c:'#ffe7a0',spark:true}); }
+function puff(x,y,c,s,life=1){ if(G.fx.length > FX_MAX) return; G.fx.push({type:'smoke', x, y, c, s, t:0, max:life, vx:rnd(-10,10), vy:rnd(-25,-8)}); }
 
 function updateFx(dt){
   for(const f of G.fx){ f.t+=dt; if(f.type==='smoke'){ f.x+=f.vx*dt+G.weather.wind*0.3*dt; f.y+=f.vy*dt; } if(f.type==='text') f.y-=30*dt; }
   G.fx = G.fx.filter(f=>f.t<f.max);
   for(const d of G.debris){ d.vy+=400*dt; d.x+=d.vx*dt; d.y+=d.vy*dt; d.r+=d.vr*dt; d.life-=dt; if(d.y>groundY(d.x)){ d.y=groundY(d.x); d.vx*=0.5; d.vy*=-0.2; } }
   G.debris = G.debris.filter(d=>d.life>0);
+  if(G.fx.length > FX_MAX*1.5) G.fx.splice(0, G.fx.length - FX_MAX*1.5);          // drop the oldest
+  if(G.debris.length > DEBRIS_MAX*1.5) G.debris.splice(0, G.debris.length - DEBRIS_MAX*1.5);
 }

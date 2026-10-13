@@ -57,15 +57,22 @@ const SFX = {
     e.o2.frequency.setTargetAtTime(fr/2 + 0.7, t, 0.15);
     e.lfo.frequency.setTargetAtTime(fr/4, t, 0.15);
   },
+  // voice limiter: in a big battle dozens of shots and blasts can fire in the same instant; beyond a dozen
+  // short sounds per tenth of a second the extra ones are inaudible anyway and only load the audio thread
+  voice(){
+    const now = performance.now();
+    if(now - (this.vT||0) > 100){ this.vT = now; this.vN = 0; }
+    return ++this.vN <= 12;
+  },
   noise(dur, freq, vol, type='lowpass', q=1){
-    if(!this.ctx||this.muted) return;
+    if(!this.ctx||this.muted||(dur<1 && !this.voice())) return;
     const t=this.ctx.currentTime, s=this.ctx.createBufferSource(); s.buffer=this.noiseBuf;
     const f=this.ctx.createBiquadFilter(); f.type=type; f.frequency.setValueAtTime(freq,t); f.frequency.exponentialRampToValueAtTime(Math.max(40,freq*0.25),t+dur); f.Q.value=q;
     const g=this.ctx.createGain(); g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
     s.connect(f); f.connect(g); g.connect(this.master); s.start(t, Math.random()*0.5); s.stop(t+dur+0.05);
   },
   tone(f0,f1,dur,vol,type='square'){
-    if(!this.ctx||this.muted) return;
+    if(!this.ctx||this.muted||!this.voice()) return;
     const t=this.ctx.currentTime, o=this.ctx.createOscillator(), g=this.ctx.createGain(); o.type=type;
     o.frequency.setValueAtTime(f0,t); o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);
     g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
@@ -73,7 +80,7 @@ const SFX = {
   },
   // one shot from a battery of .50-cal guns: a sharp crack, a hard mid "bang" and a short low thump
   shot(vol, pitch){
-    if(!this.ctx||this.muted) return;
+    if(!this.ctx||this.muted||!this.voice()) return;
     const c=this.ctx, t=c.currentTime, out=c.createGain(); out.gain.value=vol; out.connect(this.master);
     const s=c.createBufferSource(); s.buffer=this.noiseBuf;
     const hp=c.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=4500*pitch;

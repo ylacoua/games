@@ -26,15 +26,29 @@ function islandHills(is){
   for(let i=0;i<n && b>a;i++) is.hills.push({c: a + (b-a)*(i+0.5)/n + rnd(-60,60), w: rnd(70,150), h: rnd(22,58)});
   return is.hills;
 }
+function islandSurface(is, x){
+  const t = Math.max(0, Math.min(x-is.x0, is.x1-x))/is.slope;
+  const s = t>=1 ? 1 : t*t*(3-2*t);
+  let hill = 0;
+  for(const h of islandHills(is)){ const k = (x-h.c)/h.w; hill += h.h*Math.exp(-k*k); }
+  return SEA - (is.h + hill)*s - (t>=1 ? Math.sin(x*0.013+is.seed)*3 : 0);
+}
+// The ground is asked for its height well over a thousand times a frame, so each island's profile is
+// sampled once into a table (every 2 px) and read back with linear interpolation.
+const HM_STEP = 2;
+function islandHeightMap(is){
+  if(is.hm) return is.hm;
+  const n = Math.ceil((is.x1-is.x0)/HM_STEP) + 2;
+  is.hm = new Float32Array(n);
+  for(let i=0;i<n;i++) is.hm[i] = islandSurface(is, is.x0 + i*HM_STEP);
+  return is.hm;
+}
 function groundY(x){
   if(!G) return SEA;
   for(const is of G.islands){
     if(x>is.x0 && x<is.x1){
-      const t = Math.min(x-is.x0, is.x1-x)/is.slope;
-      const s = t>=1 ? 1 : t*t*(3-2*t);
-      let hill = 0;
-      for(const h of islandHills(is)){ const k = (x-h.c)/h.w; hill += h.h*Math.exp(-k*k); }
-      return SEA - (is.h + hill)*s - (t>=1 ? Math.sin(x*0.013+is.seed)*3 : 0);
+      const hm = is.hm || islandHeightMap(is), f = (x-is.x0)/HM_STEP, i = f|0;
+      return hm[i] + (hm[i+1]-hm[i])*(f-i);
     }
   }
   return SEA;

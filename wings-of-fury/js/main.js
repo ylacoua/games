@@ -3,9 +3,13 @@ const cv = document.getElementById('game');
 const ctx = cv.getContext('2d');
 let CW=0, CH=0;
 
+// The canvas is stretched to the window by CSS; its own resolution is capped to a pixel budget
+// (about 1080p x 1.2) so sharp 4K / 150-200 % displays don't draw up to 4x the pixels every frame.
+const PIXEL_BUDGET = 2.5e6;
 function resize(){
-  const dpr = Math.min(window.devicePixelRatio||1, 2);
-  CW = Math.floor(window.innerWidth*dpr); CH = Math.floor(window.innerHeight*dpr);
+  const w = window.innerWidth, h = window.innerHeight;
+  const dpr = Math.min(window.devicePixelRatio||1, 2, Math.sqrt(PIXEL_BUDGET/(w*h)));
+  CW = Math.floor(w*dpr); CH = Math.floor(h*dpr);
   cv.width = CW; cv.height = CH;
 }
 window.addEventListener('resize', resize); resize();
@@ -79,13 +83,22 @@ function update(dt, vw){
   G.cam.x = clamp(G.cam.x, -500, G.L+500-vw);
 }
 
-let last = performance.now();
+// Game clock: the real time since the last frame is simulated in steps of at most 1/60 s, so a slow frame
+// is caught up instead of making the whole game slow down and lurch. Tiny frame-to-frame jitter in the
+// browser's timestamps is smoothed out; a long gap (tab switched away) is limited to 0.1 s.
+let last = performance.now(), smoothDt = 1/60;
+const STEP = 1/60;
 function frame(now){
-  const dt = Math.min(0.033, (now-last)/1000) * GAME_SPEED; last = now;
+  let real = Math.min(0.1, Math.max(0, (now-last)/1000)); last = now;
+  if(Math.abs(real - smoothDt) < smoothDt*0.25) real = smoothDt = smoothDt*0.9 + real*0.1;   // de-jitter normal frames
   if(G){
     const vw = viewMetrics(CW, CH).vw;
-    const running = !G.paused && G.state!=='rearm' && G.state!=='over';
-    if(running) update(dt, vw);
+    const steps = Math.min(6, Math.ceil(real/STEP - 0.01));
+    for(let i=0;i<steps;i++){
+      const running = G && !G.paused && G.state!=='rearm' && G.state!=='over';
+      if(!running) break;
+      update(real/steps * GAME_SPEED, vw);
+    }
     render(ctx, CW, CH);
   } else drawTitleBackdrop(now/1000);
   requestAnimationFrame(frame);

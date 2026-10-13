@@ -38,12 +38,20 @@ function drawFooting(ctx, s){
   ctx.stroke();
 }
 
+// Hit flash: draw the object, then draw it again additively at half strength so it glows brighter.
+// (ctx.filter = 'brightness()' looked the same but re-processes the whole canvas layer: up to ~1 s per frame.)
+function withFlash(ctx, on, paint){
+  paint();
+  if(!on) return;
+  ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.5; paint(); ctx.restore();
+}
+
 function drawStruct(ctx, s){
   const x=s.x, y=s.y, w=s.w, h=s.h, night = G.weather.time==='night';
   drawFooting(ctx, s);
   if(s.dead){ drawRubble(ctx, s); return; }
   ctx.save();
-  if(s.flash>0) ctx.filter = 'brightness(1.8)';      // hit flash on the building only, not a box around it
+  withFlash(ctx, s.flash>0, ()=>{                    // hit flash on the building only, not a box around it
   switch(s.type){
     case 'bunker': {                                   // reinforced-concrete pillbox under camouflage netting
       sandbags(ctx, x-w/2-6, x+w/2+6, y, 2);
@@ -144,6 +152,7 @@ function drawStruct(ctx, s){
       sandbags(ctx, x-w/2-8, x-w/2+30, y, 2); sandbags(ctx, x+w/2-30, x+w/2+8, y, 2);
       break; }
   }
+  });
   ctx.restore();
   if(s.max>100 && s.hp<s.max){ ctx.fillStyle='#000a'; ctx.fillRect(x-w/2,y-h-12,w,3); ctx.fillStyle='#e8b33a'; ctx.fillRect(x-w/2,y-h-12,w*s.hp/s.max,3); }
 }
