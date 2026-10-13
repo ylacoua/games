@@ -48,6 +48,7 @@ function render(ctx, cw, ch){
   for(const s of G.structures) if(s.x>x0-100 && s.x<x1+100) drawStruct(ctx, s);
   for(const sh of G.ships) if(sh.x+sh.w>x0 && sh.x-sh.w<x1) drawShip(ctx, sh);
   for(const so of G.soldiers) drawSoldier(ctx, so);
+  if(G.ground) drawGround(ctx);
   // projectiles
   ctx.lineCap='round';
   for(const s of G.shots){ ctx.strokeStyle = s.team==='p'?'#ffe58a':'#ff8f6b'; ctx.lineWidth = s.small ? 1 : 2; ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x-s.vx*0.012, s.y-s.vy*0.012); ctx.stroke(); }
@@ -108,6 +109,7 @@ function render(ctx, cw, ch){
   drawHUD(ctx, vw, vw0);
   drawTutorial(ctx, vw);
   drawDefenseHUD(ctx, vw);
+  drawGroundHUD(ctx, vw);
   }
 }
 
@@ -161,13 +163,13 @@ function drawIsland(ctx, is){
 
 // infantryman in khaki with a helmet and rifle: runs while nothing is in reach, kneels and fires at low aircraft
 function drawSoldier(ctx, so){
-  const x=so.x, y=so.y, aiming = so.aim != null;
+  const x=so.x, y=so.y, aiming = so.aim != null || so.def;     // entrenched defenders kneel facing the landing
   ctx.lineCap='round';
   ctx.strokeStyle='#5a5330'; ctx.lineWidth=2;
   if(aiming){
     ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+3,y-2); ctx.lineTo(x+3,y); ctx.moveTo(x,y-6); ctx.lineTo(x-4,y); ctx.stroke();        // kneeling
     ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y-11); ctx.stroke();
-    const ca=Math.cos(so.aim), sa=Math.sin(so.aim);
+    const aim = so.aim ?? Math.PI*1.02, ca=Math.cos(aim), sa=Math.sin(aim);
     ctx.strokeStyle='#3b2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-ca*3, y-10-sa*3); ctx.lineTo(x+ca*8, y-10+sa*8); ctx.stroke();   // rifle
     ctx.strokeStyle='#5a5330'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(x,y-10); ctx.lineTo(x+ca*4, y-10+sa*4); ctx.stroke();               // arms
     if(so.fireT>0){ ctx.fillStyle='rgba(255,220,120,.95)'; ctx.beginPath(); ctx.arc(x+ca*9.5, y-10+sa*9.5, 1.8, 0, 7); ctx.fill(); }
@@ -235,6 +237,7 @@ function drawFx(ctx, f){
     case 'wake':
       ctx.fillStyle=`rgba(230,245,255,${0.5*(1-k)})`; ctx.fillRect(f.x-6-k*10, f.y, 12+k*20, 2); break;
     case 'column': drawColumn(ctx, f); break;
+    case 'tracer': ctx.strokeStyle=f.c; ctx.lineWidth=0.8; ctx.globalAlpha=1-k; ctx.beginPath(); ctx.moveTo(f.x1,f.y1); ctx.lineTo(f.x2,f.y2); ctx.stroke(); ctx.globalAlpha=1; break;
     case 'text':
       ctx.font='bold 14px Rubik, sans-serif'; ctx.textAlign='center'; ctx.fillStyle=`rgba(255,215,90,${1-k})`; ctx.fillText(f.text,f.x,f.y); break;
   }

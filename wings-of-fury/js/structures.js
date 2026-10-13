@@ -87,6 +87,15 @@ function drawStruct(ctx, s){
       ctx.fillStyle = night ? '#fffbe0' : '#d9dccd'; ctx.beginPath(); ctx.ellipse(6.5,0,1.8,6,0,0,7); ctx.fill();
       ctx.restore();
       break; }
+    case 'arty': {                                     // field gun behind a shield, barrel raised to lob shells
+      const ca=Math.cos(s.aim), sa=Math.sin(s.aim), py=y-12;
+      ctx.strokeStyle='#2f2e28'; ctx.lineWidth=4; ctx.lineCap='butt'; ctx.beginPath(); ctx.moveTo(x, py); ctx.lineTo(x+ca*30, py+sa*30); ctx.stroke();
+      ctx.fillStyle='#5d5a44'; ctx.beginPath(); ctx.moveTo(x-6,py-8); ctx.lineTo(x+6,py-10); ctx.lineTo(x+7,py+6); ctx.lineTo(x-6,py+6); ctx.fill();   // gun shield
+      ctx.fillStyle='#3a3628'; ctx.beginPath(); ctx.arc(x-4, y-4, 4, 0, 7); ctx.fill(); ctx.beginPath(); ctx.arc(x+5, y-4, 4, 0, 7); ctx.fill();   // wheels
+      ctx.strokeStyle='#4a4535'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x, y-6); ctx.lineTo(x-20, y-1); ctx.stroke();                         // trail
+      ctx.fillStyle='#5a4a2c'; ctx.fillRect(x+12, y-6, 6, 6); ctx.fillRect(x+13, y-10, 5, 4);                                                    // shell boxes
+      sandbags(ctx, x-w/2, x+w/2, y, 2);
+      break; }
     case 'biggun': {                                   // coastal-defence gun in a concrete casemate
       const ca=Math.cos(s.aim), sa=Math.sin(s.aim), py=y-h+15;
       ctx.strokeStyle='#2f2e29'; ctx.lineWidth=7; ctx.lineCap='butt'; ctx.beginPath(); ctx.moveTo(x, py); ctx.lineTo(x+ca*62, py+sa*62); ctx.stroke();

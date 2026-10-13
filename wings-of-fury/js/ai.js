@@ -100,8 +100,10 @@ function updateGround(dt){
       }
     } else {
       so.aim = null;
-      so.x += so.dir*so.speed*dt; so.y = groundY(so.x);
-      if(groundY(so.x+so.dir*12) > SEA-14) so.dir = -so.dir;
+      if(!so.def){                                             // entrenched defenders hold their positions
+        so.x += so.dir*so.speed*dt; so.y = groundY(so.x);
+        if(groundY(so.x+so.dir*12) > SEA-14) so.dir = -so.dir;
+      }
     }
   }
   G.soldiers = G.soldiers.filter(s=>!s.dead);
@@ -189,7 +191,7 @@ function shootFrom(e, team, dmg, spd=760){
 function launchSites(){
   const sites = [];
   G.islands.forEach((is,i)=>{
-    if(is.strip && G.structures.some(s=>s.island===i && !s.dead)) sites.push({kind:'island', x:(is.strip.x0+is.strip.x1)/2, is});
+    if(is.strip && !is.captured && G.structures.some(s=>s.island===i && !s.dead)) sites.push({kind:'island', x:(is.strip.x0+is.strip.x1)/2, is});
   });
   for(const sh of G.ships) if(sh.type==='jcarrier' && !sh.dead) sites.push({kind:'carrier', x:sh.x, sh});
   return sites;
@@ -313,6 +315,7 @@ function zeroAI(e, dt, lvl){
     const d = Math.hypot(w.x-e.x, w.y-e.y);
     if(!tg || d*1.3 < tg.d) tg = {x:w.x, y:w.y, vx:Math.cos(w.a)*w.speed, vy:Math.sin(w.a)*w.speed, d};
   }
+  if(!tg && G.def.mode==='ground' && G.ground) tg = groundStrafeTarget(e);     // nothing in the air: strafe the landing force
   if(!tg && G.def.mode==='defense'){                      // nothing in the air: strafe the carrier
     const C = G.carrier, cx = C.x + C.len/2;
     tg = {x:cx, y:DECK_Y-12, vx:0, vy:0, d:Math.hypot(cx-e.x, DECK_Y-12-e.y)};

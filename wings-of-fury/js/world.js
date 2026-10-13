@@ -8,6 +8,7 @@ const STRUCT = {
   fuel:    {w:36,  h:30, hp:30,  primary:false},
   light:   {w:22,  h:26, hp:25,  primary:false},
   biggun:  {w:84,  h:42, hp:320, primary:true},
+  arty:    {w:56,  h:26, hp:150, primary:true},
   core:    {w:130, h:72, hp:900, primary:true}
 };
 
@@ -33,7 +34,7 @@ function newLevel(idx, loadout, def){
   const L = def || LEVELS[idx];
   const st = planeStats(loadout.plane, loadout.up);
   G = {
-    idx, def:L, time:0, cam:{x:0, top:0}, islands:[], structures:[], ships:[], soldiers:[], enemies:[], wingmen:[],
+    idx, def:L, time:0, cam:{x:0, top:0}, islands:[], structures:[], ships:[], soldiers:[], jtanks:[], enemies:[], wingmen:[],
     shots:[], drops:[], flak:[], fx:[], debris:[], clouds:[], rain:[],
     carrier:{x:150, len:520, hp:400, max:400, hit:0},
     weather:{time:L.time, rain:L.rain, wind:L.wind, storm:L.storm, flash:0, gust:0},

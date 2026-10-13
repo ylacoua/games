@@ -39,6 +39,7 @@ const UI = {
       <div class="row"><button class="primary" data-act="level" data-v="${Math.min(SAVE.unlocked, LEVELS.length)-1}">המשך למשימה ${Math.min(SAVE.unlocked, LEVELS.length)}</button>
       <button data-act="tutorial">הדרכה</button>
       <button data-act="defense">הגנה על הנושאת</button>
+      <button data-act="ground">סיוע לכוחות היבשה</button>
       <button data-act="training">משימת אימון (הכול חינם)</button>
       <button data-act="reset">איפוס התקדמות</button></div>
       <h3 style="margin-top:18px">משימות</h3><div class="levels">${lv}</div>
@@ -49,7 +50,7 @@ const UI = {
     this.level = i; Music.start();
     if(!this.lo) this.lo = {plane:SAVE.plane, ord:'bomb', wing:[]};
     if(!SAVE.owned[this.lo.plane]) this.lo.plane='hellcat';
-    const def = i==='def', L = def ? DEFENSE : LEVELS[i], tab=this.tab;
+    const def = i==='def' || i==='gnd', L = i==='def' ? DEFENSE : i==='gnd' ? GROUND : LEVELS[i], tab=this.tab;
     const tabs = [['mission','תדריך וחימוש'],['planes','מטוסים'],['upgrades','שדרוגים']]
       .map(([k,t])=>`<button class="${tab===k?'on':''}" data-act="tab" data-v="${k}">${t}</button>`).join('');
     let body='';
@@ -58,7 +59,7 @@ const UI = {
       const ords = Object.keys(ORD).map(k=>`<button class="card ${this.lo.ord===k?'sel':''}" data-act="ord" data-v="${k}" style="text-align:right">
         <b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
       // in Carrier Defense the wingmen are free
-      const wprice = k => def ? 0 : WINGMEN[k].cost;
+      const wprice = k => i==='def' ? 0 : WINGMEN[k].cost;
       const wcost = this.lo.wing.reduce((s,w)=>s+wprice(w),0);
       const wings = Object.keys(WINGMEN).map(k=>{const d=WINGMEN[k], n=this.lo.wing.filter(x=>x===k).length;
         return `<div class="card"><div class="spread"><b>${d.name}</b><span class="pill">${def ? 'חינם' : '$'+d.cost}</span></div><p>${d.desc}</p>
@@ -130,6 +131,21 @@ const UI = {
       <div class="row"><button class="primary" data-act="defense">שחק שוב</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
+  // end of a Ground Support game: money earned is kept, the victory reward is added on success
+  groundResult(win, reason){
+    const S = G.ground, gain = win ? G.earned + GROUND.reward : Math.round(G.earned*0.5);
+    SAVE.money += gain; storeSave();
+    const taken = G.islands.filter(is=>is.captured).length;
+    const left = S.inf + S.tanks + usUnits().length;
+    this.show(`<h1 style="font-size:40px">${win ? 'ניצחון! שלושת האיים נכבשו' : 'המשימה נכשלה'}</h1>
+      <p class="sub">${win ? 'הדגל האמריקאי מתנופף על שלושת האיים.' : reason}</p>
+      <div class="stats" style="font-size:15px;margin-bottom:16px"><span>איים שנכבשו</span><span>${taken} מתוך 3</span>
+      <span>כוחות ששרדו</span><span>${S.inf + usUnits().filter(u=>u.type==='inf').length} חיילים, ${S.tanks + usUnits().filter(u=>u.type==='tank').length} טנקים</span>
+      <span>השמדות</span><span>${G.kills}</span>${win ? `<span>תגמול ניצחון</span><span>$${GROUND.reward}</span>` : '<span>שלל שנשמר</span><span>50%</span>'}
+      <span>סה"כ הרווחת</span><span>$${gain}</span></div>
+      <div class="row"><button class="primary" data-act="ground">שחק שוב</button><button data-act="menu">תפריט ראשי</button></div>`);
+  },
+
   // flight-school lesson list
   tutorialMenu(){
     Music.start();
@@ -185,6 +201,7 @@ const UI = {
       return;
     }
     if(G.defense){ this.defenseResult(win, reason); return; }
+    if(G.ground){ this.groundResult(win, reason); return; }
     const L = G.def, gain = win ? G.earned + L.reward : Math.round(G.earned*0.5);
     SAVE.money += gain;
     if(win){ SAVE.best[G.idx]=true; SAVE.unlocked = Math.max(SAVE.unlocked, Math.min(LEVELS.length, G.idx+2)); }
@@ -219,6 +236,7 @@ const UI = {
         if(cost>SAVE.money) return;
         SAVE.money -= cost; storeSave();
         if(this.level==='def'){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, {...DEFENSE}); defenseSetup(); }
+        else if(this.level==='gnd'){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, {...GROUND}); groundSetup(); }
         else newLevel(this.level, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()});
         this.hide(); break;
       }
@@ -235,6 +253,7 @@ const UI = {
       case 'training': G=null; this.trainingHangar(); break;
       case 'tutorial': G=null; this.tutorialMenu(); break;
       case 'defense': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar('def'); break;
+      case 'ground': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar('gnd'); break;
       case 'lesson': this.hide(); startLesson(+v); break;
       case 'tplane': this.tr.plane=v; this.trainingHangar(); break;
       case 'tord': this.tr.ord=v; this.trainingHangar(); break;
@@ -273,7 +292,7 @@ function drawHUD(ctx, vw, worldVW){
   ctx.textAlign='left'; ctx.direction='ltr'; ctx.fillStyle='#e8b33a'; ctx.font='18px "Secular One", Rubik, sans-serif'; ctx.fillText('$'+G.earned, 18, 24);
   ctx.textAlign='right'; ctx.direction='rtl'; ctx.font='13px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
   ctx.fillText(G.training ? 'אימון · מטוסים: ∞' : `מטוסים: ${'✈'.repeat(Math.max(0,G.lives))}`, 178, 44);
-  ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
+  ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : G.ground ? `איים שנכבשו: ${G.islands.filter(is=>is.captured).length}/3` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
   if(G.wingmen.length){ const alive=G.wingmen.filter(w=>!w.dead).length; ctx.fillText(`כנפיים ${alive}/${G.wingmen.length}: ${({escort:'ליווי', attack:'תקיפה', defend:'הגנת נושאת'})[G.wingMode]} (C)`, 178, 80); }
   { // carrier strength gauge: green, amber below 60%, red below 30%
     const k = clamp(G.carrier.hp/G.carrier.max, 0, 1);

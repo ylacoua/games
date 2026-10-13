@@ -285,6 +285,7 @@ function explode(x, y, r, dmg, team, kind){
       if(Math.abs(x-sh.x) < sh.w/2 + r && y > SEA - sh.h - r) hitShip(sh, dmg, kind, x);
     }
     for(const so of G.soldiers) if(!so.dead && !(so.safe>0) && Math.abs(so.x-x)<r && y>so.y-40) killSoldier(so);
+    groundBlast(x, y, r, dmg);
     for(const e of G.enemies) if(!e.dead && dist2(x,y,e.x,e.y) < (r+(e.size||16))**2) hurtEnemy(e, dmg*0.8);
   } else {
     const P=G.player;
@@ -309,6 +310,7 @@ function bulletVsEnemy(s){
   for(const so of G.soldiers){
     if(!so.dead && Math.abs(s.x-so.x)<6 && s.y>so.y-14 && s.y<so.y+2){ s.life=0; killSoldier(so); return; }
   }
+  groundBulletHit(s);                                       // Ground Support: Chi-Ha tanks
 }
 function bulletVsFriend(s){
   const P=G.player;
@@ -325,7 +327,7 @@ function earn(type, x, y){
 
 function hitStruct(s, d, kind){
   if(s.dead) return;
-  if(kind==='gun') d *= ({bunker:0.15, biggun:0.12, core:0.08, aa:0.6, barracks:0.45, fuel:1, light:1})[s.type];
+  if(kind==='gun') d *= ({bunker:0.15, biggun:0.12, core:0.08, aa:0.6, barracks:0.45, fuel:1, light:1, arty:0.3})[s.type] ?? 0.5;
   s.hp -= d; s.flash = 0.1;
   if(s.hp<=0){
     s.dead=true; earn(s.type, s.x, s.y-s.h);
