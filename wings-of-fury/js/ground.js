@@ -66,12 +66,16 @@ function tracer(x1,y1,x2,y2,us){ G.fx.push({type:'tracer', x1, y1, x2, y2, c: us
 function hitUS(u, d){
   if(u.dead) return;
   u.hp -= d; u.flash = 0.1;
-  if(u.hp<=0){ u.dead = true; if(u.type==='tank'){ boom(u.x, u.y-8, 30, true); G.debris.push({x:u.x,y:u.y-6,vx:rnd(-40,40),vy:-120,r:0,vr:3,life:2,c:'#4b5530'}); } }
+  if(u.hp<=0){
+    u.dead = true;
+    if(u.type==='tank'){ boom(u.x, u.y-8, 30, true); G.debris.push({x:u.x,y:u.y-6,vx:rnd(-40,40),vy:-120,r:0,vr:3,life:2,c:'#4b5530'}); addWreck(u.x, 'patton', 1); }
+    else addBody(u.x, 'us', 1);
+  }
 }
 function hitJPTank(t, d){
   if(t.dead) return;
   t.hp -= d; t.flash = 0.1;
-  if(t.hp<=0){ t.dead = true; boom(t.x, t.y-8, 34, true); earn('chiha', t.x, t.y-10); }
+  if(t.hp<=0){ t.dead = true; boom(t.x, t.y-8, 34, true); earn('chiha', t.x, t.y-10); addWreck(t.x, 'chiha', -1); }
 }
 
 // ---------- main update ----------
@@ -127,7 +131,7 @@ function groundUpdate(dt){
     let left = 0;
     for(const u of S.units){
       if(u.dead) continue;
-      if(u.x > is.x0 + 35){ u.x -= (u.type==='tank'?PATTON:US_INF).speed*1.6*dt; u.y = groundY(u.x); left++; }
+      if(u.x > is.x0 + 35){ const v = (u.type==='tank'?PATTON:US_INF).speed*1.6; u.x -= v*dt; u.y = groundY(u.x); u.moving = true; u.back = true; u.dist = (u.dist||0) - v*dt; left++; }
       else { u.dead = true; u.boarded = true; if(u.type==='tank') S.tanks++; else S.inf++; }
     }
     if(left===0){ S.units = []; S.island++; S.phase = 'sail'; say('הנחתת יוצאת לאי הבא', 3); }
@@ -163,9 +167,9 @@ function updateUSUnits(dt){
     const crowded = u.type==='inf' && S.units.some(o=>o!==u && !o.dead && o.type==='inf' && o.x > u.x && o.x - u.x < 7);
     if(!crowded && !(tg && td < st.range*u.rf)){
       const front = G.islands[S.island].x1 - 60;
-      if(u.x < front + u.off) u.x += st.speed*dt;
+      if(u.x < front + u.off){ u.x += st.speed*dt; u.moving = true; u.dist = (u.dist||0) + st.speed*dt; } else u.moving = false;
       u.y = groundY(u.x);
-    }
+    } else u.moving = false;
     if(tg){
       u.aim = Math.atan2(tg.y-(u.y-10), tg.x-u.x);
       if(u.cool<=0){
@@ -202,7 +206,8 @@ function updateJPGround(dt){
       if(u){
         const dx = u.x - s.x;
         if(Math.abs(dx) > 14){
-          s.dir = Math.sign(dx); s.x = Math.max(G.islands[S.island].x0 + 12, s.x + s.dir*30*dt); s.y = groundY(s.x);
+          const isl = G.islands[S.island];
+          s.dir = Math.sign(dx); s.x = clamp(s.x + s.dir*30*dt, isl.x0 + 12, isl.x1 - 12); s.y = groundY(s.x);
           s.t += dt; s.running = true;
         } else {
           s.mcool = (s.mcool ?? 0) - dt;
@@ -224,10 +229,15 @@ function updateJPGround(dt){
   for(const t of G.jtanks){
     if(t.dead) continue;
     t.flash = Math.max(0, t.flash-dt); t.cool -= dt;
-    const u = nearestUS(t.x, S.charge ? 6000 : 520);         // in the counter-attack the tanks drive straight at the landing
+    const home = G.islands[t.island];
+    const u = t.island===S.island ? nearestUS(t.x, S.charge ? 6000 : 520) : null;   // only on the island under attack
     if(u){
       const d = Math.abs(u.x-t.x);
-      if(d > CHIHA.range*0.85){ t.x += Math.sign(u.x-t.x)*CHIHA.speed*dt; t.y = groundY(t.x); t.moving = true; }
+      if(d > CHIHA.range*0.85){
+        const nx = clamp(t.x + Math.sign(u.x-t.x)*CHIHA.speed*dt, home.x0 + home.slope*0.6, home.x1 - home.slope*0.6);
+        t.moving = nx !== t.x; t.dist = (t.dist||0) + Math.abs(nx - t.x); t.x = nx; t.y = groundY(t.x);
+        if(t.moving && Math.random() < dt*3) puff(t.x + 13, t.y - 8, 'rgba(60,60,60,.5)', 4, 1);   // exhaust
+      }
       else t.moving = false;
       t.aim = Math.atan2(u.y-8-(t.y-9), u.x-t.x);
       if(d < CHIHA.range && t.cool<=0){

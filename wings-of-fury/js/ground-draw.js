@@ -53,52 +53,135 @@ function drawFlagpole(ctx, is){
   if(is.flag.t > 0.15) drawUSFlag(ctx, x+1, gy-h, 1.2);
 }
 
-// US Marine/GI: dark green fatigues, round M1 helmet with netting, backpack, M1 rifle; faces the enemy (right)
+// ---- articulated figures: hips, knees and feet from a walk/run cycle, body bob and swinging arms ----
+// ph: cycle phase, amp: stride (0 = standing), dir: facing (+1 right / -1 left). Returns the body bob.
+function legs(ctx, x, y, ph, amp, dir, cloth, boot){
+  const bob = -Math.abs(Math.sin(ph))*0.8*amp;
+  ctx.lineCap='round';
+  for(let i=0;i<2;i++){
+    const p = ph + i*Math.PI;
+    const thigh = Math.sin(p)*0.6*amp, bend = Math.max(0, Math.cos(p))*1.0*amp;   // the knee folds on the forward swing
+    const hx = x, hy = y - 7 + bob;
+    const kx = hx + dir*Math.sin(thigh)*3.8, ky = hy + Math.cos(thigh)*3.8;
+    const sa = thigh - bend;
+    const fx = kx + dir*Math.sin(sa)*3.6, fy = Math.min(y, ky + Math.cos(sa)*3.6);
+    ctx.strokeStyle = i ? shade(cloth) : cloth; ctx.lineWidth = 1.9;
+    ctx.beginPath(); ctx.moveTo(hx,hy); ctx.lineTo(kx,ky); ctx.lineTo(fx,fy); ctx.stroke();
+    ctx.strokeStyle = boot; ctx.lineWidth = 1.7; ctx.beginPath(); ctx.moveTo(fx,fy); ctx.lineTo(fx+dir*1.6,fy); ctx.stroke();
+  }
+  return bob;
+}
+function shade(hex){ const n=parseInt(hex.slice(1),16); return `rgb(${((n>>16)&255)*0.78|0},${((n>>8)&255)*0.78|0},${(n&255)*0.78|0})`; }
+
+// US Marine/GI: dark green fatigues, round M1 helmet with netting, backpack, M1 rifle.
+// Walks with a proper stride while advancing (backwards to the boat when re-embarking), stands and fires.
 function drawGI(ctx, u){
-  const x=u.x, y=u.y, body = u.flash>0 ? '#fff' : '#3c5226';
-  ctx.lineCap='round'; ctx.strokeStyle = body; ctx.lineWidth=2;
-  const leg = Math.sin(u.t*12)*3;
-  ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+leg,y); ctx.moveTo(x,y-6); ctx.lineTo(x-leg,y); ctx.stroke();
-  ctx.strokeStyle='#2a2418'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(x+leg*0.7,y-1); ctx.lineTo(x+leg,y); ctx.moveTo(x-leg*0.7,y-1); ctx.lineTo(x-leg,y); ctx.stroke();  // boots
-  ctx.strokeStyle = body; ctx.lineWidth=2.6; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y-12); ctx.stroke();
-  ctx.fillStyle='#4a5a30'; ctx.fillRect(x-3.2, y-11.5, 2, 4.5);                                                   // backpack
-  const a = u.aim || 0;
-  ctx.strokeStyle='#3a2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-Math.cos(a)*2, y-10-Math.sin(a)*2); ctx.lineTo(x+Math.cos(a)*8, y-10+Math.sin(a)*8); ctx.stroke();
-  if(u.fireT>0){ ctx.fillStyle='rgba(255,230,140,.95)'; ctx.beginPath(); ctx.arc(x+Math.cos(a)*9.5, y-10+Math.sin(a)*9.5, 1.6, 0, 7); ctx.fill(); }
-  ctx.fillStyle='#e0bb92'; ctx.beginPath(); ctx.arc(x,y-14,2,0,7); ctx.fill();
-  ctx.fillStyle='#2e4220'; ctx.beginPath(); ctx.ellipse(x,y-15.2,3.4,2.4,0,Math.PI,0); ctx.fill();                 // round M1 helmet
-  ctx.strokeStyle='rgba(20,30,10,.6)'; ctx.lineWidth=0.4; ctx.beginPath(); ctx.moveTo(x-3,y-15.5); ctx.lineTo(x+3,y-15.5); ctx.stroke();   // helmet netting
+  const x=u.x, y=u.y, cloth = u.flash>0 ? '#ffffff' : '#3c5226', dir = u.back ? -1 : 1;
+  const walking = u.moving, ph = (u.dist||0)*0.32;
+  const bob = legs(ctx, x, y, walking ? ph : 0, walking ? 1 : 0, dir, cloth, '#2a2418');
+  ctx.strokeStyle = cloth; ctx.lineWidth=2.8; ctx.beginPath(); ctx.moveTo(x, y-7+bob); ctx.lineTo(x+dir*0.6, y-12.5+bob); ctx.stroke();   // torso
+  ctx.fillStyle='#4a5a30'; ctx.fillRect(x-dir*3.4-1, y-12+bob, 2.2, 4.6);                                             // backpack
+  if(walking && !(u.fireT>0)){
+    // rifle at port arms, arm swinging with the stride
+    const sw = Math.sin(ph)*2;
+    ctx.strokeStyle=cloth; ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(x, y-11.5+bob); ctx.lineTo(x+dir*(2+sw*0.4), y-8.5+bob); ctx.stroke();
+    ctx.strokeStyle='#3a2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-dir*3, y-7.5+bob); ctx.lineTo(x+dir*5, y-15+bob); ctx.stroke();
+  } else {
+    const a = u.aim || 0, ca=Math.cos(a), sa=Math.sin(a), sy = y-11+bob - (u.fireT>0 ? 0.5 : 0);
+    const kick = u.fireT>0 ? 1.2 : 0;                                                                                      // recoil
+    ctx.strokeStyle='#3a2a1a'; ctx.lineWidth=1.25; ctx.beginPath(); ctx.moveTo(x-ca*(3+kick), sy-sa*(3+kick)); ctx.lineTo(x+ca*(8-kick), sy+sa*(8-kick)); ctx.stroke();
+    ctx.strokeStyle=cloth; ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(x, sy-0.5); ctx.lineTo(x+ca*4, sy+sa*4); ctx.stroke();
+    if(u.fireT>0){ ctx.fillStyle='rgba(255,230,140,.95)'; ctx.beginPath(); ctx.arc(x+ca*9.5, sy+sa*9.5, 1.7, 0, 7); ctx.fill(); }
+  }
+  ctx.fillStyle='#e0bb92'; ctx.beginPath(); ctx.arc(x+dir*0.6, y-14.2+bob, 2, 0, 7); ctx.fill();
+  ctx.fillStyle='#2e4220'; ctx.beginPath(); ctx.ellipse(x+dir*0.6, y-15.4+bob, 3.4, 2.4, 0, Math.PI, 0); ctx.fill();     // round M1 helmet
+  ctx.strokeStyle='rgba(20,30,10,.6)'; ctx.lineWidth=0.4; ctx.beginPath(); ctx.moveTo(x-2.4, y-15.7+bob); ctx.lineTo(x+3.6, y-15.7+bob); ctx.stroke();
 }
 
-// tracked hull with road wheels
-function tankHull(ctx, x, y, w, h, body, dark){
-  ctx.fillStyle=dark; ctx.beginPath(); ctx.moveTo(x-w/2, y-2); ctx.lineTo(x+w/2, y-2); ctx.quadraticCurveTo(x+w/2+3, y-4, x+w/2, y-h*0.6); ctx.lineTo(x-w/2, y-h*0.6); ctx.quadraticCurveTo(x-w/2-3, y-4, x-w/2, y-2); ctx.fill();
-  ctx.fillStyle='#2a2a26'; for(let i=0;i<5;i++){ ctx.beginPath(); ctx.arc(x-w/2+3+i*(w-6)/4, y-3, 2, 0, 7); ctx.fill(); }
-  ctx.fillStyle=body; ctx.fillRect(x-w/2+1, y-h, w-2, h*0.45);
+// ---- the fallen: bodies and burnt-out tanks stay on the ground for a while ----
+function addBody(x, side, dir){
+  (G.bodies ||= []).push({x, side, dir: dir || 1, t:0});
+  if(G.bodies.length > 140) G.bodies.shift();
 }
-// M46/M47 Patton: big olive hull, wide turret, long gun, white star
+function addWreck(x, kind, dir){
+  (G.wrecks ||= []).push({x, kind, dir, t:0});
+  if(G.wrecks.length > 30) G.wrecks.shift();
+}
+function drawRemains(ctx){
+  for(const b of (G.bodies||[])){
+    b.t += 1/60; const k = clamp(1 - (b.t-10)/3, 0, 1); if(k<=0) continue;                 // lie for 10 s, then fade
+    const y = groundY(b.x), d = b.dir, fall = Math.min(1, b.t*3);                            // topples over in ~1/3 s
+    ctx.save(); ctx.globalAlpha = k; ctx.translate(b.x, y); ctx.rotate(-d*fall*Math.PI/2*0.95);
+    ctx.strokeStyle = b.side==='us' ? '#3c5226' : '#a8925a'; ctx.lineWidth=2.4; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(0,-1); ctx.lineTo(0,-12); ctx.stroke();
+    ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(0,-14,2,0,7); ctx.fill();
+    ctx.fillStyle = b.side==='us' ? '#2e4220' : '#8f7c45'; ctx.beginPath(); ctx.arc(0,-15,2.4,Math.PI,0); ctx.fill();
+    ctx.restore();
+  }
+  for(const w of (G.wrecks||[])){
+    w.t += 1/60; const k = clamp(1 - (w.t-25)/4, 0, 1); if(k<=0) continue;
+    const y = groundY(w.x);
+    ctx.save(); ctx.globalAlpha = k; ctx.translate(w.x, y); ctx.rotate(slopeAt(w.x)); ctx.scale(w.dir, 1);
+    ctx.fillStyle='#2b2620'; ctx.beginPath(); ctx.moveTo(-13,-1); ctx.lineTo(13,-1); ctx.lineTo(12,-7); ctx.lineTo(-12,-7); ctx.fill();
+    ctx.fillStyle='#1d1a16'; ctx.beginPath(); ctx.ellipse(1,-8,6,3,0.25,Math.PI,0); ctx.fill();                          // turret knocked askew
+    ctx.strokeStyle='#1d1a16'; ctx.lineWidth=1.8; ctx.beginPath(); ctx.moveTo(4,-9); ctx.lineTo(13,-4); ctx.stroke();      // drooping gun
+    ctx.restore();
+    if(w.t < 20 && Math.random() < 0.08) puff(w.x + rnd(-6,6), y - 10, '#2a2a2a', 6, 2);                                  // still smouldering
+  }
+}
+
+// slope of the ground at x (radians), so vehicles sit on hills instead of floating
+function slopeAt(x){ return Math.atan2(groundY(x+9) - groundY(x-9), 18); }
+
+// Tracked hull drawn at the origin (the caller translates and tilts it to the slope): running gear with
+// road wheels whose spokes turn with distance travelled, track links that move, and the upper hull.
+function tankHull(ctx, w, h, body, dark, dist){
+  ctx.fillStyle=dark; ctx.beginPath(); ctx.moveTo(-w/2, -2); ctx.lineTo(w/2, -2); ctx.quadraticCurveTo(w/2+3, -4, w/2, -h*0.6); ctx.lineTo(-w/2, -h*0.6); ctx.quadraticCurveTo(-w/2-3, -4, -w/2, -2); ctx.fill();
+  // track links sliding along the top and bottom runs
+  const off = ((dist||0)*0.9) % 3;
+  ctx.fillStyle='rgba(0,0,0,.35)';
+  for(let lx=-w/2+off; lx<w/2; lx+=3){ ctx.fillRect(lx, -h*0.6, 1.2, 1); ctx.fillRect(w/2 - (lx + w/2), -2.2, 1.2, 1); }
+  // road wheels with turning spokes
+  const rot = (dist||0)/2;
+  for(let i=0;i<5;i++){
+    const cx = -w/2+3+i*(w-6)/4, cy = -3.2;
+    ctx.fillStyle='#2a2a26'; ctx.beginPath(); ctx.arc(cx, cy, 2.1, 0, 7); ctx.fill();
+    ctx.strokeStyle='#5a5a52'; ctx.lineWidth=0.5; ctx.beginPath();
+    for(let k=0;k<3;k++){ const a = rot + k*Math.PI/3; ctx.moveTo(cx-Math.cos(a)*1.7, cy-Math.sin(a)*1.7); ctx.lineTo(cx+Math.cos(a)*1.7, cy+Math.sin(a)*1.7); }
+    ctx.stroke();
+  }
+  ctx.fillStyle=body; ctx.fillRect(-w/2+1, -h, w-2, h*0.45);
+}
+// M46/M47 Patton: big olive hull, wide turret, long gun, white star; sits on the slope, rocks back when it fires
 function drawPatton(ctx, u){
-  const x=u.x, y=u.y, body = u.flash>0 ? '#ddd' : '#55613a';
-  tankHull(ctx, x, y, 30, 12, body, '#3d4529');
-  ctx.fillStyle=body; ctx.beginPath(); ctx.ellipse(x-1, y-12.5, 8, 4, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(x-9, y-13, 17, 2.5);
-  const a = clamp(u.aim||0, -0.5, 0.3);
-  ctx.strokeStyle='#3d4529'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(x+5, y-13); ctx.lineTo(x+5+Math.cos(a)*18, y-13+Math.sin(a)*18); ctx.stroke();
-  if(u.fireT>0){ ctx.fillStyle='rgba(255,220,120,.95)'; ctx.beginPath(); ctx.arc(x+5+Math.cos(a)*20, y-13+Math.sin(a)*20, 3.5, 0, 7); ctx.fill(); }
+  const body = u.flash>0 ? '#dddddd' : '#55613a', dir = u.back ? -1 : 1, recoil = u.fireT>0 ? 1 : 0;
+  ctx.save(); ctx.translate(u.x, u.y); ctx.rotate(slopeAt(u.x) - dir*recoil*0.04); ctx.scale(dir, 1);
+  tankHull(ctx, 30, 12, body, '#3d4529', u.dist);
+  ctx.fillStyle=body; ctx.beginPath(); ctx.ellipse(-1, -12.5, 8, 4, 0, Math.PI, 0); ctx.fill(); ctx.fillRect(-9, -13, 17, 2.5);
+  const a = clamp((u.aim||0) - slopeAt(u.x), -0.5, 0.3), gl = 18 - recoil*3;
+  ctx.strokeStyle='#3d4529'; ctx.lineWidth=2.2; ctx.beginPath(); ctx.moveTo(5, -13); ctx.lineTo(5+Math.cos(a)*gl, -13+Math.sin(a)*gl); ctx.stroke();
+  ctx.fillStyle='#2f3622'; ctx.beginPath(); ctx.arc(5+Math.cos(a)*gl, -13+Math.sin(a)*gl, 1.4, 0, 7); ctx.fill();      // muzzle brake
+  if(u.fireT>0){ ctx.fillStyle='rgba(255,220,120,.95)'; ctx.beginPath(); ctx.arc(5+Math.cos(a)*(gl+3), -13+Math.sin(a)*(gl+3), 4, 0, 7); ctx.fill(); }
   ctx.fillStyle='#f2f2ea'; ctx.beginPath();                                                                         // white star
-  for(let i=0;i<10;i++){ const aa=-Math.PI/2+i*Math.PI/5, rr=i%2?1.1:2.6; ctx.lineTo(x-6+Math.cos(aa)*rr, y-7.5+Math.sin(aa)*rr); } ctx.fill();
+  for(let i=0;i<10;i++){ const aa=-Math.PI/2+i*Math.PI/5, rr=i%2?1.1:2.6; ctx.lineTo(-6+Math.cos(aa)*rr, -7.5+Math.sin(aa)*rr); } ctx.fill();
+  ctx.restore();
+  if(u.moving && Math.random() < 0.15) puff(u.x - dir*16, u.y - 3, 'rgba(180,160,120,.5)', 4, 0.7);                    // dust
+  if(u.moving && Math.random() < 0.05) puff(u.x - dir*14, u.y - 10, 'rgba(60,60,60,.5)', 4, 1);                        // exhaust
 }
 // Type 97 Chi-Ha: smaller, khaki-and-brown camouflage, small offset turret with a short 57 mm gun, faces left
 function drawChiHa(ctx, t){
-  const x=t.x, y=t.y, body = t.flash>0 ? '#eee' : '#8a7d50';
-  ctx.save(); ctx.translate(x, 0); ctx.scale(-1, 1); ctx.translate(-x, 0);
-  tankHull(ctx, x, y, 24, 10, body, '#5d5434');
-  ctx.fillStyle='rgba(90,70,40,.6)'; ctx.fillRect(x-8, y-9.5, 6, 3); ctx.fillRect(x+3, y-9, 5, 2.5);             // camouflage
-  ctx.fillStyle=body; ctx.beginPath(); ctx.ellipse(x+2, y-11, 5, 3.4, 0, Math.PI, 0); ctx.fill();
-  ctx.fillStyle='#e8c34a'; ctx.fillRect(x-10, y-6, 20, 0.8);                                                       // yellow recognition band
-  ctx.strokeStyle='#4a432b'; ctx.lineWidth=1.8; ctx.beginPath(); ctx.moveTo(x+6, y-11); ctx.lineTo(x+14, y-11.5); ctx.stroke();
-  if(t.fireT>0){ t.fireT -= 1/60; ctx.fillStyle='rgba(255,210,110,.95)'; ctx.beginPath(); ctx.arc(x+15, y-11.5, 3, 0, 7); ctx.fill(); }
+  const body = t.flash>0 ? '#eeeeee' : '#8a7d50', recoil = t.fireT>0 ? 1 : 0;
+  ctx.save(); ctx.translate(t.x, t.y); ctx.rotate(slopeAt(t.x) + recoil*0.04); ctx.scale(-1, 1);
+  tankHull(ctx, 24, 10, body, '#5d5434', t.dist);
+  ctx.fillStyle='rgba(90,70,40,.6)'; ctx.fillRect(-8, -9.5, 6, 3); ctx.fillRect(3, -9, 5, 2.5);                    // camouflage
+  ctx.fillStyle=body; ctx.beginPath(); ctx.ellipse(2, -11, 5, 3.4, 0, Math.PI, 0); ctx.fill();
+  ctx.fillStyle='#e8c34a'; ctx.fillRect(-10, -6, 20, 0.8);                                                         // yellow recognition band
+  const gl = 8 - recoil*2;
+  ctx.strokeStyle='#4a432b'; ctx.lineWidth=1.8; ctx.beginPath(); ctx.moveTo(6, -11); ctx.lineTo(6+gl, -11.5); ctx.stroke();
+  if(t.fireT>0){ t.fireT -= 1/60; ctx.fillStyle='rgba(255,210,110,.95)'; ctx.beginPath(); ctx.arc(7+gl, -11.5, 3, 0, 7); ctx.fill(); }
   ctx.restore();
-  if(t.hp < t.max){ ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(x-11, y-20, 22, 2.5); ctx.fillStyle='#e8b33a'; ctx.fillRect(x-11, y-20, 22*t.hp/t.max, 2.5); }
+  if(t.moving && Math.random() < 0.12) puff(t.x + 13, t.y - 3, 'rgba(180,160,120,.5)', 4, 0.7);                        // dust
+  if(t.hp < t.max){ ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(t.x-11, t.y-22, 22, 2.5); ctx.fillStyle='#e8b33a'; ctx.fillRect(t.x-11, t.y-22, 22*t.hp/t.max, 2.5); }
 }
 
 // mission banner under the radar: which island, and how the two ground forces stand

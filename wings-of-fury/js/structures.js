@@ -18,8 +18,29 @@ function jpFlag(ctx, x, y, s=1){
 function concreteFill(ctx, y0, y1){ const g=ctx.createLinearGradient(0,y0,0,y1); g.addColorStop(0,CONCRETE[0]); g.addColorStop(0.6,CONCRETE[1]); g.addColorStop(1,CONCRETE[2]); return g; }
 function frond(ctx, x, y, len, ang){ ctx.strokeStyle='rgba(60,95,45,.85)'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(x,y); ctx.quadraticCurveTo(x+Math.cos(ang)*len*0.5, y+Math.sin(ang)*len*0.5-3, x+Math.cos(ang)*len, y+Math.sin(ang)*len); ctx.stroke(); }
 
+// On a hillside the ground drops away under one side of the building: fill the gap with a stone-faced
+// earth platform (sloping embankment at the ends) so nothing hangs in the air.
+function drawFooting(ctx, s){
+  const x0 = s.x - s.w/2 - 3, x1 = s.x + s.w/2 + 3, y = s.y;
+  let drop = 0;
+  for(let px=x0; px<=x1; px+=4) drop = Math.max(drop, groundY(px) - y);
+  if(drop < 0.8) return;
+  ctx.fillStyle='#6e5b3c'; ctx.beginPath();
+  ctx.moveTo(x0, y);
+  ctx.lineTo(x1, y);
+  for(let px=x1+drop*0.8; px>=x0-drop*0.8; px-=3) ctx.lineTo(px, Math.max(y, groundY(px)) + 0.5);   // embankment down to the real ground
+  ctx.closePath(); ctx.fill();
+  // stone retaining wall right under the building
+  ctx.fillStyle='#8a8070';
+  for(let px=x0; px<x1; px+=3){ const g = groundY(px+1.5) - y; if(g>0.8) ctx.fillRect(px, y, 3, g+0.5); }
+  ctx.strokeStyle='rgba(40,34,24,.45)'; ctx.lineWidth=0.6; ctx.beginPath();
+  for(let ry=y+3; ry<y+drop; ry+=3.5) for(let px=x0+((ry|0)%2?0:4); px<x1; px+=8){ if(groundY(px+3) > ry+1){ ctx.moveTo(px,ry); ctx.lineTo(px+6,ry); } }
+  ctx.stroke();
+}
+
 function drawStruct(ctx, s){
   const x=s.x, y=s.y, w=s.w, h=s.h, night = G.weather.time==='night';
+  drawFooting(ctx, s);
   if(s.dead){ drawRubble(ctx, s); return; }
   ctx.save();
   if(s.flash>0) ctx.filter = 'brightness(1.8)';      // hit flash on the building only, not a box around it

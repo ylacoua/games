@@ -47,6 +47,7 @@ function render(ctx, cw, ch){
   if(G.carrier2) drawCarrier(ctx, G.carrier2);
   for(const s of G.structures) if(s.x>x0-100 && s.x<x1+100) drawStruct(ctx, s);
   for(const sh of G.ships) if(sh.x+sh.w>x0 && sh.x-sh.w<x1) drawShip(ctx, sh);
+  drawRemains(ctx);
   for(const so of G.soldiers) drawSoldier(ctx, so);
   if(G.ground) drawGround(ctx);
   // projectiles
@@ -205,15 +206,16 @@ function drawSoldier(ctx, so){
     ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x,y-13,2.1,0,7); ctx.fill();
     jpCap(ctx, x, y-13, ca<0 ? -1 : 1);
   } else {
-    const leg=Math.sin(so.t*14)*3.5, d = so.dir||1;
-    ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+leg,y); ctx.moveTo(x,y-6); ctx.lineTo(x-leg,y); ctx.stroke();
-    ctx.strokeStyle='#cdbb88'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(x+leg*0.6,y-3); ctx.lineTo(x+leg,y); ctx.moveTo(x-leg*0.6,y-3); ctx.lineTo(x-leg,y); ctx.stroke();   // puttees
-    ctx.strokeStyle=JP_KHAKI; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+d*1.5,y-12); ctx.stroke();                       // leaning into the run
-    // rifle held forward with bayonet
-    ctx.strokeStyle='#3b2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-d*2,y-9); ctx.lineTo(x+d*9,y-11); ctx.stroke();
-    ctx.strokeStyle='#d8d8d0'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(x+d*9,y-11); ctx.lineTo(x+d*12,y-11.6); ctx.stroke();
-    ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x+d*1.5,y-14,2.1,0,7); ctx.fill();
-    jpCap(ctx, x+d*1.5, y-14, d);
+    // running stride with bent knees and a bounce, leaning into the charge, bayonet thrust forward
+    const d = so.dir||1, ph = so.t*11;
+    const b = legs(ctx, x, y, ph, 1.35, d, JP_KHAKI, '#cdbb88');
+    ctx.strokeStyle=JP_KHAKI; ctx.lineWidth=2.6; ctx.beginPath(); ctx.moveTo(x,y-7+b); ctx.lineTo(x+d*2,y-12.5+b); ctx.stroke();
+    const jab = Math.sin(ph)*1;
+    ctx.strokeStyle='#3b2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-d*2+d*jab,y-9+b); ctx.lineTo(x+d*(9+jab),y-11+b); ctx.stroke();
+    ctx.strokeStyle='#d8d8d0'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(x+d*(9+jab),y-11+b); ctx.lineTo(x+d*(12+jab),y-11.6+b); ctx.stroke();
+    ctx.strokeStyle=JP_KHAKI; ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(x+d*1.6,y-11.5+b); ctx.lineTo(x+d*(4+jab),y-10+b); ctx.stroke();   // arms on the rifle
+    ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x+d*2.2,y-14.4+b,2.1,0,7); ctx.fill();
+    jpCap(ctx, x+d*2.2, y-14.4+b, d);
   }
 }
 

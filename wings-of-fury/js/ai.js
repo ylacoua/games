@@ -113,7 +113,7 @@ function spawnSoldier(x){
   G.soldiers.push({x, y:groundY(x), dir:Math.random()<.5?-1:1, speed:rnd(26,42), t:rnd(0,1), cool:rnd(1,3), dead:false, safe:0.8});   // safe: they just ran out of the blast
 }
 function killSoldier(so){
-  so.dead=true; earn('soldier', so.x, so.y-10);
+  so.dead=true; earn('soldier', so.x, so.y-10); addBody(so.x, 'jp', -(so.dir||1));
   for(let i=0;i<4;i++) G.debris.push({x:so.x,y:so.y-8,vx:rnd(-50,50),vy:rnd(-120,-40),r:0,vr:0,life:0.6,c:'#7a1f1a',spark:true});
 }
 
