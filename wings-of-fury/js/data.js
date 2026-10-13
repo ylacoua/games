@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.34';
+const GAME_VERSION = '1.35';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -38,6 +38,7 @@ const WINGMEN = {
   helldiver:{name:'SB2C הלדייבר', role:'bomber',  desc:'תוקף נוסף: מפציץ בונקרים, נ"מ וספינות.',      cost:550, hp:120, speed:215, color:'#4f677d'}
 };
 const MAX_WINGMEN = 3;
+const WING_AMMO = 260;       // rounds a wingman fighter carries before it must land and rearm
 
 // time: day | dawn | dusk | night ; rain 0..1 ; wind px/s ; storm = lightning
 const LEVELS = [

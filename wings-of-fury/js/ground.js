@@ -7,7 +7,7 @@
 
 const GROUND = {
   name:'סיוע לכוחות היבשה', mode:'ground',
-  brief:'נחתת של צבא ארה"ב עם 50 חיילים ו-5 טנקי פטון יוצאת מהנושאת לכבוש שלושה איים מבוצרים. הפצץ את הבונקרים, התותחים, הטנקים והחיילים היפנים כדי שכוחות היבשה יוכלו לכבוש כל אי. האי השני חזק ב-20% מהראשון, והשלישי חזק ב-50% מהשני. אסור לאבד את הנחתת ואת כל הכוחות.',
+  brief:'נחתת של צבא ארה"ב עם 20 חיילים ו-5 טנקי פטון יוצאת מהנושאת לכבוש שלושה איים מבוצרים. הפצץ את הבונקרים, התותחים, הטנקים והחיילים היפנים כדי שכוחות היבשה יוכלו לכבוש כל אי. האי השני חזק ב-20% מהראשון, והשלישי חזק ב-50% מהשני. אסור לאבד את הנחתת ואת כל הכוחות.',
   time:'day', rain:0, wind:8, storm:false, islands:0, ships:0, zeroEvery:16, bombers:false, boss:null, jcarrier:false, reward:6000
 };
 
@@ -47,7 +47,7 @@ function groundSetup(){
     for(let k=0;k<n(30);k++){ const x = rnd(a, b); G.soldiers.push({x, y:groundY(x), dir:1, speed:0, t:rnd(0,1), cool:rnd(0.5,2), dead:false, def:true, home:x, island:i}); }
     for(let k=0;k<n(3);k++){ const x = rnd(a+(b-a)*0.3, b); G.jtanks.push({x, y:groundY(x), hp:CHIHA.hp, max:CHIHA.hp, cool:rnd(1,3), dead:false, island:i, aim:Math.PI, flash:0}); }
   });
-  G.ground = {phase:'sail', island:0, inf:50, tanks:5, units:[], shells:[], unloadT:0, flagT:0, endT:0,
+  G.ground = {phase:'sail', island:0, inf:20, tanks:5, units:[], shells:[], unloadT:0, flagT:0, endT:0,
     lst:{x:G.carrier.x + G.carrier.len + 200, hp:700, max:700, speed:36, ramp:0, flash:0}};
   say('הנחתת יוצאת לאי הראשון. הפצץ את ההגנות לפני שהכוחות יורדים לחוף', 5);
 }
@@ -83,7 +83,10 @@ function groundUpdate(dt){
   if(S.phase==='sail'){
     L.ramp = Math.max(0, L.ramp - dt);
     if(L.x < beachX){ L.x = Math.min(beachX, L.x + L.speed*dt); if(Math.random()<dt*4) G.fx.push({type:'wake', x:L.x-80, y:SEA+2, t:0, max:1.5}); }
-    else { S.phase = 'unload'; S.unloadT = 0; say(`הנחתת הגיעה לחוף האי ה${['ראשון','שני','שלישי'][S.island]}! הכוחות יורדים`, 4); }
+    else {
+      S.phase = 'unload'; S.unloadT = 0; S.charge = false;
+      say(`הנחתת הגיעה לחוף האי ה${['ראשון','שני','שלישי'][S.island]}! הכוחות יורדים`, 4);
+    }
   } else if(S.phase==='unload'){
     L.ramp = Math.min(1, L.ramp + dt);
     S.unloadT -= dt;
@@ -93,6 +96,10 @@ function groundUpdate(dt){
       S.units.push({type: tank?'tank':'inf', x, y:groundY(x), hp:st.hp, max:st.hp, cool:rnd(0.3,1.5), dead:false, t:rnd(0,1), off:rnd(-25,25), flash:0, aim:0, rf:rnd(0.45,1)});
       if(tank) S.tanks--; else S.inf--;
       S.unloadT = tank ? 0.9 : 0.18;
+      if(!S.charge){                                          // the first boots on the beach trigger the counter-attack
+        S.charge = true; SFX.banzai();
+        say('בנזאי! החיילים והטנקים היפנים יוצאים מהעמדות ומסתערים על הכוח הנוחת', 4);
+      }
     }
     if(S.inf<=0 && S.tanks<=0) S.phase = 'assault';
   }
@@ -183,7 +190,23 @@ function updateJPGround(dt){
   const S = G.ground, us = usUnits();
   const nearestUS = (x, range)=>{ let b=null, bd=range; for(const u of us){ const d=Math.abs(u.x-x); if(d<bd){ bd=d; b=u; } } return b; };
   for(const s of G.soldiers){
-    if(s.dead || s.aim != null) continue;                     // already busy shooting at a low aircraft
+    if(s.dead) continue;
+    // banzai charge: once the Americans are ashore, the defenders leave their trenches and rush them
+    s.running = false;
+    if(S.charge && islandOf(s.x)===S.island && s.aim == null){
+      const u = nearestUS(s.x, 6000);
+      if(u){
+        const dx = u.x - s.x;
+        if(Math.abs(dx) > 14){
+          s.dir = Math.sign(dx); s.x = Math.max(G.islands[S.island].x0 + 12, s.x + s.dir*30*dt); s.y = groundY(s.x);
+          s.t += dt; s.running = true;
+        } else {
+          s.mcool = (s.mcool ?? 0) - dt;
+          if(s.mcool <= 0){ s.mcool = rnd(0.8,1.4); if(Math.random() < 0.45) hitUS(u, u.type==='tank' ? 8 : 10); }   // hand-to-hand
+        }
+      }
+    }
+    if(s.aim != null) continue;                                // already busy shooting at a low aircraft
     s.gcool = (s.gcool ?? rnd(0.5,2)) - dt;
     const u = nearestUS(s.x, JP_INF.range);
     if(u && s.gcool<=0){
@@ -197,7 +220,7 @@ function updateJPGround(dt){
   for(const t of G.jtanks){
     if(t.dead) continue;
     t.flash = Math.max(0, t.flash-dt); t.cool -= dt;
-    const u = nearestUS(t.x, 520);
+    const u = nearestUS(t.x, S.charge ? 6000 : 520);         // in the counter-attack the tanks drive straight at the landing
     if(u){
       const d = Math.abs(u.x-t.x);
       if(d > CHIHA.range*0.85){ t.x += Math.sign(u.x-t.x)*CHIHA.speed*dt; t.y = groundY(t.x); t.moving = true; }

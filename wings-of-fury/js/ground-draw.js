@@ -53,18 +53,21 @@ function drawFlagpole(ctx, is){
   if(is.flag.t > 0.15) drawUSFlag(ctx, x+1, gy-h, 1.2);
 }
 
-// US infantryman: olive drab with a GI helmet; walks forward, stops to fire at the enemy
+// US Marine/GI: dark green fatigues, round M1 helmet with netting, backpack, M1 rifle; faces the enemy (right)
 function drawGI(ctx, u){
-  const x=u.x, y=u.y, firing = u.fireT>0 || (u.aim && Math.random()<0.02);
-  ctx.lineCap='round'; ctx.strokeStyle = u.flash>0 ? '#fff' : '#4f5a32'; ctx.lineWidth=2;
+  const x=u.x, y=u.y, body = u.flash>0 ? '#fff' : '#3c5226';
+  ctx.lineCap='round'; ctx.strokeStyle = body; ctx.lineWidth=2;
   const leg = Math.sin(u.t*12)*3;
   ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+leg,y); ctx.moveTo(x,y-6); ctx.lineTo(x-leg,y); ctx.stroke();
-  ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y-12); ctx.stroke();
+  ctx.strokeStyle='#2a2418'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(x+leg*0.7,y-1); ctx.lineTo(x+leg,y); ctx.moveTo(x-leg*0.7,y-1); ctx.lineTo(x-leg,y); ctx.stroke();  // boots
+  ctx.strokeStyle = body; ctx.lineWidth=2.6; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y-12); ctx.stroke();
+  ctx.fillStyle='#4a5a30'; ctx.fillRect(x-3.2, y-11.5, 2, 4.5);                                                   // backpack
   const a = u.aim || 0;
-  ctx.strokeStyle='#3a2a1a'; ctx.lineWidth=1.1; ctx.beginPath(); ctx.moveTo(x-Math.cos(a)*2, y-10-Math.sin(a)*2); ctx.lineTo(x+Math.cos(a)*8, y-10+Math.sin(a)*8); ctx.stroke();
+  ctx.strokeStyle='#3a2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-Math.cos(a)*2, y-10-Math.sin(a)*2); ctx.lineTo(x+Math.cos(a)*8, y-10+Math.sin(a)*8); ctx.stroke();
   if(u.fireT>0){ ctx.fillStyle='rgba(255,230,140,.95)'; ctx.beginPath(); ctx.arc(x+Math.cos(a)*9.5, y-10+Math.sin(a)*9.5, 1.6, 0, 7); ctx.fill(); }
-  ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x,y-14,2,0,7); ctx.fill();
-  ctx.fillStyle='#3e4a2a'; ctx.beginPath(); ctx.ellipse(x,y-15,3.2,1.8,0,Math.PI,0); ctx.fill();                 // M1 helmet
+  ctx.fillStyle='#e0bb92'; ctx.beginPath(); ctx.arc(x,y-14,2,0,7); ctx.fill();
+  ctx.fillStyle='#2e4220'; ctx.beginPath(); ctx.ellipse(x,y-15.2,3.4,2.4,0,Math.PI,0); ctx.fill();                 // round M1 helmet
+  ctx.strokeStyle='rgba(20,30,10,.6)'; ctx.lineWidth=0.4; ctx.beginPath(); ctx.moveTo(x-3,y-15.5); ctx.lineTo(x+3,y-15.5); ctx.stroke();   // helmet netting
 }
 
 // tracked hull with road wheels

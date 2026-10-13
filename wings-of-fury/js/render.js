@@ -162,27 +162,37 @@ function drawIsland(ctx, is){
 }
 
 // infantryman in khaki with a helmet and rifle: runs while nothing is in reach, kneels and fires at low aircraft
+// Japanese infantryman: light khaki uniform, field cap with a neck flap and a yellow star, puttees.
+// Kneels in his position facing the landing; runs (bayonet forward) in the banzai charge.
+const JP_KHAKI = '#a8925a', JP_CAP = '#8f7c45';
+function jpCap(ctx, x, hy, dir){
+  ctx.fillStyle=JP_CAP; ctx.beginPath(); ctx.arc(x, hy-0.6, 2.4, Math.PI, 0); ctx.fill();
+  ctx.fillRect(x - dir*2.6 - (dir<0?0:0), hy-0.8, dir*-0.01 + 1.2, 3.2);                 // neck flap at the back
+  ctx.fillStyle='#e8c34a'; ctx.fillRect(x - 0.5 + dir*0.8, hy-2.6, 1, 1);                // star
+}
 function drawSoldier(ctx, so){
-  const x=so.x, y=so.y, aiming = so.aim != null || so.def;     // entrenched defenders kneel facing the landing
+  const x=so.x, y=so.y, aiming = so.aim != null || (so.def && !so.running);
   ctx.lineCap='round';
-  ctx.strokeStyle='#5a5330'; ctx.lineWidth=2;
+  ctx.strokeStyle=JP_KHAKI; ctx.lineWidth=2;
   if(aiming){
     ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+3,y-2); ctx.lineTo(x+3,y); ctx.moveTo(x,y-6); ctx.lineTo(x-4,y); ctx.stroke();        // kneeling
     ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y-11); ctx.stroke();
     const aim = so.aim ?? Math.PI*1.02, ca=Math.cos(aim), sa=Math.sin(aim);
     ctx.strokeStyle='#3b2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-ca*3, y-10-sa*3); ctx.lineTo(x+ca*8, y-10+sa*8); ctx.stroke();   // rifle
-    ctx.strokeStyle='#5a5330'; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(x,y-10); ctx.lineTo(x+ca*4, y-10+sa*4); ctx.stroke();               // arms
+    ctx.strokeStyle=JP_KHAKI; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(x,y-10); ctx.lineTo(x+ca*4, y-10+sa*4); ctx.stroke();                // arms
     if(so.fireT>0){ ctx.fillStyle='rgba(255,220,120,.95)'; ctx.beginPath(); ctx.arc(x+ca*9.5, y-10+sa*9.5, 1.8, 0, 7); ctx.fill(); }
     ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x,y-13,2.1,0,7); ctx.fill();
-    ctx.fillStyle='#4b4a2c'; ctx.beginPath(); ctx.arc(x,y-13.6,2.4,Math.PI,0); ctx.fill();
+    jpCap(ctx, x, y-13, ca<0 ? -1 : 1);
   } else {
-    const leg=Math.sin(so.t*14)*3, arm=Math.sin(so.t*14)*2;
+    const leg=Math.sin(so.t*14)*3.5, d = so.dir||1;
     ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+leg,y); ctx.moveTo(x,y-6); ctx.lineTo(x-leg,y); ctx.stroke();
-    ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x,y-12); ctx.stroke();
-    ctx.lineWidth=1.3; ctx.beginPath(); ctx.moveTo(x,y-11); ctx.lineTo(x-arm,y-7.5); ctx.stroke();
-    ctx.strokeStyle='#3b2a1a'; ctx.lineWidth=1.1; ctx.beginPath(); ctx.moveTo(x-3*so.dir,y-6); ctx.lineTo(x+4*so.dir,y-15); ctx.stroke();      // rifle at port arms
-    ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x,y-14,2.1,0,7); ctx.fill();
-    ctx.fillStyle='#4b4a2c'; ctx.beginPath(); ctx.arc(x,y-14.6,2.4,Math.PI,0); ctx.fill();
+    ctx.strokeStyle='#cdbb88'; ctx.lineWidth=1.6; ctx.beginPath(); ctx.moveTo(x+leg*0.6,y-3); ctx.lineTo(x+leg,y); ctx.moveTo(x-leg*0.6,y-3); ctx.lineTo(x-leg,y); ctx.stroke();   // puttees
+    ctx.strokeStyle=JP_KHAKI; ctx.lineWidth=2.4; ctx.beginPath(); ctx.moveTo(x,y-6); ctx.lineTo(x+d*1.5,y-12); ctx.stroke();                       // leaning into the run
+    // rifle held forward with bayonet
+    ctx.strokeStyle='#3b2a1a'; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(x-d*2,y-9); ctx.lineTo(x+d*9,y-11); ctx.stroke();
+    ctx.strokeStyle='#d8d8d0'; ctx.lineWidth=0.8; ctx.beginPath(); ctx.moveTo(x+d*9,y-11); ctx.lineTo(x+d*12,y-11.6); ctx.stroke();
+    ctx.fillStyle='#d9b48a'; ctx.beginPath(); ctx.arc(x+d*1.5,y-14,2.1,0,7); ctx.fill();
+    jpCap(ctx, x+d*1.5, y-14, d);
   }
 }
 

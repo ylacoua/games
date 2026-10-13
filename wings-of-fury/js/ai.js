@@ -547,6 +547,14 @@ function updateWingmen(dt){
     const mode = G.wingMode, cx = C.x + C.len/2;
     // being shot at from behind with room to spare: pull up into a loop to get out of the line of fire
     if(w.vl==null && w.ft==null && w.speed > 170 && groundY(w.x)-w.y > 260 && enemyOnTail(w) && Math.random() < dt*1.5) w.vl = w.p ?? 0;
+    // Out of ammunition (fighters) or bombs (bombers): head back, land on the carrier and rearm.
+    if(w.role==='fighter' ? w.ammo<=0 : w.bombs<=0){
+      if(!w.rtb){ w.rtb = true; say(`${WINGMEN[w.kind].name} סיים את ה${w.role==='fighter'?'תחמושת':'פצצות'} וחוזר לנושאת להתחמש`, 2.5); }
+      const gate = {x:C.x+C.len+300, y:DECK_Y-90};             // a gate off the bow, then turn in and land
+      w.speed = maxS; steer(w, gate.x, gate.y, 1.4, dt);
+      if(Math.hypot(w.x-gate.x, w.y-gate.y) < 110 && Math.cos(w.a) < 0.2){ w.state='landing'; }
+      continue;
+    }
     if(w.role==='fighter'){
       // Escort: engage whatever comes near the leader. Free attack / carrier defense: every wingman takes a
       // different enemy (keeping it while it lives), defense only within reach of the carrier.
@@ -563,7 +571,7 @@ function updateWingmen(dt){
         const d = Math.hypot(tgt.x-w.x, tgt.y-w.y), lead = d/760;
         const tx = tgt.x+Math.cos(tgt.a)*tgt.speed*lead, ty = tgt.y+Math.sin(tgt.a)*tgt.speed*lead;
         steer(w, tx, ty, 2.0, dt);
-        if(w.cool<=0 && d<420 && aimedAt(w,tx,ty)<0.13){ shootFrom(w,'p',4); w.cool=0.12; }
+        if(w.cool<=0 && d<420 && aimedAt(w,tx,ty)<0.13){ shootFrom(w,'p',4); w.cool=0.12; w.ammo--; }
       } else if(attack){
         const g = nearestGroundTarget(w.x, 3000, true, claimed);
         if(g) claimed.add(g.obj);
@@ -572,17 +580,10 @@ function updateWingmen(dt){
           const tx = g.x, ty = g.y;
           const far = Math.abs(tx-w.x) > 420;
           steer(w, far ? tx - Math.sign(tx-w.x)*300 : tx, far ? g.gy-220 : ty, 1.8, dt);
-          if(!far && w.cool<=0 && aimedAt(w,tx,ty)<0.15){ shootFrom(w,'p',5); w.cool=0.11; }
+          if(!far && w.cool<=0 && aimedAt(w,tx,ty)<0.15){ shootFrom(w,'p',5); w.cool=0.11; w.ammo--; }
         } else followLeader(w, dt, maxS);
       } else followLeader(w, dt, maxS);
-    } else { // bomber
-      if(w.bombs<=0){
-        // out of bombs: fly to a gate off the carrier's bow, then turn in and land to rearm
-        const gate = {x:C.x+C.len+300, y:DECK_Y-90};
-        w.speed = maxS; steer(w, gate.x, gate.y, 1.4, dt);
-        if(Math.hypot(w.x-gate.x, w.y-gate.y) < 110 && Math.cos(w.a) < 0.2){ w.state='landing'; }
-        continue;
-      }
+    } else { // bomber (out of bombs is handled above)
       // bombers: each picks its own target in free attack; in carrier defense they stay on patrol over the carrier
       const g = mode==='attack' ? nearestGroundTarget(w.x, 99999, false, claimed) : mode==='escort' ? nearestGroundTarget(P.x, 950) : null;
       if(g) claimed.add(g.obj);
@@ -604,6 +605,7 @@ function updateWingmen(dt){
 
 // Wingmen never appear out of nowhere: they start parked on the carrier deck and launch in turn.
 function startWingLaunch(w, delay, x){
+  w.ammo = WING_AMMO; w.bombs = 4; w.rtb = false;            // every launch is with full guns and racks
   w.state='launch'; if(x!=null) w.x = x;
   w.y = DECK_Y-9; w.a = 0; w.speed = 0; w.gear = 1; w.takeoff = {t:-delay};
 }
