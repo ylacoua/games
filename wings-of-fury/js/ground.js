@@ -84,18 +84,22 @@ function groundUpdate(dt){
     L.ramp = Math.max(0, L.ramp - dt);
     if(L.x < beachX){ L.x = Math.min(beachX, L.x + L.speed*dt); if(Math.random()<dt*4) G.fx.push({type:'wake', x:L.x-80, y:SEA+2, t:0, max:1.5}); }
     else {
-      S.phase = 'unload'; S.unloadT = 0; S.charge = false;
+      S.phase = 'unload'; S.unloadT = 0; S.charge = false; S.group = null;
       say(`הנחתת הגיעה לחוף האי ה${['ראשון','שני','שלישי'][S.island]}! הכוחות יורדים`, 4);
     }
   } else if(S.phase==='unload'){
     L.ramp = Math.min(1, L.ramp + dt);
     S.unloadT -= dt;
     if(L.ramp>=1 && S.unloadT<=0 && (S.inf>0 || S.tanks>0)){
-      const tank = S.tanks>0 && (S.inf===0 || Math.random()<S.tanks/(S.tanks+S.inf)*1.6);
+      // the force goes ashore in waves: a tank leading five soldiers, then a pause of several seconds
+      if(!S.group || (S.group.inf<=0 && S.group.tank<=0)) S.group = {inf:Math.min(5, S.inf), tank:Math.min(1, S.tanks), n:(S.group?.n||0)+1};
+      const tank = S.group.tank > 0;
       const st = tank ? PATTON : US_INF, x = is.x0 + 30;
       S.units.push({type: tank?'tank':'inf', x, y:groundY(x), hp:st.hp, max:st.hp, cool:rnd(0.3,1.5), dead:false, t:rnd(0,1), off:rnd(-25,25), flash:0, aim:0, rf:rnd(0.45,1)});
-      if(tank) S.tanks--; else S.inf--;
-      S.unloadT = tank ? 0.9 : 0.18;
+      if(tank){ S.tanks--; S.group.tank--; } else { S.inf--; S.group.inf--; }
+      const groupDone = S.group.inf<=0 && S.group.tank<=0;
+      S.unloadT = groupDone ? 7 : (tank ? 1.2 : 0.35);
+      if(groupDone && (S.inf>0 || S.tanks>0)) say(`קבוצה ${S.group.n} על החוף. הקבוצה הבאה יורדת בעוד כמה שניות`, 2.5);
       if(!S.charge){                                          // the first boots on the beach trigger the counter-attack
         S.charge = true; SFX.banzai();
         say('בנזאי! החיילים והטנקים היפנים יוצאים מהעמדות ומסתערים על הכוח הנוחת', 4);

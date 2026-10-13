@@ -308,13 +308,24 @@ function updateEnemies(dt){
 
 function zeroAI(e, dt, lvl){
   const P = G.player;
-  // target: the player, or a wingman that is closer
-  let tg = (!P.dead && !P.onDeck) ? {x:P.x, y:P.y, vx:playerVel(P).vx, vy:playerVel(P).vy, d:Math.hypot(P.x-e.x,P.y-e.y)*0.85} : null;
-  for(const w of G.wingmen){
-    if(w.dead || w.state!=='fly') continue;
-    const d = Math.hypot(w.x-e.x, w.y-e.y);
-    if(!tg || d*1.3 < tg.d) tg = {x:w.x, y:w.y, vx:Math.cos(w.a)*w.speed, vy:Math.sin(w.a)*w.speed, d};
+  // Target: any American aircraft in the air - the player or a wingman - with no preference for the player.
+  // A Zero keeps its target for a while, and avoids one that several other Zeros are already chasing,
+  // so the attackers spread out over the player and the wingmen.
+  const air = [];
+  if(!P.dead && !P.onDeck) air.push({o:P, x:P.x, y:P.y, vx:playerVel(P).vx, vy:playerVel(P).vy});
+  for(const w of G.wingmen) if(!w.dead && w.state==='fly') air.push({o:w, x:w.x, y:w.y, vx:Math.cos(w.a)*w.speed, vy:Math.sin(w.a)*w.speed});
+  e.tgtT = (e.tgtT||0) - dt;
+  let pick = air.find(a=>a.o===e.tgtO);
+  if(!pick || e.tgtT<=0){
+    let best=null, bs=Infinity;
+    for(const a of air){
+      const chasers = G.enemies.filter(z=>z!==e && !z.dead && z.tgtO===a.o).length;
+      const score = Math.hypot(a.x-e.x, a.y-e.y) + chasers*300 + (a.o===e.tgtO ? -150 : 0);
+      if(score < bs){ bs=score; best=a; }
+    }
+    pick = best; e.tgtO = best ? best.o : null; e.tgtT = rnd(5,9);
   }
+  let tg = pick ? {x:pick.x, y:pick.y, vx:pick.vx, vy:pick.vy, d:Math.hypot(pick.x-e.x, pick.y-e.y)} : null;
   if(!tg && G.def.mode==='ground' && G.ground) tg = groundStrafeTarget(e);     // nothing in the air: strafe the landing force
   if(!tg && G.def.mode==='defense'){                      // nothing in the air: strafe the carrier
     const C = G.carrier, cx = C.x + C.len/2;
@@ -464,6 +475,19 @@ function nearestGroundTarget(x, range, preferAA, skip){   // skip: targets anoth
     if(sh.dead || !inPlay(sh.x) || (skip && skip.has(sh))) continue; const d=Math.abs(sh.x-x);
     if(d<bd){ bd=d; best={x:sh.x, y:SEA-sh.h/2, gy:SEA-sh.h, obj:sh}; }
   }
+  // Ground Support: Chi-Ha tanks and Japanese infantry on the island being fought over are targets too,
+  // tanks first (they count as closer)
+  if(G.ground){
+    const isl = G.ground.island;
+    for(const t of G.jtanks){
+      if(t.dead || t.island!==isl || (skip && skip.has(t))) continue; const d = Math.abs(t.x-x) - 300;
+      if(d<bd){ bd=d; best={x:t.x, y:t.y-6, gy:t.y, obj:t}; }
+    }
+    for(const s of G.soldiers){
+      if(s.dead || islandOf(s.x)!==isl || (skip && skip.has(s))) continue; const d = Math.abs(s.x-x);
+      if(d<bd){ bd=d; best={x:s.x, y:s.y-6, gy:s.y, obj:s}; }
+    }
+  }
   return best;
 }
 
@@ -487,6 +511,50 @@ function pickEnemy(w, claimed, around){
   if(!best && (around!=null || ad < 2600*2600)) best = any;
   return best && (around!=null || bd < 2600*2600 || best===any) ? best : null;
 }
+// keep attacking the same ground target until it is destroyed (and claim it so others pick different ones)
+function stickyGround(w, range, preferAA, claimed){
+  const alive = o => o && !o.dead && (o.hp == null || o.hp > 0);
+  let g = null;
+  if(w.gt && alive(w.gt.obj) && !claimed.has(w.gt.obj)){ const o = w.gt.obj; g = {x:o.x, y:w.gt.y, gy:w.gt.gy, obj:o}; }
+  else { g = nearestGroundTarget(w.x, range, preferAA, claimed); w.run = null; }
+  w.gt = g; if(g) claimed.add(g.obj);
+  return g;
+}
+// A proper attack pass that works with the wingmen's flight model (no hovering over the target):
+// setup - fly away to a start point well to one side, at altitude; run - fighters dive on the target firing,
+// bombers fly level and release when the bomb will carry onto it; pull - climb away, then set up again.
+function attackRun(w, g, dt, maxS, bomber){
+  w.speed += (maxS - w.speed)*Math.min(1, dt*2);
+  const alt = bomber ? 220 : 250;
+  if(!w.run){ w.run = 'setup'; w.side = Math.sign(w.x - g.x) || 1; }
+  if(w.run==='setup'){
+    const sx = g.x + w.side*650, sy = g.gy - alt;
+    steer(w, sx, sy, 1.6, dt);
+    if(Math.abs(w.x - sx) < 140 && Math.abs(w.y - sy) < 120) w.run = 'run';
+  } else if(w.run==='run'){
+    const dir = -w.side;                                       // attacking back toward the target
+    if(bomber){
+      steer(w, g.x + dir*400, g.gy - alt, 1.3, dt);
+      const vx = Math.cos(w.a)*w.speed, fall = Math.sqrt(2*Math.max(30, g.gy - w.y)/320);
+      if(w.cool<=0 && Math.abs(w.x + vx*fall - g.x) < 26){
+        G.drops.push({kind:'bomb', x:w.x, y:w.y+8, vx, vy:Math.sin(w.a)*w.speed, team:'p', dmg:65, r:52});
+        w.bombs--; w.cool = 0.5; w.run = 'pull'; w.t = 1.6;
+      }
+    } else {
+      steer(w, g.x, g.y, 1.9, dt);
+      const d = Math.hypot(g.x-w.x, g.y-w.y);
+      if(w.cool<=0 && d < 460 && aimedAt(w, g.x, g.y) < 0.2){ shootFrom(w,'p',5); w.cool = 0.11; w.ammo--; }
+      if(d < 90 || g.gy - w.y < 90){ w.run = 'pull'; w.t = 1.4; }
+    }
+    if((g.x - w.x)*dir < -180){ w.run = 'pull'; w.t = 1.2; }    // overshot: break off
+  } else {
+    // pull out: climb away in the direction of travel, then come round for another pass
+    const right = Math.cos(w.a) >= 0;
+    steerAngle(w, right ? -0.6 : -Math.PI+0.6, 2.0, dt);
+    w.t -= dt; if(w.t <= 0){ w.run = 'setup'; w.side = Math.sign(w.x - g.x) || 1; }
+  }
+}
+
 // carrier defense patrol: a wide racetrack above our carrier, each wingman on its own lane
 function patrolCarrier(w, dt, maxS){
   const C = G.carrier, cx = C.x + C.len/2, ang = G.time*0.3 + (w.slot||0)*2.1;
@@ -573,31 +641,14 @@ function updateWingmen(dt){
         steer(w, tx, ty, 2.0, dt);
         if(w.cool<=0 && d<420 && aimedAt(w,tx,ty)<0.13){ shootFrom(w,'p',4); w.cool=0.12; w.ammo--; }
       } else if(attack){
-        const g = nearestGroundTarget(w.x, 3000, true, claimed);
-        if(g) claimed.add(g.obj);
-        if(g){
-          w.speed = maxS;
-          const tx = g.x, ty = g.y;
-          const far = Math.abs(tx-w.x) > 420;
-          steer(w, far ? tx - Math.sign(tx-w.x)*300 : tx, far ? g.gy-220 : ty, 1.8, dt);
-          if(!far && w.cool<=0 && aimedAt(w,tx,ty)<0.15){ shootFrom(w,'p',5); w.cool=0.11; w.ammo--; }
-        } else followLeader(w, dt, maxS);
-      } else followLeader(w, dt, maxS);
+        const g = stickyGround(w, 3000, true, claimed);
+        if(g) attackRun(w, g, dt, maxS, false); else { w.run = null; followLeader(w, dt, maxS); }
+      } else { w.run = null; followLeader(w, dt, maxS); }
     } else { // bomber (out of bombs is handled above)
       // bombers: each picks its own target in free attack; in carrier defense they stay on patrol over the carrier
-      const g = mode==='attack' ? nearestGroundTarget(w.x, 99999, false, claimed) : mode==='escort' ? nearestGroundTarget(P.x, 950) : null;
-      if(g) claimed.add(g.obj);
-      if(!g){ if(mode==='defend') patrolCarrier(w, dt, maxS); else followLeader(w, dt, maxS); continue; }
-      w.speed = maxS;
-      const alt = 220, ty = g.gy - alt, fall = Math.sqrt(2*alt/320);
-      const vx = Math.cos(w.a)*w.speed, dir = Math.sign(g.x - w.x) || 1;
-      const impact = w.x + vx*fall;
-      const approach = Math.abs(g.x - w.x) > 900 ? {x:g.x - dir*200, y:ty} : {x:g.x + dir*600, y:ty};
-      steer(w, approach.x, approach.y, 1.3, dt);
-      if(w.cool<=0 && Math.abs(impact-g.x)<22 && Math.abs(w.y-ty)<70 && Math.abs(Math.sin(w.a))<0.35){
-        G.drops.push({kind:'bomb', x:w.x, y:w.y+8, vx:vx, vy:Math.sin(w.a)*w.speed, team:'p', dmg:65, r:52});
-        w.bombs--; w.cool=0.5;
-      }
+      const g = mode==='attack' ? stickyGround(w, 99999, false, claimed) : mode==='escort' ? nearestGroundTarget(P.x, 950) : null;
+      if(!g){ w.run = null; if(mode==='defend') patrolCarrier(w, dt, maxS); else followLeader(w, dt, maxS); continue; }
+      attackRun(w, g, dt, maxS, true);
     }
     if(w.y >= groundY(w.x)-4){ w.hp=0; hurtWing(w,1); }
   }

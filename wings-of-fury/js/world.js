@@ -17,13 +17,24 @@ function makeStruct(type, x){
   return {type, x, w:d.w, h:d.h, hp:d.hp, max:d.hp, primary:d.primary, dead:false, cool:rnd(1,3), y:groundY(x), aim:-Math.PI/2, spawn:0};
 }
 
+// Each island gets a few rounded hills on its plateau (made the first time the island's ground is queried,
+// so every island type has them), kept clear of the beaches.
+function islandHills(is){
+  if(is.hills) return is.hills;
+  is.hills = [];
+  const a = is.x0 + is.slope + 90, b = is.x1 - is.slope - 90, n = 1 + Math.floor((b-a)/550);
+  for(let i=0;i<n && b>a;i++) is.hills.push({c: a + (b-a)*(i+0.5)/n + rnd(-60,60), w: rnd(70,150), h: rnd(22,58)});
+  return is.hills;
+}
 function groundY(x){
   if(!G) return SEA;
   for(const is of G.islands){
     if(x>is.x0 && x<is.x1){
       const t = Math.min(x-is.x0, is.x1-x)/is.slope;
       const s = t>=1 ? 1 : t*t*(3-2*t);
-      return SEA - is.h*s - (t>=1 ? Math.sin(x*0.013+is.seed)*3 : 0);
+      let hill = 0;
+      for(const h of islandHills(is)){ const k = (x-h.c)/h.w; hill += h.h*Math.exp(-k*k); }
+      return SEA - (is.h + hill)*s - (t>=1 ? Math.sin(x*0.013+is.seed)*3 : 0);
     }
   }
   return SEA;

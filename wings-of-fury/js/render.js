@@ -153,6 +153,27 @@ function drawIsland(ctx, is){
       for(let k=0;k<6;k++){ const cx = is.strip.x0 + len*(k+0.5)/6 + Math.sin(k*7.3+is.seed)*20; ctx.beginPath(); ctx.ellipse(cx, groundY(cx)-1, 9, 2.6, 0, 0, 7); ctx.fill(); }
     }
   }
+  // jungle: broadleaf trees and extra palms across the island (generated once per island)
+  if(!is.trees){
+    is.trees = [];
+    for(let x = is.x0 + is.slope*0.5; x < is.x1 - is.slope*0.5; x += rnd(28,60))
+      is.trees.push({x, s:rnd(0.7,1.35), palm: Math.random() < 0.35, hue: Math.floor(rnd(0,3))});
+  }
+  const night = G.weather.time==='night', greens = night ? ['#1f2d1a','#243320','#1a2716'] : ['#2f6a2c','#3c7a32','#2a5b28'];
+  for(const tr of is.trees){
+    const gy = groundY(tr.x), s = tr.s;
+    if(tr.palm){
+      const sway = Math.sin(G.time*1.5+tr.x)*2 + G.weather.wind*0.05;
+      ctx.strokeStyle='#6b4f2c'; ctx.lineWidth=2.4*s; ctx.beginPath(); ctx.moveTo(tr.x,gy); ctx.quadraticCurveTo(tr.x+3*s,gy-14*s,tr.x+2*s+sway,gy-28*s); ctx.stroke();
+      ctx.strokeStyle=greens[tr.hue]; ctx.lineWidth=2.2*s;
+      for(let k=-2;k<=2;k++){ ctx.beginPath(); ctx.moveTo(tr.x+2*s+sway,gy-28*s); ctx.quadraticCurveTo(tr.x+k*7*s+sway,gy-35*s,tr.x+k*11*s+sway,gy-25*s+Math.abs(k)*3); ctx.stroke(); }
+    } else {
+      ctx.fillStyle='#5a4128'; ctx.fillRect(tr.x-1.2*s, gy-12*s, 2.4*s, 12*s);                                   // trunk
+      ctx.fillStyle=greens[tr.hue];
+      ctx.beginPath(); ctx.arc(tr.x, gy-16*s, 8*s, 0, 7); ctx.arc(tr.x-6*s, gy-12*s, 6*s, 0, 7); ctx.arc(tr.x+6*s, gy-12*s, 6.5*s, 0, 7); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.08)'; ctx.beginPath(); ctx.arc(tr.x-2*s, gy-19*s, 4*s, 0, 7); ctx.fill();   // sunlit top
+    }
+  }
   for(const p of is.palms){
     const gy = groundY(p.x), s = p.s, sway = Math.sin(G.time*1.5+p.x)*2 + G.weather.wind*0.05;
     ctx.strokeStyle='#6b4f2c'; ctx.lineWidth=3*s; ctx.beginPath(); ctx.moveTo(p.x,gy); ctx.quadraticCurveTo(p.x+4*s,gy-18*s,p.x+2*s+sway,gy-34*s); ctx.stroke();
