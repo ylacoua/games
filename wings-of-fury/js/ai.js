@@ -322,11 +322,14 @@ function zeroAI(e, dt, lvl){
   for(const w of G.wingmen) if(!w.dead && w.state==='fly') air.push({o:w, x:w.x, y:w.y, vx:Math.cos(w.a)*w.speed, vy:Math.sin(w.a)*w.speed});
   e.tgtT = (e.tgtT||0) - dt;
   let pick = air.find(a=>a.o===e.tgtO);
+  // already sitting on this target's tail: don't let it go
+  if(pick && Math.hypot(pick.x-e.x, pick.y-e.y) < 700 && aimedAt(e, pick.x, pick.y) < 0.9) e.tgtT = Math.max(e.tgtT, 1);
   if(!pick || e.tgtT<=0){
     let best=null, bs=Infinity;
     for(const a of air){
       const chasers = G.enemies.filter(z=>z!==e && !z.dead && z.tgtO===a.o).length;
-      const score = Math.hypot(a.x-e.x, a.y-e.y) + chasers*300 + (a.o===e.tgtO ? -150 : 0);
+      const onTail = aimedAt(e, a.x, a.y) < 0.9 ? -350 : 0;           // prefer whoever is already in front of the guns
+      const score = Math.hypot(a.x-e.x, a.y-e.y) + chasers*220 + (a.o===e.tgtO ? -150 : 0) + onTail;
       if(score < bs){ bs=score; best=a; }
     }
     pick = best; e.tgtO = best ? best.o : null; e.tgtT = rnd(5,9);
@@ -387,7 +390,9 @@ function zeroAI(e, dt, lvl){
   if(e.mt <= 0){ e.man = null; e.faceLock = null; e.rollOverride = null; }
   if(!e.man){
     const c = chasedBy(e);
-    if((c && Math.random() < dt*2.5) || (e.flash>0 && Math.random() < 0.5)){
+    // a hit makes it break off - but a Zero pressing home an attack from someone's tail mostly holds on
+    const committed = tg.d < 450 && aimedAt(e, tg.x, tg.y) < 0.6;
+    if((c && Math.random() < dt*2.5) || (e.flash>0 && Math.random() < (committed ? 0.04 : 0.3))){
       const ref = c ? c.a : e.a + Math.PI;
       // defensive manoeuvres: hard turns, climbs and dives, plus the aerobatic ones (maneuvers.js), each only
       // when there is the height and speed for it
@@ -405,7 +410,11 @@ function zeroAI(e, dt, lvl){
         e.turnDir = (wrapA(e.a - ref) >= 0 ? 1 : -1) * (Math.random()<0.25 ? -1 : 1);
         e.mt = rnd(0.9, 1.6);
       }
-    } else if(tg.d < 110){ e.man = 'extend'; e.mt = rnd(0.9, 1.4); e.extendA = e.a + rnd(-0.5, 0.5); }
+    } else if(tg.d < 110 && aimedAt(e, tg.x, tg.y) > 1.2){
+      // only after overshooting (target now beside or behind): extend, then turn back in.
+      // A Zero sitting on someone's tail stays there and keeps firing.
+      e.man = 'extend'; e.mt = rnd(0.7, 1.1); e.extendA = e.a + rnd(-0.5, 0.5);
+    }
   }
   e.brCool = Math.max(0, (e.brCool||0) - dt);
   if(zeroManeuverStep(e, dt, turn)) return;          // split-S, Immelmann, hammerhead fly themselves
@@ -423,15 +432,31 @@ function zeroAI(e, dt, lvl){
     steerAngle(e, want, turn*1.2, dt);
     return;
   }
-  e.speed += (e.base - e.speed)*Math.min(1, dt*1.5);
-  const lead = tg.d/760;
-  const tx = tg.x + tg.vx*lead, ty = tg.y + tg.vy*lead;
-  // weave while closing from range, tighten up when in firing range
-  const weave = tg.d > 420 ? Math.sin(G.time*2.2 + e.phase)*0.4 : 0;
-  steerAngle(e, Math.atan2(ty-e.y, tx-e.x) + weave, turn, dt);
-  if(e.cool<=0 && tg.d<430 && aimedAt(e, tx, ty) < 0.14){
+  // Pursuit: a Zero chasing an aircraft from behind opens the throttle to close the gap (even on a faster
+  // American fighter at full power), then matches its speed once in gun range instead of overshooting.
+  const tSpd = Math.hypot(tg.vx, tg.vy), ahead = aimedAt(e, tg.x, tg.y) < 0.9;
+  let want = e.base;
+  if(ahead && tSpd > 0){
+    if(tg.d > 260) want = clamp(tSpd*1.12, e.base, e.base*1.35);
+    else want = clamp(tSpd + (tg.d - 170)*0.4, e.base*0.6, e.base*1.3);
+  }
+  e.speed += (want - e.speed)*Math.min(1, dt*1.8);
+  // Lead the target along its curve, not a straight line: watch how fast its flight path is turning (loops,
+  // turn-arounds) and aim where it will be on that arc when the bullets arrive.
+  const va = Math.atan2(tg.vy, tg.vx);
+  if(e.tva != null && e.tvo === e.tgtO){ const w = clamp(wrapA(va - e.tva)/Math.max(dt, 1e-3), -3, 3); e.tw = (e.tw||0)*0.8 + w*0.2; }
+  else e.tw = 0;
+  e.tva = va; e.tvo = e.tgtO;
+  const lead = tg.d/760, la = va + (e.tw||0)*lead*0.5;
+  const tx = tg.x + Math.cos(la)*tSpd*lead, ty = tg.y + Math.sin(la)*tSpd*lead;
+  // weave while closing from range, then track hard once in firing range
+  const weave = tg.d > 560 ? Math.sin(G.time*2.2 + e.phase)*0.35 : 0;
+  steerAngle(e, Math.atan2(ty-e.y, tx-e.x) + weave, tg.d < 560 ? turn*1.25 : turn, dt);
+  // Fire when the target (its size included) is inside the cone: long bursts with short pauses
+  const cone = 0.1 + Math.atan2(18, Math.max(tg.d, 1));
+  if(e.cool<=0 && tg.d<560 && aimedAt(e, tx, ty) < cone){
     shootFrom(e, 'e', 3+lvl*0.6); SFX.enemyGun();
-    e.burst++; e.cool = e.burst%6===0 ? rnd(0.8,1.4) : 0.11;
+    e.burst++; e.cool = e.burst%8===0 ? rnd(0.8,1.3) : 0.11;
   }
 }
 
