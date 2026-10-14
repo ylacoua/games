@@ -242,12 +242,22 @@ function drawAI(ctx, e, type, s, flash, gear=0){
     return;
   }
   ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.a);
-  // keep the aircraft upright, but only roll it over once it is clearly heading the other way, so it does
-  // not flip back and forth while climbing or diving near the vertical
-  if(e.face == null) e.face = Math.cos(e.a) < 0 ? -1 : 1;
-  if(Math.cos(e.a) > 0.3) e.face = 1; else if(Math.cos(e.a) < -0.3) e.face = -1;
-  if(e.face < 0) ctx.scale(1,-1);
-  drawPlane(ctx, type, null, null, s, flash>0, !(e.takeoff && e.takeoff.t<0) && !(e.state==='rearm'), gear);
+  // Keep the aircraft upright: once it is clearly heading the other way it rolls about its own nose axis to
+  // right itself, like a pilot rolling out at the top of a half loop. The roll takes about 0.4 s and is drawn
+  // with the 3D model, instead of the sprite snapping onto its back in a single frame.
+  // (Hysteresis around the vertical so it doesn't roll back and forth while climbing or diving straight.)
+  const c = Math.cos(e.a);
+  if(e.face == null){ e.face = c < 0 ? -1 : 1; e.roll = e.face < 0 ? Math.PI : 0; }
+  if(c > 0.2) e.face = 1; else if(c < -0.2) e.face = -1;
+  const want = e.face < 0 ? Math.PI : 0, step = Math.PI/0.4/60;
+  e.roll += clamp(want - e.roll, -step, step);
+  const prop = !(e.takeoff && e.takeoff.t<0) && !(e.state==='rearm');
+  if(Math.abs(want - e.roll) > 1e-3 && type !== 'betty'){
+    drawPlane3D(ctx, type, null, (AIRCRAFT[type]||{}).nation || 'us', 0, e.roll, 0, flash>0, prop);
+  } else {
+    if(e.roll > Math.PI/2) ctx.scale(1,-1);
+    drawPlane(ctx, type, null, null, s, flash>0, prop, gear);
+  }
   ctx.restore();
 }
 
