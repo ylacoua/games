@@ -219,7 +219,7 @@ function launchFrom(site, type, delay=0){
     ? {type:'val', x, y, a:dir>0?0:Math.PI, speed:0, full, hp:45, size:18, cool:0, dead:false}
     : type==='betty'
     ? {type:'betty', x, y, a:dir>0?0:Math.PI, speed:0, full, hp:90, size:24, cool:0, bombs:3, dead:false}
-    : {type:'zero',  x, y, a:dir>0?0:Math.PI, speed:0, full, hp:28+G.idx*4, size:16, cool:1, burst:0, evade:0, dead:false};
+    : {type:'zero',  x, y, a:dir>0?0:Math.PI, speed:0, full, hp:34+G.idx*5, size:16, cool:1, burst:0, evade:0, dead:false};
   e.max = e.hp;
   e.takeoff = {t:-delay, ground:y, deck: site.kind==='carrier' ? site.sh : null};
   G.enemies.push(e);
@@ -254,14 +254,14 @@ function updateSpawns(dt, viewW){
   const airborne = !P.dead && !P.onDeck;
   const alive = G.enemies.filter(e=>!e.dead && e.type==='zero').length;
   G.zeroT -= dt;
-  if(G.zeroT<=0 && airborne && P.x>1200 && alive < 3+lvl){
+  if(G.zeroT<=0 && airborne && P.x>1200 && alive < 4+lvl){
     const site = nearestSite(launchSites(), P.x);
     if(site){
       const n = 1 + (Math.random()<0.25+lvl*0.1 ? 1 : 0);
       for(let i=0;i<n;i++) launchFrom(site, 'zero', i*1.6);
       say(site.kind==='carrier' ? 'מטוסי זירו ממריאים מהנושאת היפנית!' : (n>1 ? 'מטוסי זירו ממריאים מהאי!' : 'מטוס זירו ממריא מהאי!'), 2.5);
     }
-    G.zeroT = def.zeroEvery*rnd(0.8,1.2);
+    G.zeroT = def.zeroEvery*rnd(0.65,1.0);
   }
   if(def.bombers){
     G.bomberT -= dt;
@@ -385,11 +385,16 @@ function zeroAI(e, dt, lvl){
   // Strike-role Zeros (about half of each flight) go for the carrier itself, even when fighters are about;
   // they still break and jink if someone gets on their tail.
   if(e.role==='strike' && G.def.mode==='defense') tg = {x:cmid, y:DECK_Y-12, vx:0, vy:0, d:Math.hypot(cmid-e.x, DECK_Y-12-e.y)};
-  const turn = 2.3 + lvl*0.12;
+  const turn = 2.5 + lvl*0.12;
   e.mt -= dt; e.cool -= dt;
   if(e.mt <= 0){ e.man = null; e.faceLock = null; e.rollOverride = null; }
   if(!e.man){
-    const c = chasedBy(e);
+    // Really chased = an enemy behind it (not a head-on pass) holding its nose on it for a moment;
+    // a nose sweeping past during someone else's loop or turn-around doesn't scare it off.
+    let c = chasedBy(e);
+    if(c && Math.abs(wrapA(Math.atan2(c.y-e.y, c.x-e.x) - e.a)) < 1.9) c = null;
+    e.chasedT = c ? (e.chasedT||0) + dt : 0;
+    if(e.chasedT < 0.5) c = null;
     // a hit makes it break off - but a Zero pressing home an attack from someone's tail mostly holds on
     const committed = tg.d < 450 && aimedAt(e, tg.x, tg.y) < 0.6;
     if((c && Math.random() < dt*2.5) || (e.flash>0 && Math.random() < (committed ? 0.04 : 0.3))){
@@ -456,7 +461,7 @@ function zeroAI(e, dt, lvl){
   const cone = 0.1 + Math.atan2(18, Math.max(tg.d, 1));
   if(e.cool<=0 && tg.d<560 && aimedAt(e, tx, ty) < cone){
     shootFrom(e, 'e', 3+lvl*0.6); SFX.enemyGun();
-    e.burst++; e.cool = e.burst%8===0 ? rnd(0.8,1.3) : 0.11;
+    e.burst++; e.cool = e.burst%8===0 ? rnd(0.6,1.0) : 0.11;
   }
 }
 

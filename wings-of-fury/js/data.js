@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.42';
+const GAME_VERSION = '1.43';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -9,7 +9,7 @@ const DECK_Y = SEA - 34;
 const CEIL = -1300;     // highest altitude any aircraft can reach (world y), about 5,400 ft
 const SMALL_ARMS_ALT = 110;   // soldiers can only hit aircraft flying lower than this above the ground (about 330 ft)
 const TORPEDO_ARM = 170;      // a torpedo must run this far through the water before it arms
-const PLAYER_DAMAGE = 0.45;  // the player's aircraft takes less than half of incoming damage
+const PLAYER_DAMAGE = 0.55;  // share of incoming damage the player's aircraft takes (raised from 0.45 in v1.43)
 
 const PLANES = {
   hellcat:  {name:'F6F הלקט',   desc:'מטוס קרב מאוזן ואמין. נקודת הפתיחה של כל טייס.', price:0,    speed:280, turn:1.9,  hp:100, gun:1.0, rate:11, fuel:100, ord:{bomb:8,rocket:12,torpedo:1}, gunner:false, color:'#3d5c7c', shape:'fighter'},
