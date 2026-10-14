@@ -49,6 +49,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .lvl{text-align:right;display:flex;flex-direction:column;gap:3px;padding:10px}
 .lvl small{color:var(--steel);font-size:12px}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;color:var(--steel)}
+.keys span b.mv{all:unset;color:var(--signal);font-weight:700}
 .keys b{color:var(--paper);font-family:monospace;font-size:13px;background:#0b1626;border:1px solid #2c4262;border-radius:3px;padding:1px 6px;text-align:center}
 .spread{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .pill{font-size:12px;padding:2px 8px;border-radius:10px;background:#22344d;color:var(--steel)}
@@ -116,7 +117,7 @@ button.link:hover{background:none;color:var(--paper)}
 <canvas id="game"></canvas>
 <div id="touch">
   <div class="pad">
-    <span></span><button data-k="ArrowUp" aria-label="למעלה">▲</button><span></span>
+    <button data-k="KeyZ" aria-label="גלגול חבית">↻</button><button data-k="ArrowUp" aria-label="למעלה">▲</button><span></span>
     <button data-k="ArrowLeft" aria-label="שמאלה">◀</button><button data-k="ArrowDown" aria-label="למטה">▼</button><button data-k="ArrowRight" aria-label="ימינה">▶</button>
   </div>
   <div class="pad">
@@ -138,6 +139,7 @@ button.link:hover{background:none;color:var(--paper)}
 <script src="js/world.js"></script>
 <script src="js/entities.js"></script>
 <script src="js/ai.js"></script>
+<script src="js/maneuvers.js"></script>
 <script src="js/aircraft.js"></script>
 <script src="js/plane3d.js"></script>
 <script src="js/render.js"></script>

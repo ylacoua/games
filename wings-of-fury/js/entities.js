@@ -3,7 +3,8 @@ const keys = {};
 
 // P.loop holds a flat turn-around in progress: {t: 0..1}. The plane keeps its altitude and pitch while
 // its horizontal motion slows, passes through zero and reverses.
-function heading(P){ return P.vl ? P.vl.ang : P.p; }   // P.vl: a vertical loop in progress
+// P.vl: a vertical loop in progress; P.mv: a split-S or hammerhead (maneuvers.js)
+function heading(P){ return P.mv ? P.mv.ang : P.vl ? P.vl.ang : P.p; }
 function turnK(P){ return P.loop ? Math.cos(Math.PI*P.loop.t) : 1; }
 function playerVel(P){ const a=heading(P); return {vx:P.f*Math.cos(a)*P.speed*turnK(P), vy:-Math.sin(a)*P.speed}; }
 
@@ -43,25 +44,51 @@ function updatePlayer(dt){
   const outOfFuel = P.fuel<=0;
   if(K.KeyW) P.throttle = Math.min(1, P.throttle+dt*0.8);
   if(K.KeyS) P.throttle = Math.max(0, P.throttle-dt*0.8);
-  if(!P.loop && !P.vl){
-    const wantTurn = (K.ArrowLeft && P.f>0) || (K.ArrowRight && P.f<0);
-    if(wantTurn && P.speed>110){ P.loop = {t:0}; P.p *= 0.5; }
-    else if((K.ArrowRight && P.f>0) || (K.ArrowLeft && P.f<0)) P.throttle = Math.min(1, P.throttle+dt*0.8);
+  const fwdKey = P.f>0 ? K.ArrowRight : K.ArrowLeft, backKey = P.f>0 ? K.ArrowLeft : K.ArrowRight;
+  if(!P.loop && !P.vl && !P.mv){
+    if(backKey && P.speed>110 && !P.br){ P.loop = {t:0}; P.p *= 0.5; }
+    else if(fwdKey) P.throttle = Math.min(1, P.throttle+dt*0.8);
   }
-  if(!P.vl){
+  mvTick(P, dt);
+  // Z: barrel roll (evasive) · S twice quickly: air brake (both from level-ish flight)
+  if(K.KeyZ && !P.loop && !P.vl && !P.mv && P.speed > 110 && mvBarrel(P)){ P.lastMv = 'barrel'; say('גלגול חבית!', 0.8); }
+  if(P.brakeReq){ P.brakeReq = false; if(!P.vl && !P.mv && P.speed > 130 && mvBrake(P)){ P.lastMv = 'brake'; say('בלימה! תן לרודף לעקוף אותך', 1.2); } }
+  // dive bombers: ↓ + S in a steep dive opens the dive brakes; the plane pulls out by itself near the ground
+  const diver = DIVE_BOMBERS[G.stats.type];
+  if(diver && !P.loop && !P.vl && !P.mv){
+    if(!P.dive && K.KeyS && K.ArrowDown && P.p <= -0.8){ P.dive = true; say('בלמי צלילה פתוחים – כוון והטל', 1.5); }
+    if(P.dive && (!K.KeyS || P.p > -0.3)) P.dive = false;
+  } else P.dive = false;
+  if(P.dive && groundY(P.x) - P.y < 150){ P.dive = false; P.pull = true; say('משיכה!', 1); }
+  if(P.pull){ P.p = Math.min(0.1, P.p + 2.4*dt); if(P.p >= 0.1) P.pull = false; }
+
+  if(P.mv){
+    mvUpdate(P, dt, st.turn);
+    if(!P.mv) say(P.lastMv==='split' ? 'יציאה מספליט S' : 'יציאה מפניית פטיש', 0.8);
+  } else if(!P.vl){
     // pitch stays available during the turn
     const tr = st.turn*0.5*(P.stall?0.4:1)*(P.loop?0.5:1);   // pitch rate: gentler than the turn-around
-    if(K.ArrowUp) P.p += tr*dt;
-    if(K.ArrowDown) P.p -= tr*dt;
+    if(K.ArrowUp && !P.pull) P.p += tr*dt;
+    if(K.ArrowDown && !P.pull) P.p -= tr*dt;
     P.p = clamp(P.p, -1.35, 1.35);
-    // keep pulling with the nose already pointing up, with enough speed: go over the top into a full loop
-    P.upHold = (K.ArrowUp && P.p >= 0.95 && !P.loop) ? (P.upHold||0) + dt : 0;
-    if(P.upHold > 0.15 && P.speed > 140){ P.vl = {ang:P.p}; P.upHold = 0; say('לופ!',1); }
+    // keep pulling with the nose already pointing up: over the top into a full loop,
+    // or, with the throttle back (S), stand on the tail and pivot over in a hammerhead
+    P.upHold = (K.ArrowUp && P.p >= 0.95 && !P.loop && !P.br) ? (P.upHold||0) + dt : 0;
+    if(P.upHold > 0.15){
+      if(K.KeyS && P.speed > 80){ mvStart(P, 'hammer'); P.lastMv = 'hammer'; P.upHold = 0; say('פניית פטיש!', 1); }
+      else if(P.speed > 140){ P.vl = {ang:P.p}; P.upHold = 0; say('לופ! ← לכיוון ההפוך בפסגה = אימלמן', 1.5); }
+    }
+    // keep pushing with the nose already pointing down: half roll and pull through into a split-S
+    P.downHold = (K.ArrowDown && P.p <= -1.3 && !P.loop && !P.br && !K.KeyS && !P.dive) ? (P.downHold||0) + dt : 0;
+    if(P.downHold > 0.25 && P.speed > 120){ mvStart(P, 'split'); P.lastMv = 'split'; P.downHold = 0; say('ספליט S!', 1); }
   } else {
     // vertical loop: the nose keeps coming round, over the top inverted and down the back, back to level flight
     P.vl.ang += st.turn*0.8*dt;
     P.speed = Math.max(P.speed, 130);
-    if(P.vl.ang >= Math.PI*2){ P.p = 0; P.vl = null; }
+    // the arrow toward the new direction near the top: Immelmann, half roll upright and fly off reversed
+    if(backKey && P.vl.ang > Math.PI*0.55 && P.vl.ang < Math.PI) P.vl.imm = true;
+    if(P.vl.imm && P.vl.ang >= Math.PI){ mvFlip(P, P.vl.ang); P.p = 0; P.rollGoal = 0; P.vl = null; P.lastMv = 'imm'; say('אימלמן!', 1); }
+    else if(P.vl.ang >= Math.PI*2){ P.p = 0; P.vl = null; P.lastMv = 'loop'; }
   }
   if(P.loop){
     P.loop.t += dt * st.turn/1.25;          // ~0.65s for a Hellcat, quicker for agile planes
@@ -69,13 +96,13 @@ function updatePlayer(dt){
     if(P.loop.t >= 1){ P.f = -P.f; P.loop = null; }
   }
   // boundaries: auto turn back
-  if(!P.loop && !P.vl && ((P.x < -350 && P.f<0) || (P.x > G.L+350 && P.f>0))){ P.loop={t:0}; P.speed=Math.max(P.speed,170); }
+  if(!P.loop && !P.vl && !P.mv && ((P.x < -350 && P.f<0) || (P.x > G.L+350 && P.f>0))){ P.loop={t:0}; P.speed=Math.max(P.speed,170); }
 
   // landing gear: retracts after take-off, lowers automatically on approach to the carrier
   const mid = C.x + C.len/2;
   const nearCarrier = Math.abs(P.x-mid) < C.len/2+550 && P.y > DECK_Y-230;
   const towardDeck = Math.abs(P.x-mid) < C.len/2 || Math.sign(mid-P.x) === P.f;
-  const want = (P.airT||0) < 1 ? 1 : ((P.airT||0) > 4 && nearCarrier && towardDeck && !P.loop && P.p <= 0.2) ? 1 : 0;
+  const want = (P.airT||0) < 1 ? 1 : ((P.airT||0) > 4 && nearCarrier && towardDeck && !P.loop && !P.mv && P.p <= 0.2) ? 1 : 0;
   if(want !== P.gearWant){ P.gearWant = want; SFX.tone(want?140:220, want?220:140, 0.6, 0.05, 'sawtooth'); if(want) say('גלגלים למטה',1.5); }
   P.gear = clamp(P.gear + clamp(want-P.gear, -dt/0.9, dt/0.9), 0, 1);
 
@@ -83,12 +110,13 @@ function updatePlayer(dt){
   const target = (outOfFuel ? 0 : P.throttle*st.speed) * (1 - 0.12*P.gear);
   P.speed += (target-P.speed)*0.55*dt - (Math.sin(a)>0 ? 145 : 70)*Math.sin(a)*dt;   // dives gain speed more slowly than climbs lose it
   P.speed = clamp(P.speed, 0, st.speed*1.2);
-  P.stall = P.speed < 100 && !P.loop && !P.vl;
+  if(P.dive) P.speed = Math.min(P.speed, st.speed*0.78);                 // dive brakes hold a steady, slow dive
+  P.stall = P.speed < 100 && !P.loop && !P.vl && !P.mv;
   if(P.stall) P.p = Math.max(-1.3, P.p - 1.1*dt);
   const v = playerVel(P);
   P.x += v.vx*dt + G.weather.wind*0.35*dt + G.weather.gust*dt;
   P.y += v.vy*dt + (P.stall ? 80*dt : 0);
-  if(P.y < CEIL){ P.y = CEIL; if(!P.loop && !P.vl) P.p = Math.min(P.p, 0); }
+  if(P.y < CEIL){ P.y = CEIL; if(!P.loop && !P.vl && !P.mv) P.p = Math.min(P.p, 0); }
   if(!outOfFuel){ P.fuel -= (0.32+0.5*P.throttle)*dt; if(P.fuel<=0){ P.fuel=0; say('אזל הדלק! גלוש לנושאת',4); SFX.alarm(); } }
   else if(Math.random()<dt*0.5) {}
   if(P.hp < P.max*0.35){ P.smoke -= dt; if(P.smoke<=0){ P.smoke=0.05; puff(P.x-v.vx*0.03, P.y, '#333', 8); } }
@@ -102,7 +130,7 @@ function updatePlayer(dt){
   P.airT = (P.airT||0) + dt;
   if(onCarrierX && P.y >= DECK_Y-9 && P.y < DECK_Y+12){
     if(P.airT < 1.2 && P.p >= 0){ P.y = DECK_Y-9; P.p = Math.max(P.p, 0.05); return; }  // just lifted off
-    if(!P.loop && !P.vl && Math.abs(P.p)<0.32 && P.speed<225){
+    if(!P.loop && !P.vl && !P.mv && Math.abs(P.p)<0.32 && P.speed<225){
       P.onDeck=true; P.landing=true; P.y=DECK_Y-9; P.p=0; P.throttle=0; G.state='landing';
       SFX.tone(200,120,0.3,0.1,'triangle'); say('נחיתה! וו הבלימה נתפס',2);
       return;
@@ -157,7 +185,7 @@ function dropOrd(P){
 
 function crashPlayer(reason){
   const P = G.player; if(P.dead) return;
-  P.dead=true; P.loop=null; P.vl=null; G.lives--;
+  P.dead=true; P.loop=null; P.vl=null; P.mv=null; P.br=null; G.lives--;
   boom(P.x, Math.min(P.y, groundY(P.x)-4), 50, true, true); SFX.planeBoom();
   if(overSea(P.x) && P.y>SEA-20) splash(P.x);
   for(let i=0;i<10;i++) G.debris.push({x:P.x,y:P.y,vx:rnd(-160,160),vy:rnd(-260,-40),r:rnd(0,6),vr:rnd(-8,8),life:2.5,c:G.stats.color});
@@ -299,7 +327,7 @@ function bulletVsEnemy(s){
   for(const e of G.enemies){
     if(e.dead) continue;
     const hit = e.boxW ? (Math.abs(s.x-e.x)<e.boxW/2 && Math.abs(s.y-e.y)<e.boxH/2) : dist2(s.x,s.y,e.x,e.y) < (e.size||16)**2;
-    if(hit){ s.life=0; hurtEnemy(e, s.dmg); spark(s.x,s.y); return; }
+    if(hit && !dodges(e)){ s.life=0; hurtEnemy(e, s.dmg); spark(s.x,s.y); return; }
   }
   for(const st of G.structures){
     if(!st.dead && s.x>st.x-st.w/2 && s.x<st.x+st.w/2 && s.y>st.y-st.h){ s.life=0; hitStruct(st, s.dmg, 'gun'); spark(s.x,s.y); return; }
@@ -314,10 +342,10 @@ function bulletVsEnemy(s){
 }
 function bulletVsFriend(s){
   const P=G.player;
-  if(!P.dead && !P.onDeck && dist2(s.x,s.y,P.x,P.y)<16*16){ s.life=0; damagePlayer(s.dmg); spark(s.x,s.y); return; }
+  if(!P.dead && !P.onDeck && dist2(s.x,s.y,P.x,P.y)<16*16 && !dodges(P)){ s.life=0; damagePlayer(s.dmg); spark(s.x,s.y); return; }
   const C = G.carrier;
   if(s.x>C.x && s.x<C.x+C.len && s.y>DECK_Y-8 && s.y<SEA){ s.life=0; C.hp -= s.dmg*0.6; C.hit=0.1; spark(s.x,s.y); return; }
-  for(const w of G.wingmen) if(!w.dead && w.state!=='wait' && dist2(s.x,s.y,w.x,w.y)<15*15){ s.life=0; hurtWing(w, s.dmg); return; }
+  for(const w of G.wingmen) if(!w.dead && w.state!=='wait' && dist2(s.x,s.y,w.x,w.y)<15*15 && !dodges(w)){ s.life=0; hurtWing(w, s.dmg); return; }
 }
 
 function earn(type, x, y){

@@ -122,9 +122,14 @@ function killSoldier(so){
 // vertical loop (vl: the loop angle). They never just roll onto their back.
 function pilotSteer(w, want, turn, dt){
   if(w.f == null){ w.f = Math.cos(w.a) >= 0 ? 1 : -1; w.p = clamp(Math.atan2(-Math.sin(w.a), Math.abs(Math.cos(w.a))), -1.35, 1.35); w.pr = 0; }
-  if(w.vl != null){                                             // loop in progress
+  mvTick(w, dt);
+  if(w.mv){                                                     // split-S or hammerhead (maneuvers.js)
+    mvUpdate(w, dt, turn);
+  } else if(w.vl != null){                                      // loop in progress
     w.vl += turn*0.75*dt; w.speed = Math.max(w.speed, 130);
-    if(w.vl >= Math.PI*2){ w.p = 0; w.vl = null; }
+    // Immelmann: roll out at the top and fly off the other way, higher
+    if(w.vlImm && w.vl >= Math.PI){ mvFlip(w, w.vl); w.p = 0; w.rollGoal = 0; w.vl = null; w.vlImm = false; }
+    else if(w.vl >= Math.PI*2){ w.p = 0; w.vl = null; w.vlImm = false; }
   } else if(w.ft != null){                                      // turn-around in progress
     w.ft += dt*turn/1.3; w.speed -= 30*dt;
     if(w.ft >= 1){ w.f = -w.f; w.ft = null; }
@@ -138,7 +143,8 @@ function pilotSteer(w, want, turn, dt){
       w.p = clamp(w.p + w.pr*dt, -1.35, 1.35);
     }
   }
-  const ang = w.vl != null ? w.vl : w.p, k = w.ft != null ? Math.cos(Math.PI*w.ft) : 1;
+  const ang = w.mv ? w.mv.ang : w.vl != null ? w.vl : w.p, k = w.ft != null ? Math.cos(Math.PI*w.ft) : 1;
+  w.dive = !!DIVE_BOMBERS[w.kind] && !w.mv && w.vl == null && ang <= -0.8;   // dive brakes out in a steep dive
   const vx = w.f*Math.cos(ang)*w.speed, vy = -Math.sin(ang)*w.speed;
   w.x += vx*k*dt + G.weather.wind*0.3*dt; w.y += vy*dt;
   w.a = Math.atan2(vy, vx);                                     // heading, for aiming and for other code
@@ -378,15 +384,34 @@ function zeroAI(e, dt, lvl){
   if(e.role==='strike' && G.def.mode==='defense') tg = {x:cmid, y:DECK_Y-12, vx:0, vy:0, d:Math.hypot(cmid-e.x, DECK_Y-12-e.y)};
   const turn = 2.3 + lvl*0.12;
   e.mt -= dt; e.cool -= dt;
-  if(e.mt <= 0) e.man = null;
+  if(e.mt <= 0){ e.man = null; e.faceLock = null; e.rollOverride = null; }
   if(!e.man){
     const c = chasedBy(e);
     if((c && Math.random() < dt*2.5) || (e.flash>0 && Math.random() < 0.5)){
       const ref = c ? c.a : e.a + Math.PI;
-      e.man = ['break','break','zoom','dive'][Math.floor(Math.random()*4)];
-      e.turnDir = (wrapA(e.a - ref) >= 0 ? 1 : -1) * (Math.random()<0.25 ? -1 : 1);
-      e.mt = rnd(0.9, 1.6);
+      // defensive manoeuvres: hard turns, climbs and dives, plus the aerobatic ones (maneuvers.js), each only
+      // when there is the height and speed for it
+      const alt = groundY(e.x) - e.y, level = Math.abs(Math.sin(e.a)) < 0.5;
+      const pool = ['break','break','zoom','dive'];
+      if(level && (e.brCool||0) <= 0) pool.push('barrel','barrel');
+      if(level && alt > 330) pool.push('split');
+      if(level && e.y > CEIL + 300) pool.push('imm');
+      if(level && e.speed > 150 && e.y > CEIL + 350) pool.push('hammer');
+      if(level && c && Math.hypot(c.x-e.x, c.y-e.y) < 260) pool.push('brake');
+      const pick = pool[Math.floor(Math.random()*pool.length)];
+      if(['barrel','split','imm','hammer','brake'].includes(pick)){ zeroManeuver(e, pick); if(pick==='barrel') e.brCool = BARREL_COOL; }
+      else {
+        e.man = pick;
+        e.turnDir = (wrapA(e.a - ref) >= 0 ? 1 : -1) * (Math.random()<0.25 ? -1 : 1);
+        e.mt = rnd(0.9, 1.6);
+      }
     } else if(tg.d < 110){ e.man = 'extend'; e.mt = rnd(0.9, 1.4); e.extendA = e.a + rnd(-0.5, 0.5); }
+  }
+  e.brCool = Math.max(0, (e.brCool||0) - dt);
+  if(zeroManeuverStep(e, dt, turn)) return;          // split-S, Immelmann, hammerhead fly themselves
+  if(e.man==='barrel' || e.man==='brake'){            // these keep the chase going underneath
+    steerAngle(e, e.a, turn, dt);
+    return;
   }
   if(e.man){
     let want, sp = e.base;
@@ -613,8 +638,22 @@ function updateWingmen(dt){
     }
     w.pilot = true;                                            // flies like the player's aircraft (see pilotSteer)
     const mode = G.wingMode, cx = C.x + C.len/2;
-    // being shot at from behind with room to spare: pull up into a loop to get out of the line of fire
-    if(w.vl==null && w.ft==null && w.speed > 170 && groundY(w.x)-w.y > 260 && enemyOnTail(w) && Math.random() < dt*1.5) w.vl = w.p ?? 0;
+    // being shot at from behind: shake the attacker off with a loop, Immelmann, split-S, hammerhead,
+    // barrel roll or air brake - whichever the height and speed allow
+    if(w.vl==null && w.ft==null && !w.mv && !w.br && enemyOnTail(w) && Math.random() < dt*1.5){
+      const alt = groundY(w.x) - w.y, pool = [];
+      if(w.brCool <= 0 || w.brCool == null) pool.push('barrel', 'barrel');
+      if(w.speed > 170 && alt > 260) pool.push('loop', 'imm');
+      if(w.speed > 140 && alt > 340) pool.push('split');
+      if(w.speed > 150 && alt > 220 && w.y > CEIL + 350) pool.push('hammer');
+      if(w.speed > 150) pool.push('brake');
+      const pick = pool[Math.floor(Math.random()*pool.length)];
+      if(pick==='barrel') mvBarrel(w);
+      else if(pick==='loop') w.vl = w.p ?? 0;
+      else if(pick==='imm'){ w.vl = w.p ?? 0; w.vlImm = true; }
+      else if(pick==='split' || pick==='hammer') mvStart(w, pick);
+      else if(pick==='brake') mvBrake(w);
+    }
     // Out of ammunition (fighters) or bombs (bombers): head back, land on the carrier and rearm.
     if(w.role==='fighter' ? w.ammo<=0 : w.bombs<=0){
       if(!w.rtb){ w.rtb = true; say(`${WINGMEN[w.kind].name} סיים את ה${w.role==='fighter'?'תחמושת':'פצצות'} וחוזר לנושאת להתחמש`, 2.5); }
@@ -668,7 +707,7 @@ function wingTakeoff(w, dt){
   else {
     w.a = -0.25; w.x += Math.cos(w.a)*w.speed*dt; w.y += Math.sin(w.a)*w.speed*dt;
     w.gear = Math.max(0, w.gear - dt);
-    if(DECK_Y-9 - w.y > 70){ w.state='fly'; w.takeoff=null; w.gear=0; w.f=null; w.ft=null; w.vl=null; }
+    if(DECK_Y-9 - w.y > 70){ w.state='fly'; w.takeoff=null; w.gear=0; w.f=null; w.ft=null; w.vl=null; w.mv=null; w.br=null; w.roll=0; w.rollGoal=0; }
   }
 }
 function wingLandingGlide(w, dt){

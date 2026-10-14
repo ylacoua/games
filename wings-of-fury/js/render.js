@@ -77,10 +77,7 @@ function render(ctx, cw, ch){
       const yaw = (P.f>0 ? 0 : Math.PI) + (P.f>0 ? -1 : 1)*Math.PI*ease;
       const roll = -Math.sin(Math.PI*t)*0.75;
       drawPlane3D(ctx, G.stats.type, null, 'us', yaw, roll, a, P.hitT>0, true);
-    } else {
-      ctx.scale(P.f,1); ctx.rotate(-a);
-      drawPlane(ctx, G.stats.type, null, null, 1, P.hitT>0, P.throttle>0.05||P.speed>40, P.gear);
-    }
+    } else drawPilotPlane(ctx, P, G.stats.type, 'us', a, P.hitT>0, P.throttle>0.05||P.speed>40, P.gear);
     ctx.restore();
   }
   // effects
@@ -232,12 +229,12 @@ function drawAI(ctx, e, type, s, flash, gear=0){
   if(e.pilot && e.state==='fly' && e.f != null){
     // wingmen are drawn exactly like the player's aircraft: upright, the 3D model during a turn-around,
     // and naturally upside down only at the top of a loop
-    const ang = e.vl != null ? e.vl : e.p;
+    const ang = e.mv ? e.mv.ang : e.vl != null ? e.vl : e.p;
     ctx.save(); ctx.translate(e.x, e.y);
     if(e.ft != null){
       const t = e.ft, ease = t*t*(3-2*t);
       drawPlane3D(ctx, type, null, 'us', (e.f>0 ? 0 : Math.PI) + (e.f>0 ? -1 : 1)*Math.PI*ease, -Math.sin(Math.PI*t)*0.75, ang, flash>0, true);
-    } else { ctx.scale(e.f, 1); ctx.rotate(-ang); drawPlane(ctx, type, null, null, s, flash>0, true, gear); }
+    } else drawPilotPlane(ctx, e, type, 'us', ang, flash>0, true, gear);
     ctx.restore();
     return;
   }
@@ -246,17 +243,23 @@ function drawAI(ctx, e, type, s, flash, gear=0){
   // right itself, like a pilot rolling out at the top of a half loop. The roll takes about 0.4 s and is drawn
   // with the 3D model, instead of the sprite snapping onto its back in a single frame.
   // (Hysteresis around the vertical so it doesn't roll back and forth while climbing or diving straight.)
+  // A manoeuvre (maneuvers.js) can hold the attitude: faceLock keeps it on its back through a split-S or
+  // upright until the top of an Immelmann; rollOverride shows it from above while it pivots in a hammerhead.
   const c = Math.cos(e.a);
   if(e.face == null){ e.face = c < 0 ? -1 : 1; e.roll = e.face < 0 ? Math.PI : 0; }
-  if(c > 0.2) e.face = 1; else if(c < -0.2) e.face = -1;
-  const want = e.face < 0 ? Math.PI : 0, step = Math.PI/0.4/60;
+  if(e.man && e.faceLock != null) e.face = e.faceLock;
+  else if(c > 0.2) e.face = 1; else if(c < -0.2) e.face = -1;
+  const want = e.man && e.rollOverride != null ? e.rollOverride : e.face < 0 ? Math.PI : 0, step = Math.PI/0.4/60;
   e.roll += clamp(want - e.roll, -step, step);
+  const r = visRoll(e);                                       // plus a full turn during a barrel roll
   const prop = !(e.takeoff && e.takeoff.t<0) && !(e.state==='rearm');
-  if(Math.abs(want - e.roll) > 1e-3 && type !== 'betty'){
-    drawPlane3D(ctx, type, null, (AIRCRAFT[type]||{}).nation || 'us', 0, e.roll, 0, flash>0, prop);
+  if(Math.abs(r) > 0.02 && Math.abs(r) < Math.PI-0.02 && type !== 'betty'){
+    drawPlane3D(ctx, type, null, (AIRCRAFT[type]||{}).nation || 'us', 0, r, 0, flash>0, prop);
   } else {
-    if(e.roll > Math.PI/2) ctx.scale(1,-1);
+    if(Math.abs(r) > Math.PI/2) ctx.scale(1,-1);
     drawPlane(ctx, type, null, null, s, flash>0, prop, gear);
+    // dive brakes on a Val in its dive onto the carrier; split flaps on a Zero braking hard
+    drawBrakes(ctx, type, type==='val' && Math.sin(e.a) > 0.6, e.brk > 0);
   }
   ctx.restore();
 }

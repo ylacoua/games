@@ -14,12 +14,19 @@ function resize(){
 }
 window.addEventListener('resize', resize); resize();
 
-const GAME_KEYS = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyS','KeyX','KeyB'];
+const GAME_KEYS = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyW','KeyS','KeyX','KeyB','KeyZ'];
+// S pressed twice within 0.3 s: air brake
+let lastS = 0;
+function tapS(){
+  const now = performance.now();
+  if(now - lastS < 300 && G && G.player){ G.player.brakeReq = true; lastS = 0; } else lastS = now;
+}
 window.addEventListener('keydown', e=>{
   SFX.init();
   if(GAME_KEYS.includes(e.code) && G && !UI.open()) e.preventDefault();
   if(e.repeat) { keys[e.code]=true; return; }
   keys[e.code] = true;
+  if(e.code==='KeyS') tapS();
   if(!G) return;
   if(e.code==='Escape' || e.code==='KeyP'){ if(G.paused){ G.paused=false; UI.hide(); } else UI.pause(); }
   if(e.code==='KeyM') say(SFX.toggleMute() ? 'צליל כבוי' : 'צליל פועל', 1.5);
@@ -40,7 +47,7 @@ function toggleWingMode(){
 document.querySelectorAll('#touch button').forEach(b=>{
   const k = b.dataset.k;
   const down = e=>{ e.preventDefault(); SFX.init(); if(!G) return;
-    if(k==='Escape'){ UI.pause(); return; } if(k==='KeyC'){ toggleWingMode(); return; } keys[k]=true; };
+    if(k==='Escape'){ UI.pause(); return; } if(k==='KeyC'){ toggleWingMode(); return; } keys[k]=true; if(k==='KeyS') tapS(); };
   const up = e=>{ e.preventDefault(); keys[k]=false; };
   b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up);
 });

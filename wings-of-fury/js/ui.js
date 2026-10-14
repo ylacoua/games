@@ -21,9 +21,23 @@ const UI = {
       <b>רווח</b><span>מקלעים</span>
       <b>X</b><span>הטלת חימוש (פצצה / רקטה / טורפדו)</span>
       <b>C</b><span>פקודה לכנפיים: ליווי ← תקיפה חופשית ← הגנה על הנושאת</span>
+      <b>Z</b><span>גלגול חבית</span>
       <b>Esc</b><span>עצירה · <b>M</b> השתקה</span>
     </div>
     <p class="note">נחיתה: התקרב לנושאת נמוך, במצערת נמוכה ובאף כמעט ישר. מהירות מתחת ל-225 וזווית קטנה.</p>`;
+  },
+  // combat manoeuvres: the key combinations and what each one is good for
+  maneuversHTML(){
+    return `<div class="keys">
+      <b>↑ ארוך</b><span><b class="mv">לופ</b> · המשך למשוך כשהאף כבר פונה למעלה. מסיים מאחורי מי שרדף אחריך.</span>
+      <b>↑ ארוך ואז ← / →</b><span><b class="mv">אימלמן</b> · באמצע הלופ לחץ על החץ לכיוון ההפוך: בפסגה המטוס מתיישר בחצי גלגול וטס חזרה, גבוה יותר.</span>
+      <b>↓ ארוך</b><span><b class="mv">ספליט S</b> · המשך לדחוף כשהאף כבר פונה למטה: חצי גלגול על הגב וחצי לופ כלפי מטה. בורחים מהר וצוברים מהירות, אבל מאבדים גובה.</span>
+      <b>↑ ארוך + S</b><span><b class="mv">פניית פטיש</b> · עם מצערת נמוכה: טיפוס אנכי עד שהמטוס כמעט עוצר, סיבוב על המקום וצלילה חזרה. רגע פגיע בפסגה.</span>
+      <b>Z</b><span><b class="mv">גלגול חבית</b> · גלגול מהיר מסביב לציר. רוב הכדורים מחטיאים אותך בזמן הגלגול. אפשר שוב אחרי כ-2 שניות.</span>
+      <b>S S</b><span><b class="mv">בלימת אוויר</b> · לחיצה כפולה מהירה: המטוס מאט בבת אחת והרודף עוקף אותך. אפשר שוב אחרי כ-2.5 שניות.</span>
+      <b>↓ + S</b><span><b class="mv">צלילת הפצצה</b> · רק במפציצי צלילה (דונטלס): בצלילה תלולה נפתחים בלמי הצלילה, המהירות נשארת יציבה, והמטוס מושך לבד מעל הקרקע.</span>
+    </div>
+    <p class="note">גם מטוסי הכנף שלך ומטוסי הזירו משתמשים בתמרונים האלה כשמישהו יושב להם על הזנב.</p>`;
   },
 
   // Home screen: the sunset sky with flying planes stays visible behind it (drawn on the canvas);
@@ -68,9 +82,10 @@ const UI = {
         <div class="list">${row('def', DEFENSE, '⚓')}${row('gnd', GROUND, '⚑')}</div>`;
     }
     return `<h2>תפעול המשחק</h2><p class="sub">מקלדת. במסך מגע מופיעים לחצנים בתחתית המסך.</p>${this.keysHTML()}
+      <h3 style="margin:16px 0 8px">תמרוני קרב</h3>${this.maneuversHTML()}
       <h3 style="margin:16px 0 8px">לחצני מסך מגע</h3>
-      <div class="keys"><b>▲ ▼ ◀ ▶</b><span>כמו מקשי החיצים</span><b>⇧ / ⇩</b><span>הגברה / הורדה של המצערת</span>
-      <b>✸</b><span>מקלעים</span><b>💣</b><span>הטלת חימוש</span><b>⚑</b><span>פקודה לכנפיים</span><b>II</b><span>עצירה</span></div>`;
+      <div class="keys"><b>▲ ▼ ◀ ▶</b><span>כמו מקשי החיצים (כולל לחיצה ארוכה לתמרונים)</span><b>⇧ / ⇩</b><span>הגברה / הורדה של המצערת · ⇩ פעמיים = בלימת אוויר</span>
+      <b>↻</b><span>גלגול חבית</span><b>✸</b><span>מקלעים</span><b>💣</b><span>הטלת חימוש</span><b>⚑</b><span>פקודה לכנפיים</span><b>II</b><span>עצירה</span></div>`;
   },
 
   // Short mission briefing between choosing a mission and the hangar: the situation, what must be done, a tip
@@ -196,7 +211,7 @@ const UI = {
     Music.start();
     const cards = LESSONS.map((L,i)=>`<div class="card"><div class="spread"><b>${i+1}. ${L.name}</b><span class="pill">${PLANES[L.plane].name}</span></div>
       <p>${L.desc}</p><button class="primary" data-act="lesson" data-v="${i}">התחל שיעור</button></div>`).join('');
-    this.show(`<h2>הדרכה</h2><p class="sub">ארבעה שיעורים קצרים. ההוראות מופיעות בראש המסך ומתקדמות לבד כשאתה מבצע כל שלב. התרסקות מחזירה אותך לתחילת השיעור.</p>
+    this.show(`<h2>הדרכה</h2><p class="sub">חמישה שיעורים קצרים. ההוראות מופיעות בראש המסך ומתקדמות לבד כשאתה מבצע כל שלב. התרסקות מחזירה אותך לתחילת השיעור.</p>
       <div class="grid">${cards}</div><div class="row" style="margin-top:16px"><button data-act="menu">תפריט ראשי</button></div>`);
   },
   tutorialDone(){
@@ -233,7 +248,7 @@ const UI = {
     if(!G || G.state==='rearm' || G.state==='over') return;
     G.paused = true; SFX.setEngine(false,0);
     this.show(`<h2>הפסקה</h2><p class="sub">${G.def.name} · נותרו ${primariesLeft()} מטרות · שלל $${G.earned}</p>
-      ${this.keysHTML()}<div class="row" style="margin-top:14px"><button class="primary" data-act="resume">המשך</button><button data-act="abort">נטוש משימה</button></div>`);
+      ${this.keysHTML()}<h3 style="margin:14px 0 8px">תמרוני קרב</h3>${this.maneuversHTML()}<div class="row" style="margin-top:14px"><button class="primary" data-act="resume">המשך</button><button data-act="abort">נטוש משימה</button></div>`);
   },
 
   result(win, reason){

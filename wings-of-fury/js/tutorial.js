@@ -1,4 +1,4 @@
-// ---- Flight school: four guided lessons with step-by-step instructions ----
+// ---- Flight school: five guided lessons with step-by-step instructions ----
 // A lesson builds its own small world, puts the player in the air (or on approach) and advances through
 // steps as each step's check() passes. Crashes respawn at the lesson start; nothing is saved.
 
@@ -78,6 +78,22 @@ const LESSONS = [
        check:()=> G.drops.some(d=>d.kind==='torpedo' && d.run)},
       {text:'הטורפדו שט ישר מתחת למים. חכה לפגיעה: טורפדו אחד מטביע משחתת.',
        check:()=> G.ships[0].dead}
+    ]},
+  { id:'maneuvers', name:'תמרוני קרב', plane:'hellcat', ord:'rocket',
+    desc:'גלגול חבית, אימלמן, ספליט S, פניית פטיש ובלימת אוויר: איך מנערים אויב מהזנב.',
+    start:{x:1400, y:SEA-950, f:1, speed:250, throttle:0.8},
+    setup(T){ G.L = 7000; },
+    steps:[
+      {text:'גלגול חבית: לחץ Z. המטוס מתגלגל סביב הציר שלו, ורוב הכדורים שנורים עליך בזמן הגלגול מחטיאים.',
+       check:()=> G.player.lastMv==='barrel'},
+      {text:'אימלמן: משוך ↑ והמשך להחזיק עד שהמטוס נכנס ללופ. באמצע הלופ לחץ על החץ לכיוון ההפוך (← אם אתה טס ימינה). בפסגה המטוס יתיישר ויטוס חזרה, גבוה יותר.',
+       check:()=> G.player.lastMv==='imm'},
+      {text:'ספליט S: ודא שיש לך גובה (מעל 1,000 רגל). לחץ ↓ והמשך להחזיק גם כשהאף כבר פונה למטה. המטוס יתהפך על הגב, יצלול בחצי לופ ויצא בכיוון ההפוך.',
+       check:()=> G.player.lastMv==='split' && !G.player.mv},
+      {text:'פניית פטיש: החזק S (מצערת נמוכה), משוך ↑ והמשך להחזיק. המטוס יטפס אנכית עד שכמעט יעצור, יסתובב על המקום ויצלול חזרה.',
+       check:()=> G.player.lastMv==='hammer' && !G.player.mv},
+      {text:'בלימת אוויר: טוס ישר ולחץ S פעמיים מהר. המטוס מאט בבת אחת, ומי שרודף אחריך עוקף אותך ונמצא מולך.',
+       check:()=> G.player.lastMv==='brake'}
     ]}
 ];
 
