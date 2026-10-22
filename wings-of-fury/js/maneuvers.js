@@ -83,9 +83,9 @@ function drawPilotPlane(ctx, o, type, nation, ang, flash, prop, gear){
   ctx.save();
   if(Math.abs(r) < 0.02 || Math.abs(r) > Math.PI-0.02){
     ctx.scale(o.f, 1); ctx.rotate(-ang); if(Math.abs(r) > 1) ctx.scale(1, -1);
-    drawPlane(ctx, type, null, null, 1, flash, prop, gear);
+    drawPlane(ctx, type, o.skin || null, null, 1, flash, prop, gear);
     drawBrakes(ctx, type, o.dive, o.brk > 0);
-  } else drawPlane3D(ctx, type, null, nation, o.f > 0 ? 0 : Math.PI, r, ang, flash, prop);
+  } else drawPlane3D(ctx, type, o.skin || null, nation, o.f > 0 ? 0 : Math.PI, r, ang, flash, prop);
   ctx.restore();
 }
 

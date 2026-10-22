@@ -57,9 +57,9 @@ function shadeHex(hex, k){
 }
 
 function drawPlane3D(ctx, type, color, nation, yaw, roll, pitch, flash, prop){
-  // per-type model family and the aircraft's real paint scheme
+  // per-type model family and the aircraft's real paint scheme (or the player's skin, passed as `color`)
   const shape = {corsair:'corsair', dauntless:'bomber', helldiver:'bomber', avenger:'heavy'}[type] || 'fighter';
-  const scheme = SCHEMES[(AIRCRAFT[type]||AIRCRAFT.hellcat).scheme];
+  const scheme = (color && typeof color==='object' && color.s) || SCHEMES[(AIRCRAFT[type]||AIRCRAFT.hellcat).scheme];
   color = scheme.top;
   const M = buildModel(shape);
   const cr=Math.cos(roll), sr=Math.sin(roll), cp=Math.cos(pitch), sp=Math.sin(pitch), cy=Math.cos(yaw), sy=Math.sin(yaw);

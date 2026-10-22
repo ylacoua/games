@@ -99,7 +99,7 @@ const UI = {
       : [];
     this.show(`<div class="spread"><span class="pill">${tag}</span>${this.money()}</div>
       <h2 style="margin-top:8px">תדריך: ${L.name}</h2>
-      <div class="row" style="margin:8px 0">${cond.map(c=>`<span class="pill">${c}</span>`).join('')}${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${L.reward}</span></div>
+      <div class="row" style="margin:8px 0">${cond.map(c=>`<span class="pill">${c}</span>`).join('')}${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${L.reward}</span>${skinFor(k) ? `<span class="pill">🎨 פותח סקין: ${skinFor(k).name}</span>` : ''}</div>
       <p class="sub">${L.brief}</p>
       <h3>מה צריך לעשות</h3><ol class="goals">${L.goals.map(g=>`<li>${g}</li>`).join('')}</ol>
       ${L.tip?`<p class="tip"><b>טיפ:</b> ${L.tip}</p>`:''}
@@ -111,7 +111,7 @@ const UI = {
     if(!this.lo) this.lo = {plane:SAVE.plane, ord:'bomb', wing:[]};
     if(!SAVE.owned[this.lo.plane]) this.lo.plane='hellcat';
     const def = i==='def' || i==='gnd', L = i==='def' ? DEFENSE : i==='gnd' ? GROUND : LEVELS[i], tab=this.tab;
-    const tabs = [['mission','תדריך וחימוש'],['planes','מטוסים'],['upgrades','שדרוגים']]
+    const tabs = [['mission','תדריך וחימוש'],['planes','מטוסים'],['upgrades','שדרוגים'],['skins','סקינים']]
       .map(([k,t])=>`<button class="${tab===k?'on':''}" data-act="tab" data-v="${k}">${t}</button>`).join('');
     let body='';
     if(tab==='mission'){
@@ -140,6 +140,17 @@ const UI = {
         <span>תמרון</span><span class="bar"><i style="width:${b.turn/2.4*100}%"></i></span><span>חוזק</span><span class="bar"><i style="width:${b.hp/maxH*100}%"></i></span>
         <span>חימוש</span><span>${b.ord.bomb} פצצות · ${b.ord.rocket} רקטות · ${b.ord.torpedo} טורפדו${b.gunner?' · תותחן אחורי':''}</span></div>
         ${own?`<button data-act="pick" data-v="${k}" ${sel?'disabled':''}>בחר</button>`:`<button class="primary" data-act="buy" data-v="${k}" ${SAVE.money<b.price?'disabled':''}>קנה</button>`}</div>`;}).join('')}</div>`;
+    } else if(tab==='skins'){
+      // paint schemes: each mission won makes one available to buy; the chosen one is used on every plane
+      const cards = Object.values(SKINS).map(k=>{
+        const own = SAVE.skins[k.id], sel = (SAVE.skin||'standard')===k.id, open = skinUnlocked(k.id);
+        const action = sel ? '<span class="pill ok">✓ בשימוש</span>'
+          : own ? `<button data-act="skin" data-v="${k.id}">בחר</button>`
+          : open ? `<button class="primary" data-act="buyskin" data-v="${k.id}" ${SAVE.money<k.price?'disabled':''}>קנה · $${k.price.toLocaleString('en-US')}</button>`
+          : `<span class="pill">🔒 ${skinUnlockText(k.id)}</span>`;
+        return `<div class="card ${sel?'sel':''} ${open||own?'':'locked'}"><canvas class="skinprev" data-skin="${k.id}" width="360" height="140" aria-label="${k.name}"></canvas>
+          <div class="spread"><b>${k.name}</b>${!own && open ? `<span class="pill">$${k.price.toLocaleString('en-US')}</span>` : ''}</div><p>${k.desc}</p>${action}</div>`;}).join('');
+      body = `<p class="sub">כל משימה שמסיימים בהצלחה פותחת סקין חדש לרכישה. הסקין שנבחר צובע את המטוס שלך, בכל דגם.</p><div class="grid">${cards}</div>`;
     } else {
       body = `<div class="grid">${Object.keys(UPGRADES).map(k=>{const u=UPGRADES[k], lv=SAVE.up[k], c=u.costs[lv];
         return `<div class="card"><div class="spread"><b>${u.name}</b><span class="pill">דרגה ${lv}/3</span></div><p>${u.desc} לכל דרגה. חל על כל המטוסים.</p>
@@ -147,6 +158,23 @@ const UI = {
         ${c?`<button data-act="up" data-v="${k}" ${SAVE.money<c?'disabled':''}>שדרג · $${c}</button>`:'<span class="note">דרגה מרבית</span>'}</div>`;}).join('')}</div>`;
     }
     this.show(`<div class="spread"><h2>חדר התדריכים</h2>${this.money()}</div><div class="tabs">${tabs}</div>${body}`);
+    if(tab==='skins') this.drawSkinPreviews(this.lo.plane);
+  },
+  // the selected plane, painted in each skin, on the skin cards
+  drawSkinPreviews(type){
+    this.root.querySelectorAll('canvas[data-skin]').forEach(c=>{
+      const x = c.getContext('2d'), k = SKINS[c.dataset.skin];
+      x.clearRect(0, 0, c.width, c.height);
+      x.save(); x.translate(c.width/2 - 4, c.height/2 - 4); x.scale(3.3, 3.3);
+      drawPlane(x, type, k.id==='standard' ? null : k, null, 1, false, false, 0);
+      x.restore();
+    });
+  },
+  // line for a result screen when a win has just made a new skin available
+  newSkinNote(key, wasOpen){
+    const k = skinFor(key);
+    if(!k || wasOpen || !skinUnlocked(k.id) || SAVE.skins[k.id]) return '';
+    return `<p class="tip"><b>סקין חדש זמין:</b> ${k.name} · $${k.price.toLocaleString('en-US')} – בחדר התדריכים, בלשונית "סקינים".</p>`;
   },
 
   // Training: every plane, upgrade, wingman and weather option, free and unsaved
@@ -181,20 +209,23 @@ const UI = {
   // end of a Carrier Defense game: all money earned is kept (wave bonuses are part of it)
   defenseResult(win, reason){
     const D = G.defense, gain = G.earned + (win ? DEFENSE.reward : 0);
-    SAVE.money += gain; storeSave();
+    const skinWasOpen = skinUnlocked(skinFor('def').id);
+    SAVE.money += gain; if(win){ SAVE.won = SAVE.won || {}; SAVE.won.def = true; } storeSave();
     const waves = D.phase===2 ? DEFENSE_WAVES : Math.max(0, D.state==='between' ? D.wave : D.wave-1);
     this.show(`<h1 style="font-size:40px">${win ? 'ניצחון! כוח המשימה היפני הושמד' : 'המשימה הסתיימה'}</h1>
       <p class="sub">${win ? 'שרדת עשרה גלים והטבעת את הנושאת היפנית ואת משחתות הליווי שלה.' : reason}</p>
       <div class="stats" style="font-size:15px;margin-bottom:16px"><span>גלים ששרדת</span><span>${waves} מתוך ${DEFENSE_WAVES}</span>
       <span>בונוסי גלים</span><span>$${D.bonus}</span><span>השמדות</span><span>${G.kills}</span>
       ${win ? `<span>תגמול ניצחון</span><span>$${DEFENSE.reward}</span>` : ''}<span>סה"כ הרווחת</span><span>$${gain}</span></div>
+      ${win ? this.newSkinNote('def', skinWasOpen) : ''}
       <div class="row"><button class="primary" data-act="defense">שחק שוב</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
   // end of a Ground Support game: money earned is kept, the victory reward is added on success
   groundResult(win, reason){
     const S = G.ground, gain = win ? G.earned + GROUND.reward : Math.round(G.earned*0.5);
-    SAVE.money += gain; storeSave();
+    const skinWasOpen = skinUnlocked(skinFor('gnd').id);
+    SAVE.money += gain; if(win){ SAVE.won = SAVE.won || {}; SAVE.won.gnd = true; } storeSave();
     const taken = G.islands.filter(is=>is.captured).length;
     const left = S.inf + S.tanks + usUnits().length;
     this.show(`<h1 style="font-size:40px">${win ? 'ניצחון! שלושת האיים נכבשו' : 'המשימה נכשלה'}</h1>
@@ -203,6 +234,7 @@ const UI = {
       <span>כוחות ששרדו</span><span>${S.inf + usUnits().filter(u=>u.type==='inf').length} חיילים, ${S.tanks + usUnits().filter(u=>u.type==='tank').length} טנקים</span>
       <span>השמדות</span><span>${G.kills}</span>${win ? `<span>תגמול ניצחון</span><span>$${GROUND.reward}</span>` : '<span>שלל שנשמר</span><span>50%</span>'}
       <span>סה"כ הרווחת</span><span>$${gain}</span></div>
+      ${win ? this.newSkinNote('gnd', skinWasOpen) : ''}
       <div class="row"><button class="primary" data-act="ground">שחק שוב</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
@@ -264,6 +296,7 @@ const UI = {
     if(G.ground){ this.groundResult(win, reason); return; }
     const L = G.def, gain = win ? G.earned + L.reward : Math.round(G.earned*0.5);
     SAVE.money += gain;
+    const sk = skinFor(G.idx), skinWasOpen = !sk || skinUnlocked(sk.id);
     if(win){ SAVE.best[G.idx]=true; SAVE.unlocked = Math.max(SAVE.unlocked, Math.min(LEVELS.length, G.idx+2)); }
     storeSave();
     const last = win && G.idx===LEVELS.length-1;
@@ -272,7 +305,8 @@ const UI = {
       <div class="stats" style="font-size:15px;margin-bottom:16px"><span>שלל מהמשימה</span><span>$${G.earned}</span>
       ${win?`<span>תגמול</span><span>$${L.reward}</span>`:'<span>שלל שנשמר</span><span>50%</span>'}<span>השמדות</span><span>${G.kills}</span>
       <span>כנפיים ששרדו</span><span>${G.wingmen.filter(w=>!w.dead).length}/${G.wingmen.length}</span><span>סה"כ הרווחת</span><span>$${gain}</span></div>
-      <div class="row">${win&&!last?`<button class="primary" data-act="level" data-v="${G.idx+1}">למשימה הבאה</button>`:''}
+      ${win ? this.newSkinNote(G.idx, skinWasOpen) : ''}
+      <div class="row" style="margin-top:12px">${win&&!last?`<button class="primary" data-act="level" data-v="${G.idx+1}">למשימה הבאה</button>`:''}
       <button class="${win?'':'primary'}" data-act="level" data-v="${G.idx}">${win?'שחק שוב':'נסה שוב'}</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
@@ -288,6 +322,10 @@ const UI = {
       case 'level': G=null; this.briefing(+v); break;          // e.g. "next mission" after a win: briefing first
       case 'hangar': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar(v==='def'||v==='gnd' ? v : +v); break;
       case 'tab': this.tab=v; this.hangar(this.level); break;
+      case 'skin': if(SAVE.skins[v]){ SAVE.skin=v; storeSave(); } this.hangar(this.level); break;
+      case 'buyskin': { const k=SKINS[v];
+        if(k && skinUnlocked(v) && !SAVE.skins[v] && SAVE.money>=k.price){ SAVE.money-=k.price; SAVE.skins[v]=true; SAVE.skin=v; storeSave(); SFX.pickup(); }
+        this.hangar(this.level); break; }
       case 'ord': lo.ord=v; this.hangar(this.level); break;
       case 'wadd': if(lo.wing.length<MAX_WINGMEN) lo.wing.push(v); this.hangar(this.level); break;
       case 'wdel': { const k=lo.wing.lastIndexOf(v); if(k>=0) lo.wing.splice(k,1); this.hangar(this.level); break; }

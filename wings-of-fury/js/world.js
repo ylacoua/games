@@ -145,7 +145,7 @@ function makeShip(type, x, minX, maxX){
 function resetPlayer(){
   const st = G.stats, lo = G.loadout;
   G.player = {x:G.carrier.x+70, y:DECK_Y-9, f:1, p:0, loop:null, speed:0, throttle:0, hp:st.hp, max:st.hp, fuel:st.fuel, maxFuel:st.fuel,
-    ammo:500, ordType:lo.ord, ord:st.ord[lo.ord], ordMax:st.ord[lo.ord], onDeck:true, cool:0, ordCool:0, gunnerCool:0, inv:2, dead:false, stall:false, hitT:0, smoke:0, gear:1, gearWant:1, airT:0};
+    skin:playerSkin(), ammo:500, ordType:lo.ord, ord:st.ord[lo.ord], ordMax:st.ord[lo.ord], onDeck:true, cool:0, ordCool:0, gunnerCool:0, inv:2, dead:false, stall:false, hitT:0, smoke:0, gear:1, gearWant:1, airT:0};
   G.state='deck';
   SFX.setEngineProfile(G.loadout.plane);
 }

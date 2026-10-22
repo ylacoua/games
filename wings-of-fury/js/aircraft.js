@@ -146,8 +146,10 @@ function deckLift(type, x, y, gear){
   return Math.max(0, wheelDrop(type, gear) - 9) * clamp(1 - (DECK_Y-9-y)/30, 0, 1);
 }
 
+// `color` may be a skin (see SKINS in data.js): its colours replace the type's scheme and its markings are added.
 function drawPlane(ctx, type, color, nation, s, flash, prop, gear=0){
-  const A = AIRCRAFT[type] || AIRCRAFT.hellcat, S = SCHEMES[A.scheme];
+  const A = AIRCRAFT[type] || AIRCRAFT.hellcat, K = color && typeof color==='object' ? color : null;
+  const S = (K && K.s) || SCHEMES[A.scheme];
   const W = flash ? '#ffffff' : null;
   ctx.save(); ctx.scale(s,s); ctx.lineJoin='round'; ctx.lineCap='round';
   const body = A.top.concat(A.bot.slice().reverse());
@@ -185,7 +187,8 @@ function drawPlane(ctx, type, color, nation, s, flash, prop, gear=0){
     ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=0.4;
     for(const px of [A.cowl||14, (A.cowl||14)-9, -A.cowl*0.6||-8]){ ctx.beginPath(); ctx.moveTo(px,minY); ctx.lineTo(px,maxY); ctx.stroke(); }
     // engine cowling (Zero: black)
-    if(A.cowl){ ctx.fillStyle = A.cowlColor || 'rgba(0,0,0,.12)'; ctx.fillRect(A.cowl, minY, 40, maxY-minY); }
+    if(A.cowl){ ctx.fillStyle = (K && K.cowl) || A.cowlColor || 'rgba(0,0,0,.12)'; ctx.fillRect(A.cowl, minY, 40, maxY-minY); }
+    if(K && K.deco) skinMarkings(ctx, A, K.deco, minY, maxY);
     // exhaust staining streaking back from the cowl
     if(A.exhaust){ const [ex,ey]=A.exhaust; const eg=ctx.createLinearGradient(ex,0,ex-18,0); eg.addColorStop(0,'rgba(15,15,15,.4)'); eg.addColorStop(1,'rgba(15,15,15,0)');
       ctx.fillStyle=eg; ctx.beginPath(); ctx.moveTo(ex,ey-0.7); ctx.quadraticCurveTo(ex-9,ey-1.1,ex-18,ey+0.2); ctx.quadraticCurveTo(ex-9,ey+0.6,ex,ey+0.7); ctx.fill();
@@ -242,13 +245,13 @@ function drawPlane(ctx, type, color, nation, s, flash, prop, gear=0){
   // near wing: an airfoil seen edge-on; the Corsair's inverted gull drops below the fuselage first
   const w = A.wing;
   if(A.gull){ ctx.fillStyle = W || S.side; poly(ctx, [[8,4],[-4,4],[w.x-6,w.y],[w.x+7,w.y-0.5]]); ctx.fill(); }
-  ctx.fillStyle = W || (A.scheme==='tri' ? S.side : A.scheme==='gsb' ? '#2b3f61' : '#4a5b3a');
+  ctx.fillStyle = W || (K && K.wing) || (A.scheme==='tri' ? S.side : A.scheme==='gsb' ? '#2b3f61' : '#4a5b3a');
   ctx.beginPath(); ctx.moveTo(w.x+w.rx, w.y);
   ctx.bezierCurveTo(w.x+w.rx, w.y-w.ry*1.4, w.x-w.rx*0.4, w.y-w.ry, w.x-w.rx, w.y);
   ctx.bezierCurveTo(w.x-w.rx*0.4, w.y+w.ry*0.6, w.x+w.rx, w.y+w.ry, w.x+w.rx, w.y); ctx.fill();
   if(!W){ ctx.strokeStyle='rgba(0,0,0,.35)'; ctx.lineWidth=0.45; ctx.stroke();
     ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.beginPath(); ctx.moveTo(w.x+w.rx*0.9, w.y-w.ry*0.55); ctx.quadraticCurveTo(w.x, w.y-w.ry*1.05, w.x-w.rx*0.8, w.y-w.ry*0.2); ctx.stroke(); }
-  if(!W && A.scheme!=='gsb'){ ctx.fillStyle=S.under; ctx.beginPath(); ctx.ellipse(w.x, w.y+w.ry*0.45, w.rx*0.9, w.ry*0.45, 0, 0, Math.PI); ctx.fill(); }
+  if(!W && (K && K.s ? !K.flat : A.scheme!=='gsb')){ ctx.fillStyle=S.under; ctx.beginPath(); ctx.ellipse(w.x, w.y+w.ry*0.45, w.rx*0.9, w.ry*0.45, 0, 0, Math.PI); ctx.fill(); }
   // perforated dive flaps on the Dauntless trailing edge
   if(A.flaps && !W){ const f=A.flaps; ctx.fillStyle=S.side; ctx.fillRect(f.x0, f.y-0.6, f.x1-f.x0, 2);
     ctx.fillStyle='rgba(10,10,10,.6)'; for(let x=f.x0+0.8; x<f.x1; x+=1.6) ctx.fillRect(x, f.y, 0.7, 0.7); }
@@ -268,8 +271,46 @@ function drawPlane(ctx, type, color, nation, s, flash, prop, gear=0){
     ctx.fillStyle='#202020';
     for(let i=0;i<A.blades;i++){ const a = i/A.blades*Math.PI*2 + 0.3, h = Math.sin(a)*A.propR; ctx.fillRect(px, Math.min(py,py+h), 1.6, Math.abs(h)); }
   }
-  ctx.fillStyle = W || (A.nation==='jp' ? '#4a4a40' : '#1c2433'); ctx.beginPath(); ctx.ellipse(px, py, 2.2, 2.6, 0, -Math.PI/2, Math.PI/2); ctx.fill();
+  ctx.fillStyle = W || (K && K.cowl) || (A.nation==='jp' ? '#4a4a40' : '#1c2433'); ctx.beginPath(); ctx.ellipse(px, py, 2.2, 2.6, 0, -Math.PI/2, Math.PI/2); ctx.fill();
+  // Blue Angels: gold band across the top of the fin
+  if(!W && K && K.deco==='blueangels'){
+    ctx.save(); smoothShape(ctx, A.fin); ctx.clip();
+    const fy = Math.min(...A.fin.map(p=>p[1]));
+    ctx.fillStyle='#e8b923'; ctx.fillRect(A.rudder-8, fy, 16, 2.6);
+    ctx.restore();
+  }
   ctx.restore();
+}
+
+// Skin markings on the fuselage (called inside the fuselage clip, sprite frame: nose +x)
+function skinMarkings(ctx, A, deco, minY, maxY){
+  const nose = A.top[0][0], cw = A.cowl || 14;
+  if(deco==='checker'){
+    // yellow-and-black checks over the engine cowling
+    const sz = 2.2;
+    for(let x=cw, i=0; x<nose+2; x+=sz, i++) for(let y=minY, j=0; y<maxY; y+=sz, j++){
+      ctx.fillStyle = (i+j)%2 ? '#151515' : '#f0c419'; ctx.fillRect(x, y, sz, sz);
+    }
+  } else if(deco==='shark'){
+    // red mouth with white teeth along the lower nose, and an eye above it
+    const mx0 = cw - 4, my = 2.2;
+    ctx.fillStyle='#b81f1a'; ctx.beginPath(); ctx.moveTo(nose+1, my-1.6); ctx.quadraticCurveTo(cw+2, my-1.8, mx0, my);
+    ctx.quadraticCurveTo(cw+2, my+3.5, nose+1, my+3.6); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='#f4f1e8';
+    for(let x=mx0+1.5; x<nose; x+=1.6){
+      ctx.beginPath(); ctx.moveTo(x, my-1.3); ctx.lineTo(x+0.8, my+0.4); ctx.lineTo(x+1.6, my-1.3); ctx.fill();           // upper teeth
+      ctx.beginPath(); ctx.moveTo(x, my+3.2); ctx.lineTo(x+0.8, my+1.6); ctx.lineTo(x+1.6, my+3.2); ctx.fill();           // lower teeth
+    }
+    ctx.fillStyle='#f4f1e8'; ctx.beginPath(); ctx.arc(cw+1.5, -1.6, 1.3, 0, 7); ctx.fill();
+    ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(cw+1.9, -1.6, 0.65, 0, 7); ctx.fill();
+  } else if(deco==='blueangels'){
+    // gold cheat line along the fuselage
+    ctx.fillStyle='#e8b923'; ctx.fillRect(A.bot[A.bot.length-1][0], 0.2, cw - A.bot[A.bot.length-1][0], 1.1);
+  } else if(deco==='invasion'){
+    // black and white bands round the rear fuselage
+    const x0 = -A.cowl*0.6 - 3;
+    for(let i=0;i<5;i++){ ctx.fillStyle = i%2 ? '#141414' : '#f2f2ee'; ctx.fillRect(x0 - i*1.4, minY, 1.4, maxY-minY); }
+  }
 }
 
 // Kawanishi H8K "Emily": deep two-step flying-boat hull, shoulder wing on a pylon, four engines, gun turrets

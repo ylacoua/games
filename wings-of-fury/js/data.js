@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.44';
+const GAME_VERSION = '1.45';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -72,7 +72,43 @@ const SCORE = {bunker:150, aa:120, barracks:100, fuel:80, light:60, soldier:10, 
   destroyer:300, battleship:1500, turret:200, emily:1500, biggun:300, core:2000};
 
 const SAVE_KEY = 'wof1944-save';
-function defaultSave(){ return {money:0, owned:{hellcat:true}, plane:'hellcat', up:{engine:0,armor:0,guns:0,payload:0,fuel:0}, unlocked:1, best:{}}; }
+// Paint schemes ("skins") for the player's aircraft. Winning a mission makes its skin available to buy
+// (campaign missions 0-5, 'def' = Carrier Defense, 'gnd' = Ground Support); 'standard' is each type's own
+// 1944 Navy scheme. s: fuselage colours, wing: near-wing colour, cowl: engine cowling, flat: no light
+// underside on the wing, deco: extra markings drawn by drawPlane.
+const SKINS = {
+  standard:   {name:'צבע תקני 1944', desc:'צבעי הצי של כל דגם: כחול ים מבריק או שלושה גוונים.', price:0},
+  olive:      {name:'ירוק זית – הנחתים', desc:'ירוק זית מעל אפור בהיר, כמו טייסות הנחתים באיי שלמה.', price:600, unlock:0,
+               s:{top:'#4b5133', side:'#565d3b', under:'#b9bcb2', hi:'rgba(200,210,160,.25)'}, wing:'#4f5636'},
+  checker:    {name:'אף משובץ', desc:'מכסה מנוע משובץ בצהוב ושחור של טייסת קרב מצטיינת.', price:900, unlock:1, deco:'checker'},
+  storm:      {name:'אפור סערה', desc:'אפור כהה מעל לבן, צבעי מטוסי הסיור מעל האוקיינוס.', price:1200, unlock:2,
+               s:{top:'#4d5862', side:'#6c7782', under:'#eef0f0', hi:'rgba(230,235,240,.3)'}, wing:'#5b6670'},
+  blackcat:   {name:'החתולים השחורים', desc:'שחור מט לטיסות לילה, עם טבעת אדומה על מכסה המנוע.', price:1500, unlock:3,
+               s:{top:'#16181c', side:'#1c1f24', under:'#202329', hi:'rgba(120,130,150,.25)'}, wing:'#1a1d22', cowl:'#a8231c', flat:true},
+  shark:      {name:'פה של כריש', desc:'שיני כריש ועין על האף, בסגנון "הנמרים המעופפים".', price:2000, unlock:4,
+               s:{top:'#5a5a3a', side:'#66664a', under:'#a9b1b0', hi:'rgba(210,210,170,.25)'}, wing:'#5d5d3e', deco:'shark'},
+  blueangels: {name:'הבלו אנג׳לס', desc:'כחול כהה עם עיטורי זהב, כמו צוות הראווה האווירית של הצי.', price:3000, unlock:5,
+               s:{top:'#0e2a66', side:'#123375', under:'#0f2d6c', hi:'rgba(150,180,240,.35)'}, wing:'#123170', cowl:'#e8b923', flat:true, deco:'blueangels'},
+  invasion:   {name:'פסי פלישה', desc:'פסים שחורים ולבנים סביב הגוף, כמו ביום הפלישה.', price:1500, unlock:'def', deco:'invasion'},
+  metal:      {name:'מתכת חשופה', desc:'אלומיניום מבריק עם אף אדום, כמו מטוסי האסים בסוף המלחמה.', price:2500, unlock:'gnd',
+               s:{top:'#aeb6bd', side:'#c3cad0', under:'#d0d5d9', hi:'rgba(255,255,255,.55)'}, wing:'#b4bcc3', cowl:'#c0281f'}
+};
+for(const [id,k] of Object.entries(SKINS)) k.id = id;
+const skinFor = key => Object.values(SKINS).find(k => k.unlock === key);      // the skin a mission awards
+function skinUnlocked(id){
+  const k = SKINS[id]; if(!k || k.unlock == null) return true;
+  if(k.unlock==='def' || k.unlock==='gnd') return !!(SAVE.won && SAVE.won[k.unlock]);
+  return !!SAVE.best[k.unlock];
+}
+function skinUnlockText(id){
+  const u = SKINS[id].unlock;
+  return u==='def' ? 'נפתח בניצחון במשימת ההגנה על הנושאת' : u==='gnd' ? 'נפתח בניצחון במשימת הסיוע לכוחות היבשה' : `נפתח בסיום משימה ${u+1}`;
+}
+// the skin object to paint the player's aircraft with (null = the type's standard scheme)
+const playerSkin = () => (SAVE.skin && SAVE.skin !== 'standard' && SAVE.skins && SAVE.skins[SAVE.skin]) ? SKINS[SAVE.skin] : null;
+
+function defaultSave(){ return {money:0, owned:{hellcat:true}, plane:'hellcat', up:{engine:0,armor:0,guns:0,payload:0,fuel:0}, unlocked:1, best:{},
+  skins:{standard:true}, skin:'standard', won:{}}; }
 function loadSave(){
   try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if(s && s.owned) return Object.assign(defaultSave(), s); }catch(e){}
   return defaultSave();

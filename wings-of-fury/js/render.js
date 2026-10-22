@@ -75,7 +75,7 @@ function render(ctx, cw, ch){
       const t = P.loop.t, ease = t*t*(3-2*t);
       const yaw = (P.f>0 ? 0 : Math.PI) + (P.f>0 ? -1 : 1)*Math.PI*ease;
       const roll = -Math.sin(Math.PI*t)*0.75;
-      drawPlane3D(ctx, G.stats.type, null, 'us', yaw, roll, a, P.hitT>0, true);
+      drawPlane3D(ctx, G.stats.type, P.skin || null, 'us', yaw, roll, a, P.hitT>0, true);
     } else drawPilotPlane(ctx, P, G.stats.type, 'us', a, P.hitT>0, P.throttle>0.05||P.speed>40, P.gear);
     ctx.restore();
   }
