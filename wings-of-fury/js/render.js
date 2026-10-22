@@ -67,8 +67,7 @@ function render(ctx, cw, ch){
   if(!P.dead){
     const a = heading(P);
     // lift the sprite so the wheels sit on the deck rather than sinking into it
-    const C = G.carrier, overDeck = P.x > C.x-20 && P.x < C.x+C.len+20;
-    const lift = overDeck ? 9*P.gear*clamp(1-(DECK_Y-9-P.y)/30, 0, 1) : 0;
+    const lift = deckLift(G.stats.type, P.x, P.y, P.gear);
     ctx.save(); ctx.translate(P.x, P.y-lift);
     if(P.inv>0 && Math.floor(G.time*12)%2) ctx.globalAlpha=0.5;
     if(P.loop){
@@ -226,11 +225,13 @@ function drawDrop(ctx, d){
 }
 
 function drawAI(ctx, e, type, s, flash, gear=0){
+  // American aircraft on (or just leaving / settling onto) our carrier: wheels on the deck, not through it
+  const lift = e.team==='p' ? deckLift(type, e.x, e.y, gear) : 0;
   if(e.pilot && e.state==='fly' && e.f != null){
     // wingmen are drawn exactly like the player's aircraft: upright, the 3D model during a turn-around,
     // and naturally upside down only at the top of a loop
     const ang = e.mv ? e.mv.ang : e.vl != null ? e.vl : e.p;
-    ctx.save(); ctx.translate(e.x, e.y);
+    ctx.save(); ctx.translate(e.x, e.y - lift);
     if(e.ft != null){
       const t = e.ft, ease = t*t*(3-2*t);
       drawPlane3D(ctx, type, null, 'us', (e.f>0 ? 0 : Math.PI) + (e.f>0 ? -1 : 1)*Math.PI*ease, -Math.sin(Math.PI*t)*0.75, ang, flash>0, true);
@@ -238,7 +239,7 @@ function drawAI(ctx, e, type, s, flash, gear=0){
     ctx.restore();
     return;
   }
-  ctx.save(); ctx.translate(e.x,e.y); ctx.rotate(e.a);
+  ctx.save(); ctx.translate(e.x, e.y - lift); ctx.rotate(e.a);
   // Keep the aircraft upright: once it is clearly heading the other way it rolls about its own nose axis to
   // right itself, like a pilot rolling out at the top of a half loop. The roll takes about 0.4 s and is drawn
   // with the 3D model, instead of the sprite snapping onto its back in a single frame.

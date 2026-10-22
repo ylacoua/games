@@ -129,6 +129,23 @@ function lineAt(pts, x){   // y of a profile line at x (pts run nose -> tail, x 
 }
 
 // Signature kept from the earlier sprite: drawPlane(ctx, type, color, nation, scale, flash, propSpinning, gear 0..1)
+// Main landing gear: leg length and wheel size (sprite units). The wheel is kept to a scale that matches
+// the airframe (it used to be drawn about 40% too big).
+const GEAR_LEG = 9, WHEEL_R = 2.4;
+// distance from the sprite's origin down to the bottom of the main wheels
+function wheelDrop(type, gear){
+  const A = AIRCRAFT[type] || AIRCRAFT.hellcat;
+  return lineAt(A.bot, A.gearX) - 1 + (GEAR_LEG + WHEEL_R)*gear + 0.3;
+}
+// How far to raise an aircraft sitting at DECK_Y-9 (or descending onto it) so its wheels rest exactly on the
+// flight deck instead of sinking into it. Fades out as it climbs away from the deck.
+function deckLift(type, x, y, gear){
+  if(!G || !gear) return 0;
+  const over = C => C && x > C.x-20 && x < C.x+C.len+20;      // our carrier, or the second one in Carrier Defense
+  if(!over(G.carrier) && !over(G.carrier2)) return 0;
+  return Math.max(0, wheelDrop(type, gear) - 9) * clamp(1 - (DECK_Y-9-y)/30, 0, 1);
+}
+
 function drawPlane(ctx, type, color, nation, s, flash, prop, gear=0){
   const A = AIRCRAFT[type] || AIRCRAFT.hellcat, S = SCHEMES[A.scheme];
   const W = flash ? '#ffffff' : null;
@@ -138,12 +155,12 @@ function drawPlane(ctx, type, color, nation, s, flash, prop, gear=0){
 
   // landing gear (behind everything)
   if(gear>0.02){
-    const gx = A.gearX, gy = lineAt(A.bot, gx) - 1, ex = gx + 3*gear, ey = gy + 9*gear;
+    const gx = A.gearX, gy = lineAt(A.bot, gx) - 1, ex = gx + 3*gear, ey = gy + GEAR_LEG*gear;
     const tx = A.bot[A.bot.length-1][0] + 3, ty = lineAt(A.bot, tx);
-    ctx.strokeStyle='#2a2f36'; ctx.lineWidth=1.8;
+    ctx.strokeStyle='#2a2f36'; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.moveTo(gx,gy); ctx.lineTo(ex,ey); ctx.moveTo(tx,ty); ctx.lineTo(tx-1,ty+4*gear); ctx.stroke();
-    ctx.fillStyle='#14171b'; ctx.beginPath(); ctx.arc(ex,ey,3.4*gear+0.4,0,7); ctx.fill();
-    ctx.fillStyle='#8a929c'; ctx.beginPath(); ctx.arc(ex,ey,1.2*gear,0,7); ctx.fill();
+    ctx.fillStyle='#14171b'; ctx.beginPath(); ctx.arc(ex,ey,WHEEL_R*gear+0.3,0,7); ctx.fill();
+    ctx.fillStyle='#8a929c'; ctx.beginPath(); ctx.arc(ex,ey,0.9*gear,0,7); ctx.fill();
     ctx.fillStyle='#14171b'; ctx.beginPath(); ctx.arc(tx-1,ty+4*gear,1.7*gear,0,7); ctx.fill();
   }
   // far horizontal stabiliser peeks out above the near one
