@@ -113,19 +113,21 @@ function drawDefenseHUD(ctx, vw){
 
 // Aichi D3A "Val": climbs out at altitude, rolls into a steep dive on the carrier, releases low and pulls out
 function valAI(e, dt){
-  const C = G.carrier, cx = C.x + C.len*0.5;
+  // target: our carrier, or (e.aim) a ship of the convoy in "The Convoy"
+  if(e.aim && e.aim.dead) e.aim = specialPickShip ? specialPickShip(e.x) : null;
+  const C = G.carrier, cx = e.aim ? e.aim.x + e.aim.speed*1.2 : C.x + C.len*0.5, deck = e.aim ? SEA-16 : DECK_Y;
   if(!e.ph) e.ph = 'cruise';
   if(e.ph==='cruise'){
     e.speed += (e.full - e.speed)*Math.min(1, dt);
     steer(e, cx + 180, e.cruiseY || DECK_Y-300, 1.0, dt);
-    if(Math.abs(e.x - cx) < 240 && e.y < DECK_Y-200) e.ph = 'dive';
+    if(Math.abs(e.x - cx) < 240 && e.y < deck-200) e.ph = 'dive';
   } else if(e.ph==='dive'){
     // steep dive straight at the deck (no terrain avoidance: it is aiming for the ship)
     e.speed = Math.min(e.full*1.5, e.speed + 140*dt);
-    const want = Math.atan2(DECK_Y-5 - e.y, cx - e.x), d = wrapA(want - e.a);
+    const want = Math.atan2(deck-5 - e.y, cx - e.x), d = wrapA(want - e.a);
     e.a = wrapA(e.a + clamp(d, -2.4*dt, 2.4*dt));
     e.x += Math.cos(e.a)*e.speed*dt; e.y += Math.sin(e.a)*e.speed*dt;
-    if(DECK_Y - e.y < 170){
+    if(deck - e.y < 170){
       G.drops.push({kind:'bomb', x:e.x, y:e.y+8, vx:Math.cos(e.a)*e.speed*0.9, vy:Math.sin(e.a)*e.speed*0.9, team:'e', dmg:90, r:55});
       e.ph = 'pull'; e.t = 1.3;
     }

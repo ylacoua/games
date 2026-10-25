@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.45';
+const GAME_VERSION = '1.46';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -69,7 +69,8 @@ const LEVELS = [
 ];
 
 const SCORE = {bunker:150, aa:120, barracks:100, fuel:80, light:60, soldier:10, zero:100, betty:150, val:150, chiha:200, arty:180, jcarrier:1200,
-  destroyer:300, battleship:1500, turret:200, emily:1500, biggun:300, core:2000};
+  destroyer:300, battleship:1500, turret:200, emily:1500, biggun:300, core:2000,
+  radar:250, boat:150, sub:300, train:600, bridge:1500};
 
 const SAVE_KEY = 'wof1944-save';
 // Paint schemes ("skins") for the player's aircraft. Winning a mission makes its skin available to buy
@@ -91,18 +92,37 @@ const SKINS = {
                s:{top:'#0e2a66', side:'#123375', under:'#0f2d6c', hi:'rgba(150,180,240,.35)'}, wing:'#123170', cowl:'#e8b923', flat:true, deco:'blueangels'},
   invasion:   {name:'פסי פלישה', desc:'פסים שחורים ולבנים סביב הגוף, כמו ביום הפלישה.', price:1500, unlock:'def', deco:'invasion'},
   metal:      {name:'מתכת חשופה', desc:'אלומיניום מבריק עם אף אדום, כמו מטוסי האסים בסוף המלחמה.', price:2500, unlock:'gnd',
-               s:{top:'#aeb6bd', side:'#c3cad0', under:'#d0d5d9', hi:'rgba(255,255,255,.55)'}, wing:'#b4bcc3', cowl:'#c0281f'}
+               s:{top:'#aeb6bd', side:'#c3cad0', under:'#d0d5d9', hi:'rgba(255,255,255,.55)'}, wing:'#b4bcc3', cowl:'#c0281f'},
+  // special missions (specials.js)
+  rescue:     {name:'חילוץ ים', desc:'כחול אפור עם אף וזנב צהובים, כמו מטוסי החילוץ הימי.', price:1800, unlock:'rescue',
+               s:{top:'#3b5a7a', side:'#4a6a8a', under:'#dfe3e6', hi:'rgba(200,220,240,.3)'}, wing:'#42617f', cowl:'#f2c419', fin:'#f2c419'},
+  nightfighter:{name:'לוחם לילה', desc:'אפור צפחה כהה עם ברק צהוב על הגוף.', price:2200, unlock:'dark',
+               s:{top:'#22282f', side:'#2a3139', under:'#2a3139', hi:'rgba(140,150,170,.25)'}, wing:'#262c33', flat:true, deco:'lightning'},
+  atlantic:   {name:'מלווה השיירות', desc:'אפור כחלחל מעל לבן, צבעי מטוסי הליווי של האטלנטי.', price:2000, unlock:'convoy',
+               s:{top:'#6f8193', side:'#8a9bac', under:'#f1f2f2', hi:'rgba(240,245,250,.3)'}, wing:'#73879a'},
+  desert:     {name:'חום מדבר', desc:'חום חול מעל תכלת, כמו המטוסים שתקפו גשרים ומסילות.', price:2200, unlock:'bridge',
+               s:{top:'#a88f62', side:'#b39a6c', under:'#9fbad0', hi:'rgba(250,235,200,.3)'}, wing:'#a48b5e'},
+  redcowl:    {name:'אף אדום', desc:'הצבעים המקוריים עם אף וזנב אדומים, סימן של טייסת מהירה.', price:1600, unlock:'clock', cowl:'#c42a1f', fin:'#c42a1f'},
+  ace:        {name:'צבעי האס (שלל)', desc:'ירוק כהה עם פסים צהובים וזנב אדום, כמו המטוס של האס היפני.', price:3500, unlock:'ace',
+               s:{top:'#3f4a33', side:'#4a553b', under:'#c9c7b4', hi:'rgba(200,210,170,.25)'}, wing:'#44503a', cowl:'#151515', fin:'#a52a1e', deco:'acebands'},
+  phoenix:    {name:'עוף החול', desc:'שחור עם להבות כתומות על האף, למי שנחת על נושאת בוערת.', price:2800, unlock:'burning',
+               s:{top:'#1c1a1a', side:'#252121', under:'#2c2626', hi:'rgba(180,140,120,.25)'}, wing:'#211e1e', cowl:'#e0601c', flat:true, deco:'flames'},
+  victory:    {name:'ניצחון', desc:'לבן עם פסי אדום-לבן-כחול על הזנב, למי שהוביל את הפלישה הגדולה.', price:4000, unlock:'assault',
+               s:{top:'#e8e6df', side:'#dcd9cf', under:'#c8c5ba', hi:'rgba(255,255,255,.5)'}, wing:'#d5d2c8', cowl:'#1d3566', deco:'tailstripes'}
 };
 for(const [id,k] of Object.entries(SKINS)) k.id = id;
 const skinFor = key => Object.values(SKINS).find(k => k.unlock === key);      // the skin a mission awards
 function skinUnlocked(id){
   const k = SKINS[id]; if(!k || k.unlock == null) return true;
-  if(k.unlock==='def' || k.unlock==='gnd') return !!(SAVE.won && SAVE.won[k.unlock]);
+  if(typeof k.unlock==='string') return !!(SAVE.won && SAVE.won[k.unlock]);   // 'def', 'gnd' or a special mission
   return !!SAVE.best[k.unlock];
 }
 function skinUnlockText(id){
   const u = SKINS[id].unlock;
-  return u==='def' ? 'נפתח בניצחון במשימת ההגנה על הנושאת' : u==='gnd' ? 'נפתח בניצחון במשימת הסיוע לכוחות היבשה' : `נפתח בסיום משימה ${u+1}`;
+  if(u==='def') return 'נפתח בניצחון במשימת ההגנה על הנושאת';
+  if(u==='gnd') return 'נפתח בניצחון במשימת הסיוע לכוחות היבשה';
+  if(typeof u==='string') return `נפתח בניצחון במשימה "${SPECIALS[u].name}"`;
+  return `נפתח בסיום משימה ${u+1}`;
 }
 // the skin object to paint the player's aircraft with (null = the type's standard scheme)
 const playerSkin = () => (SAVE.skin && SAVE.skin !== 'standard' && SAVE.skins && SAVE.skins[SAVE.skin]) ? SKINS[SAVE.skin] : null;

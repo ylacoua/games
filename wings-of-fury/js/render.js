@@ -50,6 +50,7 @@ function render(ctx, cw, ch){
   drawRemains(ctx);
   for(const so of G.soldiers) drawSoldier(ctx, so);
   if(G.ground) drawGround(ctx);
+  if(G.special) specialDraw(ctx);                      // special-mission objects: boats, convoy, bridge, train...
   // projectiles
   ctx.lineCap='round';
   for(const s of G.shots){ ctx.strokeStyle = s.team==='p'?'#ffe58a':'#ff8f6b'; ctx.lineWidth = s.small ? 1 : 2; ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x-s.vx*0.012, s.y-s.vy*0.012); ctx.stroke(); }
@@ -87,6 +88,7 @@ function render(ctx, cw, ch){
     ctx.globalAlpha=1;
   }
   for(const f of G.fx) drawFx(ctx, f);
+  if(G.special) specialDrawOver(ctx);                  // drawn above the aircraft: flames, flares, sun glare
   ctx.restore();
 
   // night / dusk lighting
@@ -107,6 +109,7 @@ function render(ctx, cw, ch){
   drawTutorial(ctx, vw);
   drawDefenseHUD(ctx, vw);
   drawGroundHUD(ctx, vw);
+  if(G.special) drawSpecialHUD(ctx, vw);
   }
 }
 
@@ -255,10 +258,10 @@ function drawAI(ctx, e, type, s, flash, gear=0){
   const r = visRoll(e);                                       // plus a full turn during a barrel roll
   const prop = !(e.takeoff && e.takeoff.t<0) && !(e.state==='rearm');
   if(Math.abs(r) > 0.02 && Math.abs(r) < Math.PI-0.02 && type !== 'betty'){
-    drawPlane3D(ctx, type, null, (AIRCRAFT[type]||{}).nation || 'us', 0, r, 0, flash>0, prop);
+    drawPlane3D(ctx, type, e.skin || null, (AIRCRAFT[type]||{}).nation || 'us', 0, r, 0, flash>0, prop);
   } else {
     if(Math.abs(r) > Math.PI/2) ctx.scale(1,-1);
-    drawPlane(ctx, type, null, null, s, flash>0, prop, gear);
+    drawPlane(ctx, type, e.skin || null, null, s, flash>0, prop, gear);       // e.skin: the enemy ace's colours
     // dive brakes on a Val in its dive onto the carrier; split flaps on a Zero braking hard
     drawBrakes(ctx, type, type==='val' && Math.sin(e.a) > 0.6, e.brk > 0);
   }

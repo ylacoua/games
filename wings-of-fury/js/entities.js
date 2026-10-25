@@ -8,8 +8,13 @@ function heading(P){ return P.mv ? P.mv.ang : P.vl ? P.vl.ang : P.p; }
 function turnK(P){ return P.loop ? Math.cos(Math.PI*P.loop.t) : 1; }
 function playerVel(P){ const a=heading(P); return {vx:P.f*Math.cos(a)*P.speed*turnK(P), vy:-Math.sin(a)*P.speed}; }
 
+// our carriers (a second one exists in Carrier Defense and "The Burning Carrier")
+function carriers(){ return G.carrier2 ? [G.carrier, G.carrier2] : [G.carrier]; }
+function nearestCarrier(x){ return carriers().reduce((b,c)=> Math.abs(c.x+c.len/2-x) < Math.abs(b.x+b.len/2-x) ? c : b); }
+
 function updatePlayer(dt){
-  const P = G.player, st = G.stats, K = keys, C = G.carrier;
+  const P = G.player, st = G.stats, K = keys;
+  const C = P.onDeck ? (P.deckC || G.carrier) : nearestCarrier(P.x);   // the deck we are on, or the nearest one
   if(P.dead) return;
   P.inv = Math.max(0, P.inv-dt); P.hitT = Math.max(0, P.hitT-dt);
   P.cool -= dt; P.ordCool -= dt; P.gunnerCool -= dt;
@@ -130,7 +135,9 @@ function updatePlayer(dt){
   P.airT = (P.airT||0) + dt;
   if(onCarrierX && P.y >= DECK_Y-9 && P.y < DECK_Y+12){
     if(P.airT < 1.2 && P.p >= 0){ P.y = DECK_Y-9; P.p = Math.max(P.p, 0.05); return; }  // just lifted off
+    if(C.burning > 0) return crashPlayer('הסיפון בוער – אי אפשר לנחות עליו עדיין');
     if(!P.loop && !P.vl && !P.mv && Math.abs(P.p)<0.32 && P.speed<225){
+      P.deckC = C; G.homeDeck = C;                           // re-arm and take off again from this carrier
       P.onDeck=true; P.landing=true; P.y=DECK_Y-9; P.p=0; P.throttle=0; G.state='landing';
       SFX.tone(200,120,0.3,0.1,'triangle'); say('נחיתה! וו הבלימה נתפס',2);
       return;
@@ -315,11 +322,13 @@ function explode(x, y, r, dmg, team, kind){
     for(const so of G.soldiers) if(!so.dead && !(so.safe>0) && Math.abs(so.x-x)<r && y>so.y-40) killSoldier(so);
     groundBlast(x, y, r, dmg);
     for(const e of G.enemies) if(!e.dead && dist2(x,y,e.x,e.y) < (r+(e.size||16))**2) hurtEnemy(e, dmg*0.8);
+    if(G.special) specialBlast(x, y, r, dmg, 'p');       // boats, submarines, the bridge, the train
   } else {
     const P=G.player;
     if(!P.dead && dist2(x,y,P.x,P.y)<(r+10)**2) damagePlayer(dmg*0.5);
     const C=G.carrier;
     if(x>C.x-r && x<C.x+C.len+r && y>DECK_Y-r){ C.hp -= dmg; C.hit=0.3; if(C.hp<=0){ C.hp=0; } }
+    if(G.special) specialBlast(x, y, r, dmg, 'e');       // our convoy ships
   }
 }
 
@@ -339,10 +348,12 @@ function bulletVsEnemy(s){
     if(!so.dead && Math.abs(s.x-so.x)<6 && s.y>so.y-14 && s.y<so.y+2){ s.life=0; killSoldier(so); return; }
   }
   groundBulletHit(s);                                       // Ground Support: Chi-Ha tanks
+  if(G.special && s.life>0) specialBulletHit(s);            // special missions: boats, train...
 }
 function bulletVsFriend(s){
   const P=G.player;
   if(!P.dead && !P.onDeck && dist2(s.x,s.y,P.x,P.y)<16*16 && !dodges(P)){ s.life=0; damagePlayer(s.dmg); spark(s.x,s.y); return; }
+  if(G.special && specialFriendHit(s)) return;              // the rescue plane
   const C = G.carrier;
   if(s.x>C.x && s.x<C.x+C.len && s.y>DECK_Y-8 && s.y<SEA){ s.life=0; C.hp -= s.dmg*0.6; C.hit=0.1; spark(s.x,s.y); return; }
   for(const w of G.wingmen) if(!w.dead && w.state!=='wait' && dist2(s.x,s.y,w.x,w.y)<15*15 && !dodges(w)){ s.life=0; hurtWing(w, s.dmg); return; }
@@ -355,7 +366,7 @@ function earn(type, x, y){
 
 function hitStruct(s, d, kind){
   if(s.dead) return;
-  if(kind==='gun') d *= ({bunker:0.15, biggun:0.12, core:0.08, aa:0.6, barracks:0.45, fuel:1, light:1, arty:0.3})[s.type] ?? 0.5;
+  if(kind==='gun') d *= ({bunker:0.15, biggun:0.12, core:0.08, aa:0.6, barracks:0.45, fuel:1, light:1, arty:0.3, radar:0.5})[s.type] ?? 0.5;
   s.hp -= d; s.flash = 0.1;
   if(s.hp<=0){
     s.dead=true; earn(s.type, s.x, s.y-s.h);

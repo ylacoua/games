@@ -116,6 +116,20 @@ function drawStruct(ctx, s){
       ctx.fillStyle = night ? '#fffbe0' : '#d9dccd'; ctx.beginPath(); ctx.ellipse(6.5,0,1.8,6,0,0,7); ctx.fill();
       ctx.restore();
       break; }
+    case 'radar': {                                    // early-warning radar: lattice mast, rotating "bedspring" array, operators' hut
+      ctx.fillStyle='#4f4d42'; ctx.fillRect(x+6, y-9, 12, 9); ctx.fillStyle='#2e2c25'; ctx.fillRect(x+8, y-7, 3, 3);   // hut
+      ctx.strokeStyle='#3b3a33'; ctx.lineWidth=1.1; ctx.beginPath();
+      ctx.moveTo(x-8,y); ctx.lineTo(x-2,y-h+10); ctx.moveTo(x+4,y); ctx.lineTo(x+1,y-h+10);
+      for(let i=0;i<5;i++){ const a=y-i*7, b=y-(i+1)*7; ctx.moveTo(x-8+i*1.2,a); ctx.lineTo(x+4-(i+1)*0.6,b); ctx.moveTo(x+4-i*0.6,a); ctx.lineTo(x-8+(i+1)*1.2,b); }
+      ctx.stroke();
+      // the antenna turns: its apparent width swings with the rotation
+      const k = Math.cos(G.time*1.6 + s.x*0.01), aw = 16*Math.abs(k) + 2, top = y-h+6;
+      ctx.fillStyle = k > 0 ? '#6a6a5e' : '#4e4e44'; ctx.fillRect(x-1-aw/2, top-10, aw, 12);
+      ctx.strokeStyle='rgba(20,20,16,.6)'; ctx.lineWidth=0.5; ctx.beginPath();
+      for(let i=1;i<4;i++){ ctx.moveTo(x-1-aw/2, top-10+i*3); ctx.lineTo(x-1+aw/2, top-10+i*3); }
+      ctx.stroke();
+      if(night && Math.sin(G.time*3)>0){ ctx.fillStyle='#ff4a3a'; ctx.beginPath(); ctx.arc(x-1, top-12, 1.4, 0, 7); ctx.fill(); }   // warning lamp
+      break; }
     case 'arty': {                                     // field gun behind a shield, barrel raised to lob shells
       const ca=Math.cos(s.aim), sa=Math.sin(s.aim), py=y-12;
       ctx.strokeStyle='#2f2e28'; ctx.lineWidth=4; ctx.lineCap='butt'; ctx.beginPath(); ctx.moveTo(x, py); ctx.lineTo(x+ca*30, py+sa*30); ctx.stroke();

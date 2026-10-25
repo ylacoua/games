@@ -9,6 +9,7 @@ const STRUCT = {
   light:   {w:22,  h:26, hp:25,  primary:false},
   biggun:  {w:84,  h:42, hp:320, primary:true},
   arty:    {w:56,  h:26, hp:150, primary:true},
+  radar:   {w:34,  h:46, hp:70,  primary:true},
   core:    {w:130, h:72, hp:900, primary:true}
 };
 
@@ -143,8 +144,8 @@ function makeShip(type, x, minX, maxX){
 }
 
 function resetPlayer(){
-  const st = G.stats, lo = G.loadout;
-  G.player = {x:G.carrier.x+70, y:DECK_Y-9, f:1, p:0, loop:null, speed:0, throttle:0, hp:st.hp, max:st.hp, fuel:st.fuel, maxFuel:st.fuel,
+  const st = G.stats, lo = G.loadout, home = G.homeDeck || G.carrier;   // the carrier we last landed on
+  G.player = {x:home.x+70, deckC:home, y:DECK_Y-9, f:1, p:0, loop:null, speed:0, throttle:0, hp:st.hp, max:st.hp, fuel:st.fuel, maxFuel:st.fuel,
     skin:playerSkin(), ammo:500, ordType:lo.ord, ord:st.ord[lo.ord], ordMax:st.ord[lo.ord], onDeck:true, cool:0, ordCool:0, gunnerCool:0, inv:2, dead:false, stall:false, hitT:0, smoke:0, gear:1, gearWant:1, airT:0};
   G.state='deck';
   SFX.setEngineProfile(G.loadout.plane);

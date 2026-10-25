@@ -26,10 +26,12 @@ function updateGround(dt){
     s.flash = Math.max(0,(s.flash||0)-dt); s.muzzle = Math.max(0,(s.muzzle||0)-dt);
     if(s.type==='light'){
       const dx = P.x-s.x;
-      if(night && !P.dead && Math.abs(dx)<950 && !P.onDeck){   // searchlights only lock on in the dark
+      // a working radar on the same island ("Dark Game" mission) cues the light: longer reach, faster slew
+      const radar = G.special && G.structures.some(r=>r.type==='radar' && !r.dead && r.island===s.island);
+      if(night && !P.dead && Math.abs(dx)<(radar?1500:950) && !P.onDeck){   // searchlights only lock on in the dark
         const want = Math.atan2(P.y-(s.y-s.h), dx);
         const d = wrapA(want-s.aim);
-        s.aim += clamp(d, -0.55*dt, 0.55*dt);
+        s.aim += clamp(d, -(radar?1.3:0.55)*dt, (radar?1.3:0.55)*dt);
         if(Math.abs(d)<0.07) lit = true;
       } else s.aim = -Math.PI/2 + Math.sin(G.time*0.5+s.x)*0.7;
       continue;
@@ -320,6 +322,7 @@ function zeroAI(e, dt, lvl){
   const air = [];
   if(!P.dead && !P.onDeck) air.push({o:P, x:P.x, y:P.y, vx:playerVel(P).vx, vy:playerVel(P).vy});
   for(const w of G.wingmen) if(!w.dead && w.state==='fly') air.push({o:w, x:w.x, y:w.y, vx:Math.cos(w.a)*w.speed, vy:Math.sin(w.a)*w.speed});
+  if(G.special) for(const v of specialAirTargets()) air.push(v);   // e.g. the rescue floatplane
   e.tgtT = (e.tgtT||0) - dt;
   let pick = air.find(a=>a.o===e.tgtO);
   // already sitting on this target's tail: don't let it go
@@ -346,10 +349,13 @@ function zeroAI(e, dt, lvl){
   if(e.base == null){ e.base = e.speed; e.phase = rnd(0, 6.28); e.man = null; e.mt = 0; }
   // Badly damaged (20% or less) and within reach of our carrier: a suicide dive onto its deck.
   const C = G.carrier, cmid = C.x + C.len/2;
-  if(e.max && e.hp <= e.max*0.2 && Math.abs(e.x - cmid) < 3500){
-    if(!e.kamikaze){ e.kamikaze = true; e.escort = null; say('מטוס זירו פגוע צולל בקמיקזה על הנושאת! בנזאיייייייי!', 2.5); SFX.banzai(); }
+  // (forceKami: sent off as a kamikaze from the start - "Ticking Clock" mission)
+  if(!e.ace && (e.forceKami || (e.max && e.hp <= e.max*0.2 && Math.abs(e.x - cmid) < 3500))){
+    if(!e.kamikaze){ e.kamikaze = true; e.escort = null; if(!e.forceKami){ say('מטוס זירו פגוע צולל בקמיקזה על הנושאת! בנזאיייייייי!', 2.5); SFX.banzai(); } }
     e.speed += (e.base*1.25 - e.speed)*Math.min(1, dt*2);
-    const want = Math.atan2(DECK_Y-4 - e.y, cmid - e.x), d = wrapA(want - e.a);
+    // from far away it cruises over the islands at altitude first, then dives at the deck
+    const far = Math.abs(cmid - e.x) > 1100;
+    const want = far ? Math.atan2(170 - e.y, cmid - e.x) : Math.atan2(DECK_Y-4 - e.y, cmid - e.x), d = wrapA(want - e.a);
     e.a = wrapA(e.a + clamp(d, -2.2*dt, 2.2*dt));                     // no terrain avoidance: it means to hit
     e.x += Math.cos(e.a)*e.speed*dt; e.y += Math.sin(e.a)*e.speed*dt;
     if(Math.random() < 0.5) puff(e.x, e.y, '#2a2a2a', 7, 1.2);        // trailing smoke
@@ -385,7 +391,24 @@ function zeroAI(e, dt, lvl){
   // Strike-role Zeros (about half of each flight) go for the carrier itself, even when fighters are about;
   // they still break and jink if someone gets on their tail.
   if(e.role==='strike' && G.def.mode==='defense') tg = {x:cmid, y:DECK_Y-12, vx:0, vy:0, d:Math.hypot(cmid-e.x, DECK_Y-12-e.y)};
-  const turn = 2.5 + lvl*0.12;
+  const turn = 2.5 + lvl*0.12 + (e.ace ? 0.7 : 0);
+  // The ace ("Ace vs Ace"): each time it is badly hurt it breaks away, climbs high into the sun, and dives
+  // back on its opponent out of the glare.
+  if(e.ace && e.retreat){
+    const R = e.retreat; R.t += dt;
+    if(R.ph==='climb'){
+      e.speed += (e.base*1.1 - e.speed)*Math.min(1, dt*2);
+      steer(e, P.x + (e.x < P.x ? -650 : 650), CEIL + 260, 2.2, dt);
+      if(R.t > 5 || e.y < CEIL + 320){ R.ph = 'dive'; e.sunDive = true; say('האס צולל עליך מתוך השמש! קשה לראות אותו בסנוור', 3); }
+    } else {
+      e.speed += (e.base*1.35 - e.speed)*Math.min(1, dt*2);
+      steerAngle(e, Math.atan2(tg.y + tg.vy*0.4 - e.y, tg.x + tg.vx*0.4 - e.x), turn*1.2, dt);
+      e.cool -= dt;
+      if(e.cool<=0 && tg.d<560 && aimedAt(e, tg.x, tg.y) < 0.25){ shootFrom(e, 'e', 4+lvl*0.6); SFX.enemyGun(); e.cool = 0.1; }
+      if(tg.d < 180 || e.y > tg.y + 40 || R.t > 12){ e.retreat = null; e.sunDive = false; }
+    }
+    return;
+  }
   e.mt -= dt; e.cool -= dt;
   if(e.mt <= 0){ e.man = null; e.faceLock = null; e.rollOverride = null; }
   if(!e.man){
@@ -394,15 +417,15 @@ function zeroAI(e, dt, lvl){
     let c = chasedBy(e);
     if(c && Math.abs(wrapA(Math.atan2(c.y-e.y, c.x-e.x) - e.a)) < 1.9) c = null;
     e.chasedT = c ? (e.chasedT||0) + dt : 0;
-    if(e.chasedT < 0.5) c = null;
+    if(e.chasedT < (e.ace ? 0.2 : 0.5)) c = null;
     // a hit makes it break off - but a Zero pressing home an attack from someone's tail mostly holds on
     const committed = tg.d < 450 && aimedAt(e, tg.x, tg.y) < 0.6;
-    if((c && Math.random() < dt*2.5) || (e.flash>0 && Math.random() < (committed ? 0.04 : 0.3))){
+    if((c && Math.random() < dt*(e.ace ? 5 : 2.5)) || (e.flash>0 && Math.random() < (committed ? (e.ace ? 0.12 : 0.04) : 0.3))){
       const ref = c ? c.a : e.a + Math.PI;
       // defensive manoeuvres: hard turns, climbs and dives, plus the aerobatic ones (maneuvers.js), each only
       // when there is the height and speed for it
       const alt = groundY(e.x) - e.y, level = Math.abs(Math.sin(e.a)) < 0.5;
-      const pool = ['break','break','zoom','dive'];
+      const pool = e.ace ? ['break','split','imm','hammer','brake'] : ['break','break','zoom','dive'];   // the ace favours aerobatics
       if(level && (e.brCool||0) <= 0) pool.push('barrel','barrel');
       if(level && alt > 330) pool.push('split');
       if(level && e.y > CEIL + 300) pool.push('imm');
@@ -485,9 +508,20 @@ function bettyAI(e, dt){
 
 function emilyAI(e, dt, lvl){
   const P = G.player;
-  // slow patrol over the far half of the map, bobbing in altitude
-  if(e.x < G.L*0.45) e.dir = 1; if(e.x > G.L-300) e.dir = -1;
-  steer(e, e.x + e.dir*500, 170 + Math.sin(G.time*0.4)*60, 0.35, dt);
+  if(e.raid){
+    // "The Great Invasion": a bombing raid on our carrier - heads straight for it and unloads over the deck
+    const C = G.carrier, cx = C.x + C.len/2;
+    steer(e, cx, 160, 0.4, dt);
+    e.bcool = (e.bcool||0) - dt;
+    if(e.bombs > 0 && e.bcool <= 0 && Math.abs(e.x - cx) < C.len*0.45){
+      G.drops.push({kind:'bomb', x:e.x, y:e.y+16, vx:Math.cos(e.a)*e.speed, vy:30, team:'e', dmg:80, r:60}); e.bombs--; e.bcool = 0.5;
+    }
+    if(e.bombs <= 0 && Math.abs(e.x - cx) > 600) e.bombs = 6;          // comes round for another pass
+  } else {
+    // slow patrol over the far half of the map, bobbing in altitude
+    if(e.x < G.L*0.45) e.dir = 1; if(e.x > G.L-300) e.dir = -1;
+    steer(e, e.x + e.dir*500, 170 + Math.sin(G.time*0.4)*60, 0.35, dt);
+  }
   if(P.dead || P.onDeck) return;
   e.guns.forEach((g,i)=>{
     e.gcool[i] -= dt;

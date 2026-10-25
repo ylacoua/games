@@ -21,10 +21,11 @@ const JP_INF  = {range:110, dmg:3, rate:1.2};
 const BUNKER_MG = {range:180, dmg:3, rate:0.3};
 const ARTY    = {range:760, rate:4.5};
 
-function groundSetup(){
+// o (optional, "The Great Invasion"): plan = the islands, inf / tanks = the landing force, msg = opening line
+function groundSetup(o={}){
   G.L = 9800;
   // three islands, each stronger than the last (x1.0, x1.2, x1.8)
-  const plan = [
+  const plan = o.plan || [
     {x0:2500, w:1250, h:58, mult:1.0},
     {x0:5000, w:1450, h:62, mult:1.2},
     {x0:7600, w:1750, h:70, mult:1.8}
@@ -49,9 +50,9 @@ function groundSetup(){
     for(let k=0;k<n(30);k++){ const x = rnd(a, b); G.soldiers.push({x, y:groundY(x), dir:1, speed:0, t:rnd(0,1), cool:rnd(0.5,2), dead:false, def:true, home:x, island:i}); }
     for(let k=0;k<n(3);k++){ const x = rnd(a+(b-a)*0.3, b); G.jtanks.push({x, y:groundY(x), hp:CHIHA.hp, max:CHIHA.hp, cool:rnd(1,3), dead:false, island:i, aim:Math.PI, flash:0}); }
   });
-  G.ground = {phase:'sail', island:0, inf:20, tanks:5, units:[], shells:[], unloadT:0, flagT:0, endT:0,
+  G.ground = {phase:'sail', island:0, inf:o.inf||20, tanks:o.tanks||5, units:[], shells:[], unloadT:0, flagT:0, endT:0,
     lst:{x:G.carrier.x + G.carrier.len + 200, hp:700, max:700, speed:36, ramp:0, flash:0}};
-  say('הנחתת יוצאת לאי הראשון. הפצץ את ההגנות לפני שהכוחות יורדים לחוף', 5);
+  say(o.msg || 'הנחתת יוצאת לאי הראשון. הפצץ את ההגנות לפני שהכוחות יורדים לחוף', 5);
 }
 
 // ---------- helpers ----------
@@ -88,7 +89,8 @@ function groundUpdate(dt){
 
   if(S.phase==='sail'){
     L.ramp = Math.max(0, L.ramp - dt);
-    if(L.x < beachX){ L.x = Math.min(beachX, L.x + L.speed*dt); if(Math.random()<dt*4) G.fx.push({type:'wake', x:L.x-80, y:SEA+2, t:0, max:1.5}); }
+    if(S.hold){}                                              // waiting for the beach defences to be cleared
+    else if(L.x < beachX){ L.x = Math.min(beachX, L.x + L.speed*dt); if(Math.random()<dt*4) G.fx.push({type:'wake', x:L.x-80, y:SEA+2, t:0, max:1.5}); }
     else {
       S.phase = 'unload'; S.unloadT = 0; S.charge = false; S.group = null;
       say(`הנחתת הגיעה לחוף האי ה${['ראשון','שני','שלישי'][S.island]}! הכוחות יורדים`, 4);
@@ -125,7 +127,7 @@ function groundUpdate(dt){
   } else if(S.phase==='flag'){
     S.flagT += dt; is.flag.t = Math.min(1, S.flagT/4);
     if(S.flagT > 5){
-      if(S.island >= G.islands.length-1){ S.phase = 'won'; S.endT = 3; say('שלושת האיים נכבשו! ניצחון!', 5); }
+      if(S.island >= G.islands.length-1){ S.phase = 'won'; S.endT = 3; if(!G.special) say('שלושת האיים נכבשו! ניצחון!', 5); }
       else { S.phase = 'load'; say('הכוחות חוזרים לנחתת וממשיכים לאי הבא', 4); }
     }
   } else if(S.phase==='load'){
@@ -138,7 +140,7 @@ function groundUpdate(dt){
     }
     if(left===0){ S.units = []; S.island++; S.phase = 'sail'; say('הנחתת יוצאת לאי הבא', 3); }
   } else if(S.phase==='won'){
-    S.endT -= dt; if(S.endT<=0){ UI.result(true); return; }
+    S.endT -= dt; if(S.endT<=0){ if(G.special){ S.phase = 'done'; return; } UI.result(true); return; }   // a special mission goes on
   }
 
   updateUSUnits(dt);

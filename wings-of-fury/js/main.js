@@ -67,9 +67,10 @@ function update(dt, vw){
   if(G.defense) defenseUpdate(dt);
   if(G.ground){ groundUpdate(dt); if(G.state==='over') return; }
   if(G.tutorial){ tutorialUpdate(dt); if(G.state==='over') return; }
+  if(G.special){ specialUpdate(dt); if(!G || G.state==='over') return; }
   SFX.setEngine(!P.dead && (P.speed>5 || P.throttle>0), P.speed);
 
-  if(!G.complete && !G.tutorial && !G.ground && primariesLeft()===0){
+  if(!G.complete && !G.tutorial && !G.ground && !G.special && primariesLeft()===0){
     G.complete = true; SFX.pickup();
     say('כל המטרות הושמדו! חזור לנושאת ונחת כדי לסיים', 6);
   }

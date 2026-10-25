@@ -168,7 +168,7 @@ function drawPlane(ctx, type, color, nation, s, flash, prop, gear=0){
   // far horizontal stabiliser peeks out above the near one
   ctx.fillStyle = W || S.under; ctx.beginPath(); ctx.ellipse(A.stab.x+1, A.stab.y-0.8, A.stab.rx*0.8, A.stab.ry*0.8, 0, 0, 7); ctx.fill();
   // vertical fin and rudder
-  ctx.fillStyle = W || S.top; smoothShape(ctx, A.fin); ctx.fill();
+  ctx.fillStyle = W || (K && K.fin) || S.top; smoothShape(ctx, A.fin); ctx.fill();
   if(!W){ ctx.strokeStyle=FRAME; ctx.lineWidth=0.5; ctx.beginPath(); ctx.moveTo(A.rudder, lineAt(A.top, A.rudder)-0.5);
     ctx.lineTo(A.rudder+1.2, Math.min(...A.fin.map(p=>p[1]))+1.5); ctx.stroke(); }
   // engine nacelle on the far side (twin-engine types)
@@ -272,11 +272,12 @@ function drawPlane(ctx, type, color, nation, s, flash, prop, gear=0){
     for(let i=0;i<A.blades;i++){ const a = i/A.blades*Math.PI*2 + 0.3, h = Math.sin(a)*A.propR; ctx.fillRect(px, Math.min(py,py+h), 1.6, Math.abs(h)); }
   }
   ctx.fillStyle = W || (K && K.cowl) || (A.nation==='jp' ? '#4a4a40' : '#1c2433'); ctx.beginPath(); ctx.ellipse(px, py, 2.2, 2.6, 0, -Math.PI/2, Math.PI/2); ctx.fill();
-  // Blue Angels: gold band across the top of the fin
-  if(!W && K && K.deco==='blueangels'){
+  // Blue Angels: gold band across the top of the fin; "victory": red, white and blue bands on the fin
+  if(!W && K && (K.deco==='blueangels' || K.deco==='tailstripes')){
     ctx.save(); smoothShape(ctx, A.fin); ctx.clip();
     const fy = Math.min(...A.fin.map(p=>p[1]));
-    ctx.fillStyle='#e8b923'; ctx.fillRect(A.rudder-8, fy, 16, 2.6);
+    if(K.deco==='blueangels'){ ctx.fillStyle='#e8b923'; ctx.fillRect(A.rudder-8, fy, 16, 2.6); }
+    else ['#b22234','#f2f2ee','#1d3566','#f2f2ee','#b22234'].forEach((c,i)=>{ ctx.fillStyle=c; ctx.fillRect(A.rudder-10, fy+1+i*2, 20, 2); });
     ctx.restore();
   }
   ctx.restore();
@@ -310,6 +311,21 @@ function skinMarkings(ctx, A, deco, minY, maxY){
     // black and white bands round the rear fuselage
     const x0 = -A.cowl*0.6 - 3;
     for(let i=0;i<5;i++){ ctx.fillStyle = i%2 ? '#141414' : '#f2f2ee'; ctx.fillRect(x0 - i*1.4, minY, 1.4, maxY-minY); }
+  } else if(deco==='acebands'){
+    // two yellow command bands round the rear fuselage
+    const x0 = -A.cowl*0.6 - 2;
+    ctx.fillStyle='#e8c228'; ctx.fillRect(x0, minY, 1.6, maxY-minY); ctx.fillRect(x0-3.2, minY, 1.6, maxY-minY);
+  } else if(deco==='lightning'){
+    // a yellow lightning bolt along the fuselage side
+    ctx.fillStyle='#f0c419'; ctx.beginPath();
+    ctx.moveTo(cw-2, -1.6); ctx.lineTo(cw-9, 0.4); ctx.lineTo(cw-8, -0.6); ctx.lineTo(cw-17, 1.6); ctx.lineTo(cw-9.5, 0.9); ctx.lineTo(cw-10.5, 1.9); ctx.closePath(); ctx.fill();
+  } else if(deco==='flames'){
+    // orange-and-yellow flames licking back from the cowling
+    for(const [c, k] of [['#e0601c', 1], ['#f2c419', 0.6]]){
+      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(cw, minY*0.6*k);
+      for(let i=0;i<4;i++){ const fx = cw - 3 - i*2.2; ctx.quadraticCurveTo(fx+1, (i%2? -2.4 : 2.4)*k, fx - (6-i)*k, (i%2? -0.6 : 1.2)*k); }
+      ctx.lineTo(cw, maxY*0.6*k); ctx.closePath(); ctx.fill();
+    }
   }
 }
 

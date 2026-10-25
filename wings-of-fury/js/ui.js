@@ -1,4 +1,7 @@
 // ---- Menus (DOM overlays, RTL) and the in-flight HUD (canvas) ----
+// a mission key from a button: campaign index (number), 'def', 'gnd' or a special mission id
+const missionKey = v => (v==='def' || v==='gnd' || SPECIALS[v]) ? v : +v;
+const missionDef = k => k==='def' ? DEFENSE : k==='gnd' ? GROUND : SPECIALS[k] || LEVELS[k];
 const UI = {
   root: null, tab:'mission', level:0, lo:null, confirmReset:false,
   init(){ this.root = document.getElementById('ui'); },
@@ -47,7 +50,7 @@ const UI = {
     this.confirmReset=false; Music.start();
     const p = this.homePanel;
     const nav = [['tut','משימות הדרכה','שיעורי טיסה ואימון חופשי'],['camp','משימות הקמפיין','משימות 1 עד 6'],
-                 ['extra','משימות נוספות','הגנה על הנושאת · סיוע ליבשה'],['keys','תפעול המשחק','מקשים ולחצנים']]
+                 ['extra','משימות נוספות','10 משימות מיוחדות'],['keys','תפעול המשחק','מקשים ולחצנים']]
       .map(([k,t,s])=>`<button class="navbtn ${p===k?'on':''}" data-act="home" data-v="${k}" aria-expanded="${p===k}"><b>${t}</b><small>${s}</small></button>`).join('');
     const reset = `<button class="link" data-act="reset">איפוס התקדמות</button>`;
     this.root.innerHTML = `<div class="home">
@@ -78,8 +81,10 @@ const UI = {
     if(p==='extra'){
       const row = (k, L, icon) => `<button class="item" data-act="brief" data-v="${k}"><span class="num">${icon}</span>
         <span class="txt"><b>${L.name}</b><small>${L.goals[0]} · תגמול $${L.reward}</small></span></button>`;
-      return `<h2>משימות נוספות</h2><p class="sub">משימות מיוחדות שאפשר לשחק בכל שלב, וכל הכסף שמרוויחים בהן נשמר.</p>
-        <div class="list">${row('def', DEFENSE, '⚓')}${row('gnd', GROUND, '⚑')}</div>`;
+      const won = k => SAVE.won && SAVE.won[k] ? ' ✓' : '';
+      return `<h2>משימות נוספות</h2><p class="sub">משימות מיוחדות שאפשר לשחק בכל שלב, וכל הכסף שמרוויחים בהן נשמר. כל ניצחון פותח סקין.</p>
+        <div class="list">${row('def', DEFENSE, '⚓')}${row('gnd', GROUND, '⚑')}
+        ${SPECIAL_ORDER.map(k=>row(k, {...SPECIALS[k], name:SPECIALS[k].name + won(k)}, SPECIALS[k].icon)).join('')}</div>`;
     }
     return `<h2>תפעול המשחק</h2><p class="sub">מקלדת. במסך מגע מופיעים לחצנים בתחתית המסך.</p>${this.keysHTML()}
       <h3 style="margin:16px 0 8px">תמרוני קרב</h3>${this.maneuversHTML()}
@@ -91,11 +96,12 @@ const UI = {
   // Short mission briefing between choosing a mission and the hangar: the situation, what must be done, a tip
   briefing(k){
     Music.start();
-    const L = k==='def' ? DEFENSE : k==='gnd' ? GROUND : LEVELS[k];
+    const L = missionDef(k);
     const time = {day:'יום',dawn:'שחר',dusk:'שקיעה',night:'לילה'};
-    const tag = typeof k==='number' ? `משימה ${k+1} מתוך ${LEVELS.length}` : 'משימה נוספת';
+    const tag = typeof k==='number' ? `משימה ${k+1} מתוך ${LEVELS.length}` : SPECIALS[k] ? 'משימה מיוחדת' : 'משימה נוספת';
     const cond = typeof k==='number'
       ? [time[L.time], L.rain?'גשם':'', L.storm?'סערה וברקים':'', L.wind?`רוח ${L.wind>0?'ימינה':'שמאלה'}`:'', L.bombers?'מפציצי אויב':''].filter(Boolean)
+      : SPECIALS[k] ? [L.time && L.time!=='day' ? time[L.time] : '', L.lives ? `${L.lives} מטוסים בלבד` : '', L.noWing ? 'בלי מטוסי כנף' : ''].filter(Boolean)
       : [];
     this.show(`<div class="spread"><span class="pill">${tag}</span>${this.money()}</div>
       <h2 style="margin-top:8px">תדריך: ${L.name}</h2>
@@ -110,7 +116,7 @@ const UI = {
     this.level = i; Music.start();
     if(!this.lo) this.lo = {plane:SAVE.plane, ord:'bomb', wing:[]};
     if(!SAVE.owned[this.lo.plane]) this.lo.plane='hellcat';
-    const def = i==='def' || i==='gnd', L = i==='def' ? DEFENSE : i==='gnd' ? GROUND : LEVELS[i], tab=this.tab;
+    const def = typeof i==='string', L = missionDef(i), tab=this.tab, free = i==='def', noWing = !!L.noWing;
     const tabs = [['mission','תדריך וחימוש'],['planes','מטוסים'],['upgrades','שדרוגים'],['skins','סקינים']]
       .map(([k,t])=>`<button class="${tab===k?'on':''}" data-act="tab" data-v="${k}">${t}</button>`).join('');
     let body='';
@@ -119,18 +125,20 @@ const UI = {
       const ords = Object.keys(ORD).map(k=>`<button class="card ${this.lo.ord===k?'sel':''}" data-act="ord" data-v="${k}" style="text-align:right">
         <b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
       // in Carrier Defense the wingmen are free
-      const wprice = k => i==='def' ? 0 : WINGMEN[k].cost;
+      const wprice = k => free ? 0 : WINGMEN[k].cost;
+      if(noWing) this.lo.wing = [];
       const wcost = this.lo.wing.reduce((s,w)=>s+wprice(w),0);
       const wings = Object.keys(WINGMEN).map(k=>{const d=WINGMEN[k], n=this.lo.wing.filter(x=>x===k).length;
-        return `<div class="card"><div class="spread"><b>${d.name}</b><span class="pill">${def ? 'חינם' : '$'+d.cost}</span></div><p>${d.desc}</p>
+        return `<div class="card"><div class="spread"><b>${d.name}</b><span class="pill">${free ? 'חינם' : '$'+d.cost}</span></div><p>${d.desc}</p>
         <div class="row"><button data-act="wadd" data-v="${k}" ${this.lo.wing.length>=MAX_WINGMEN||SAVE.money<wcost+wprice(k)?'disabled':''}>+ הוסף</button>
         <button data-act="wdel" data-v="${k}" ${n?'':'disabled'}>− הסר</button><span class="note">בטייסת: ${n}</span></div></div>`;}).join('');
       body = `<h2>${def ? L.name : (i+1)+'. '+L.name}</h2><p class="sub">${L.brief}</p>
         <div class="row" style="margin-bottom:12px">${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${L.reward}</span>
         <span class="pill">מטוס: ${PLANES[this.lo.plane].name}</span>${L.bombers?'<span class="pill">מפציצי אויב</span>':''}</div>
         <h3>חימוש לגיחה הראשונה</h3><p class="note">אפשר להחליף חימוש בכל נחיתה על הנושאת.</p><div class="grid">${ords}</div>
-        <h3 style="margin-top:16px">כנפיים (עד ${MAX_WINGMEN} מטוסים בשליטת המחשב)</h3><div class="grid">${wings}</div>
-        <div class="spread" style="margin-top:18px"><span class="note">${def ? 'במשימת ההגנה מטוסי הכנף ניתנים בחינם' : 'עלות הכנפיים למשימה: $'+wcost}</span>
+        <h3 style="margin-top:16px">כנפיים (עד ${MAX_WINGMEN} מטוסים בשליטת המחשב)</h3>
+        ${noWing ? '<p class="note">במשימה הזו אתה טס לבד – אין מטוסי כנף.</p>' : `<div class="grid">${wings}</div>`}
+        <div class="spread" style="margin-top:18px"><span class="note">${free ? 'במשימת ההגנה מטוסי הכנף ניתנים בחינם' : noWing ? '' : 'עלות הכנפיים למשימה: $'+wcost}</span>
         <div class="row"><button data-act="menu">חזרה</button><button class="primary" data-act="launch">יציאה למשימה</button></div></div>`;
     } else if(tab==='planes'){
       const maxS = 480, maxH = 200;
@@ -221,6 +229,21 @@ const UI = {
       <div class="row"><button class="primary" data-act="defense">שחק שוב</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
+  // end of a special mission: reward and mission bonus on a win (half the loot otherwise), and its skin
+  specialResult(win, reason){
+    const S = G.special, M = S.M, gain = win ? G.earned + M.reward : Math.round(G.earned*0.5);
+    const sk = skinFor(S.id), skinWasOpen = !sk || skinUnlocked(sk.id);
+    SAVE.money += gain; if(win){ SAVE.won = SAVE.won || {}; SAVE.won[S.id] = true; } storeSave();
+    this.show(`<h1 style="font-size:40px">${win ? 'המשימה הושלמה!' : 'המשימה נכשלה'}</h1>
+      <p class="sub">${M.icon} ${M.name} · ${win ? (S.reason || '') : reason}</p>
+      <div class="stats" style="font-size:15px;margin-bottom:16px"><span>שלל מהמשימה</span><span>$${G.earned}</span>
+      ${S.bonus ? `<span>מתוכו בונוסים</span><span>$${S.bonus}</span>` : ''}
+      ${win ? `<span>תגמול</span><span>$${M.reward}</span>` : '<span>שלל שנשמר</span><span>50%</span>'}<span>השמדות</span><span>${G.kills}</span>
+      <span>סה"כ הרווחת</span><span>$${gain}</span></div>
+      ${win ? this.newSkinNote(S.id, skinWasOpen) : ''}
+      <div class="row" style="margin-top:12px"><button class="primary" data-act="hangar" data-v="${S.id}">${win ? 'שחק שוב' : 'נסה שוב'}</button><button data-act="menu">תפריט ראשי</button></div>`);
+  },
+
   // end of a Ground Support game: money earned is kept, the victory reward is added on success
   groundResult(win, reason){
     const S = G.ground, gain = win ? G.earned + GROUND.reward : Math.round(G.earned*0.5);
@@ -292,6 +315,7 @@ const UI = {
         <div class="row"><button class="primary" data-act="training">אימון נוסף</button><button data-act="menu">תפריט ראשי</button></div>`);
       return;
     }
+    if(G.special){ this.specialResult(win, reason); return; }
     if(G.defense){ this.defenseResult(win, reason); return; }
     if(G.ground){ this.groundResult(win, reason); return; }
     const L = G.def, gain = win ? G.earned + L.reward : Math.round(G.earned*0.5);
@@ -318,9 +342,9 @@ const UI = {
         if(!this.confirmReset){ this.confirmReset=true; const b=this.root.querySelector('[data-act="reset"]'); b.textContent='לחץ שוב לאישור המחיקה'; return; }
         SAVE = defaultSave(); storeSave(); this.lo=null; this.mainMenu(); break;
       case 'home': this.homePanel = this.homePanel===v ? null : v; this.mainMenu(); break;
-      case 'brief': G=null; this.briefing(v==='def'||v==='gnd' ? v : +v); break;
+      case 'brief': G=null; this.briefing(missionKey(v)); break;
       case 'level': G=null; this.briefing(+v); break;          // e.g. "next mission" after a win: briefing first
-      case 'hangar': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar(v==='def'||v==='gnd' ? v : +v); break;
+      case 'hangar': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar(missionKey(v)); break;
       case 'tab': this.tab=v; this.hangar(this.level); break;
       case 'skin': if(SAVE.skins[v]){ SAVE.skin=v; storeSave(); } this.hangar(this.level); break;
       case 'buyskin': { const k=SKINS[v];
@@ -333,11 +357,13 @@ const UI = {
       case 'buy': { const p=PLANES[v]; if(SAVE.money>=p.price){ SAVE.money-=p.price; SAVE.owned[v]=true; lo.plane=v; SAVE.plane=v; storeSave(); SFX.pickup(); } this.hangar(this.level); break; }
       case 'up': { const c=UPGRADES[v].costs[SAVE.up[v]]; if(c && SAVE.money>=c){ SAVE.money-=c; SAVE.up[v]++; storeSave(); SFX.pickup(); } this.hangar(this.level); break; }
       case 'launch': {
+        if(SPECIALS[this.level] && SPECIALS[this.level].noWing) lo.wing = [];
         const cost = this.level==='def' ? 0 : lo.wing.reduce((s,w)=>s+WINGMEN[w].cost,0);   // free in Carrier Defense
         if(cost>SAVE.money) return;
         SAVE.money -= cost; storeSave();
         if(this.level==='def'){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, {...DEFENSE}); defenseSetup(); }
         else if(this.level==='gnd'){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, {...GROUND}); groundSetup(); }
+        else if(SPECIALS[this.level]){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, specialDef(this.level)); specialSetup(this.level); }
         else newLevel(this.level, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()});
         this.hide(); break;
       }
@@ -393,7 +419,7 @@ function drawHUD(ctx, vw, worldVW){
   ctx.textAlign='left'; ctx.direction='ltr'; ctx.fillStyle='#e8b33a'; ctx.font='18px "Secular One", Rubik, sans-serif'; ctx.fillText('$'+G.earned, 18, 24);
   ctx.textAlign='right'; ctx.direction='rtl'; ctx.font='13px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
   ctx.fillText(G.training ? 'אימון · מטוסים: ∞' : `מטוסים: ${'✈'.repeat(Math.max(0,G.lives))}`, 178, 44);
-  ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : G.ground ? `איים שנכבשו: ${G.islands.filter(is=>is.captured).length}/3` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
+  ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.special ? G.special.M.short(G.special) : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : G.ground ? `איים שנכבשו: ${G.islands.filter(is=>is.captured).length}/3` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
   if(G.wingmen.length){ const alive=G.wingmen.filter(w=>!w.dead).length; ctx.fillText(`כנפיים ${alive}/${G.wingmen.length}: ${({escort:'ליווי', attack:'תקיפה', defend:'הגנת נושאת'})[G.wingMode]} (C)`, 178, 80); }
   { // carrier strength gauge: green, amber below 60%, red below 30%
     const k = clamp(G.carrier.hp/G.carrier.max, 0, 1);

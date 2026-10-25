@@ -190,9 +190,9 @@ function drawGroundHUD(ctx, vw){
   const S = G.ground; if(!S) return;
   const us = usUnits(), inf = S.inf + us.filter(u=>u.type==='inf').length, tanks = S.tanks + us.filter(u=>u.type==='tank').length;
   const i = Math.min(S.island, G.islands.length-1), f = jpForces(i);
-  const phase = {sail:'הנחתת בדרך', unload:'נחיתה בחוף', assault:'קרב על האי', flag:'האי נכבש!', load:'עולים לנחתת', won:'ניצחון!'}[S.phase];
+  const phase = S.hold ? 'הנחתת ממתינה ליד הנושאת' : {sail:'הנחתת בדרך', unload:'נחיתה בחוף', assault:'קרב על האי', flag:'האי נכבש!', load:'עולים לנחתת', won:'האי נכבש!', done:'האי נכבש!'}[S.phase];
   // two short lines, so the banner stays clear of the side panels on narrow screens
-  const line1 = `אי ${i+1} מתוך 3 · ${phase}`;
+  const line1 = G.islands.length > 1 ? `אי ${i+1} מתוך ${G.islands.length} · ${phase}` : phase;
   const line2 = `ארה"ב: ${inf} חיילים, ${tanks} טנקים  |  יפן: ${f.inf} חיילים, ${f.tanks} טנקים, ${f.posts} עמדות`;
   ctx.save(); ctx.direction='rtl'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.font='13px Rubik, sans-serif';
   const w = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width) + 24, y = 64;
