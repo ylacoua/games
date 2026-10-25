@@ -44,7 +44,7 @@ function render(ctx, cw, ch){
   ctx.save();
   const x0 = camX-100, x1 = camX+vw+100;
   drawSea(ctx, x0, x1, sky, W);
-  for(const is of G.islands) if(is.x1>x0 && is.x0<x1) drawIsland(ctx, is);
+  for(const is of G.islands) if(is.x1>x0 && is.x0<x1) drawIsland(ctx, is, x0, x1);
   drawCarrier(ctx, G.carrier);
   if(G.carrier2) drawCarrier(ctx, G.carrier2);
   for(const s of G.structures) if(s.x>x0-100 && s.x<x1+100) drawStruct(ctx, s);
@@ -134,14 +134,18 @@ function drawSea(ctx, x0, x1, sky, W){
   ctx.stroke();
 }
 
-function drawIsland(ctx, is){
-  ctx.beginPath(); ctx.moveTo(is.x0, SEA+2);
-  for(let x=is.x0; x<=is.x1; x+=8) ctx.lineTo(x, groundY(x));
-  ctx.lineTo(is.x1, SEA+2); ctx.closePath();
+// vx0..vx1: the visible stretch of the world, so a long coastline (the mainland in "Bridge on the River")
+// only draws what is on screen
+function drawIsland(ctx, is, vx0=-Infinity, vx1=Infinity){
+  const a = Math.max(is.x0, Math.floor((vx0-16)/8)*8), b = Math.min(is.x1, vx1+16);
+  ctx.beginPath(); ctx.moveTo(a, SEA+2);
+  for(let x=a; x<=b; x+=8) ctx.lineTo(x, groundY(x));
+  ctx.lineTo(b, SEA+2); ctx.closePath();
   ctx.fillStyle = G.weather.time==='night' ? '#3c3829' : '#c8b07a'; ctx.fill();
+  const ga = Math.max(is.x0+is.slope*0.6, a), gb = Math.min(is.x1-is.slope*0.6, b);
   ctx.beginPath();
-  for(let x=is.x0+is.slope*0.6; x<=is.x1-is.slope*0.6; x+=8) ctx.lineTo(x, groundY(x)+1);
-  for(let x=is.x1-is.slope*0.6; x>=is.x0+is.slope*0.6; x-=8) ctx.lineTo(x, groundY(x)+9);
+  for(let x=ga; x<=gb; x+=8) ctx.lineTo(x, groundY(x)+1);
+  for(let x=gb; x>=ga; x-=8) ctx.lineTo(x, groundY(x)+9);
   ctx.fillStyle = G.weather.time==='night' ? '#24331f' : '#5f8a3c'; ctx.fill();
   // airstrip: enemy fighters take off from it while the island still has a working building; cratered once it is dead
   if(is.strip){
@@ -163,6 +167,7 @@ function drawIsland(ctx, is){
   }
   const night = G.weather.time==='night', greens = night ? ['#1f2d1a','#243320','#1a2716'] : ['#2f6a2c','#3c7a32','#2a5b28'];
   for(const tr of is.trees){
+    if(tr.x < vx0-40 || tr.x > vx1+40) continue;
     const gy = groundY(tr.x), s = tr.s;
     if(tr.palm){
       const sway = Math.sin(G.time*1.5+tr.x)*2 + G.weather.wind*0.05;
@@ -177,6 +182,7 @@ function drawIsland(ctx, is){
     }
   }
   for(const p of is.palms){
+    if(p.x < vx0-40 || p.x > vx1+40) continue;
     const gy = groundY(p.x), s = p.s, sway = Math.sin(G.time*1.5+p.x)*2 + G.weather.wind*0.05;
     ctx.strokeStyle='#6b4f2c'; ctx.lineWidth=3*s; ctx.beginPath(); ctx.moveTo(p.x,gy); ctx.quadraticCurveTo(p.x+4*s,gy-18*s,p.x+2*s+sway,gy-34*s); ctx.stroke();
     ctx.strokeStyle='#2f6b2a'; ctx.lineWidth=2.5*s;

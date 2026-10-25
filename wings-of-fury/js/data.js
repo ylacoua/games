@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.50';
+const GAME_VERSION = '1.51';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
