@@ -110,7 +110,11 @@ function spRunQueue(S, jc){
 const spLiveLeft = S => (S.live||[]).filter(e=>!e.dead && G.enemies.includes(e)).length + (S.queue ? S.queue.length : 0);
 
 // --- motor torpedo boats ---
+// drawn 1.6x the original sketch: a 70-foot motor torpedo boat should look bigger than a fighter
+const BOAT_S = 1.6, BOAT_HALF = 21*BOAT_S, BOAT_H = 13*BOAT_S;
 function spBoat(x, dir){ return {x, dir, hp:30, speed:rnd(60,75), cool:rnd(1,2), shots:0, away:0, flash:0, dead:false, torp:true}; }
+// is a point (with some padding, for blast radius) on the boat?
+const boatHit = (b, x, y, pad=0) => Math.abs(x - b.x) < BOAT_HALF + pad && y > SEA - BOAT_H - pad && y < SEA + 4;
 function hurtBoat(b, d){
   if(b.dead) return;
   b.hp -= d; b.flash = 0.1;
@@ -129,18 +133,18 @@ function boatsUpdate(S, dt, goalOf, attack){
       if(Math.abs(d) > 10){ b.dir = Math.sign(d); b.x += b.dir*Math.min(Math.abs(d), b.speed*dt); }
       else attack(b, dt);
     }
-    if(Math.random() < dt*5) G.fx.push({type:'wake', x:b.x - b.dir*18, y:SEA+2, t:0, max:1.2});
+    if(Math.random() < dt*5) G.fx.push({type:'wake', x:b.x - b.dir*BOAT_HALF, y:SEA+2, t:0, max:1.2});
     // bow machine gun at a low-flying aircraft
-    if(!P.dead && !P.onDeck && Math.abs(P.x-b.x) < 340 && P.y > SEA-280 && b.cool <= 0){
-      const a = Math.atan2(P.y-(SEA-10), P.x-b.x) + rnd(-0.08,0.08);
-      G.shots.push({x:b.x, y:SEA-10, vx:Math.cos(a)*700, vy:Math.sin(a)*700, team:'e', dmg:2, life:0.6});
-      b.shots++; b.cool = b.shots%5===0 ? rnd(1.2,2) : 0.14;
+    if(!P.dead && !P.onDeck && Math.abs(P.x-b.x) < (S.boatRange||340) && P.y > SEA-300 && b.cool <= 0){
+      const a = Math.atan2(P.y-(SEA-16), P.x-b.x) + rnd(-0.07,0.07);
+      G.shots.push({x:b.x + b.dir*14, y:SEA-16, vx:Math.cos(a)*700, vy:Math.sin(a)*700, team:'e', dmg:S.boatDmg||2, life:0.65});
+      b.shots++; b.cool = b.shots%5===0 ? rnd(1.0,1.7) : 0.13;
     }
   }
   S.boats = S.boats.filter(b=>!b.dead && b.x > -700 && b.x < G.L+900);
 }
 function drawBoat(ctx, b){
-  ctx.save(); ctx.translate(b.x, SEA+1); ctx.scale(b.dir, 1);
+  ctx.save(); ctx.translate(b.x, SEA+2); ctx.scale(b.dir*BOAT_S, BOAT_S);
   const W = b.flash > 0 ? '#ffffff' : null;
   ctx.fillStyle = W || '#4a4f55'; ctx.beginPath(); ctx.moveTo(-18,0); ctx.lineTo(13,0); ctx.lineTo(21,-8); ctx.lineTo(-18,-6); ctx.closePath(); ctx.fill();
   ctx.fillStyle = W || '#3a3e43'; ctx.fillRect(-18,-2,32,2);
@@ -236,33 +240,50 @@ const SPECIALS = {
 
 // 1. ---------------------------------------------------------------------------------------------------
 rescue:{
-  name:'הטייס שנפל', icon:'🛟', reward:3500, zeroEvery:24, wind:5,
-  brief:'טייס אמריקאי נטש את מטוסו ונמצא במים ליד אי יפני, עם רפסודה וזיקוקי איתות. חיילים מהחוף וסירות טורפדו מנסים להגיע אליו. מטוס חילוץ ימי (קינגפישר) יוצא מהנושאת, ינחת לידו על המים ויאסוף אותו. באמצע המשימה פורצת סערה.',
-  goals:['הגן על הטייס שבמים: השמד את החיילים בחוף ואת הסירות שמתקרבות','לווה את מטוס החילוץ עד הטייס – הוא לא יוכל לאסוף אותו כשסירות קרובות','לווה את מטוס החילוץ בחזרה לנושאת'],
-  tip:'בסערה קשה לראות: זיקוקי האיתות האדומים מסמנים איפה הטייס. מטוסי זירו ינסו להפיל את מטוס החילוץ.',
+  name:'הטייס שנפל', icon:'🛟', reward:4500, zeroEvery:20, wind:5,
+  brief:'טייס אמריקאי נטש את מטוסו הרחק מהנושאת, ונמצא במים ליד אי יפני מבוצר, עם רפסודה וזיקוקי איתות. רובאים מהחוף וגלים של סירות טורפדו מנסים להגיע אליו. מטוס חילוץ ימי (קינגפישר) יוצא מהנושאת למסע ארוך, ינחת לידו על המים ויאסוף אותו – ואז צריך ללוות אותו כל הדרך חזרה. באמצע המשימה פורצת סערה.',
+  goals:['הגן על הטייס שבמים: השמד את הרובאים בחוף ואת גלי הסירות','לווה את מטוס החילוץ עד הטייס – הוא לא יאסוף אותו כל עוד יש סירות בטווח','לווה את מטוס החילוץ בדרך הארוכה חזרה לנושאת – מטוסי זירו יארבו לו'],
+  tip:'הטייס רחוק מהנושאת: לא תספיק לנחות ולחמש מחדש באמצע. צא עם רקטות – הן הכי טובות נגד סירות. בסערה, זיקוקי האיתות האדומים מסמנים איפה הטייס.',
   setup(S){
-    G.L = 5600;
-    specIsland(1700, 1250, 58, [['aa',1960],['bunker',2160],['barracks',2360],['aa',2560],['bunker',2700]], {soldiers:10, sx0:2660, sx1:2870});
-    S.pilot = {x:3120, hp:100, max:100}; S.flares = []; S.flareT = 2;
-    S.boats = []; S.boatT = 9; S.vip = null; S.pick = 0;
-    say('הטייס שלנו במים מזרחית לאי! הגן עליו עד שמטוס החילוץ יגיע', 5);
+    G.L = 8400;
+    specIsland(4300, 1250, 60, [['aa',4560],['bunker',4760],['aa',4900],['barracks',5020],['aa',5170],['bunker',5310]], {soldiers:14, sx0:5260, sx1:5470});
+    S.pilot = {x:5720, hp:100, max:100}; S.flares = []; S.flareT = 2;
+    S.boats = []; S.boatT = 6; S.wave = 0; S.vip = null; S.pick = 0;
+    S.boatRange = 400; S.boatDmg = 2.5;                    // the boats' deck guns reach further and hit harder here
+    say('הטייס שלנו במים, רחוק מזרחית לאי! טוס אליו והגן עליו עד שמטוס החילוץ יגיע', 5);
+  },
+  // two Zeros take off from the island to jump the rescue plane
+  ambush(S, text){
+    const is = G.islands[0], site = {kind:'island', x:(is.strip.x0+is.strip.x1)/2, is};
+    for(let k=0;k<2;k++) launchFrom(site, 'zero', k*1.4);
+    say(text, 3.5);
   },
   update(S, dt){
-    const p = S.pilot, C = G.carrier;
+    const p = S.pilot, C = G.carrier, M = SPECIALS.rescue;
     // riflemen on the beach shoot at the man in the water
     if(!p.aboard) for(const so of G.soldiers){
-      if(so.dead || Math.abs(so.x - p.x) > 340) continue;
-      if(Math.random() < dt*0.35){ tracer(so.x, so.y-10, p.x, SEA-6, false); if(Math.random() < 0.5) p.hp -= 1.2; }
+      if(so.dead || Math.abs(so.x - p.x) > 360) continue;
+      if(Math.random() < dt*0.4){ tracer(so.x, so.y-10, p.x, SEA-6, false); if(Math.random() < 0.5) p.hp -= 1.5; }
     }
-    // torpedo boats come in from the east; they stop off the pilot and rake him with machine guns
+    // waves of torpedo boats come in from the east, each bigger than the last; they stop off the pilot
+    // and rake him with machine guns
     S.boatT -= dt;
     if(S.boatT <= 0 && !p.aboard){
-      if(S.boats.length < 4){ for(let k=0;k<(S.t < 60 ? 2 : 3);k++) S.boats.push(spBoat(G.L + 150 + k*120, -1)); say('סירות טורפדו מתקרבות לטייס!', 3); }
-      S.boatT = 26;
+      S.wave++;
+      const n = Math.min(6 - S.boats.length, 2 + S.wave);
+      for(let k=0;k<n;k++){ const b = spBoat(p.x + 1400 + k*150, -1); b.hp = 45; S.boats.push(b); }
+      if(n > 0) say(`גל ${S.wave}: ${n} סירות טורפדו מתקרבות לטייס!`, 3);
+      S.boatT = 22;
     }
-    boatsUpdate(S, dt, b => p.aboard ? G.L + 600 : p.x + 120 + (S.boats.indexOf(b)%3)*45, (b, dt) => {
-      if(b.cool <= 0){ tracer(b.x, SEA-8, p.x, SEA-6, false); if(Math.random() < 0.6) p.hp -= 3; b.cool = rnd(1.2, 1.8); }
+    const v0 = S.vip;
+    boatsUpdate(S, dt, b => p.aboard ? G.L + 600 : p.x + 120 + (S.boats.indexOf(b)%4)*45, (b, dt) => {
+      if(b.cool > 0 || p.aboard) return;
+      // they shoot at the rescue plane too once it is down on the water
+      if(v0 && !v0.dead && v0.ph==='water' && Math.random() < 0.35){ tracer(b.x, SEA-14, v0.x, v0.y, false); if(Math.random() < 0.5){ v0.hp -= 2.5; v0.flash = 0.1; } }
+      else { tracer(b.x, SEA-14, p.x, SEA-6, false); if(Math.random() < 0.6) p.hp -= 3; }
+      b.cool = rnd(1.0, 1.6);
     });
+    if(v0 && !v0.dead && v0.hp <= 0){ v0.dead = true; boom(v0.x, v0.y, 40, true); return specialEnd(false, 'מטוס החילוץ הושמד.'); }
     if(p.hp <= 0 && !p.aboard) return specialEnd(false, 'הטייס שבמים נהרג.');
     // flares: every few seconds the pilot fires one, more often once the storm closes in
     S.flareT -= dt;
@@ -272,14 +293,21 @@ rescue:{
     // the storm
     if(!S.storm && S.t > 50){ S.storm = true; Object.assign(G.weather, {rain:0.85, storm:true, wind:-22}); say('סערה פורצת! הראות יורדת – עקוב אחרי זיקוקי האיתות האדומים', 5); }
     // the rescue plane
-    if(!S.vip && S.t > 35){
-      S.vip = {x:C.x + C.len, y:DECK_Y-40, dir:1, speed:140, hp:120, max:120, ph:'out', pitch:0.1, flash:0, dead:false};
-      say('מטוס החילוץ ממריא מהנושאת! לווה אותו', 4);
+    if(!S.vip && S.t > 30){
+      S.vip = {x:C.x + C.len, y:DECK_Y-40, dir:1, speed:140, hp:150, max:150, ph:'out', pitch:0.1, flash:0, dead:false, gcool:0};
+      say('מטוס החילוץ ממריא מהנושאת – יש לו דרך ארוכה. הגן על הטייס עד שיגיע', 4);
     }
     const v = S.vip; if(!v || v.dead) return;
     v.flash = Math.max(0, v.flash - dt);
+    // the Kingfisher's rear gunner fires at a Zero closing from behind
+    v.gcool -= dt;
+    if(v.gcool <= 0 && v.ph!=='water'){
+      const z = G.enemies.find(e=>!e.dead && e.type==='zero' && !e.takeoff && dist2(e.x, e.y, v.x, v.y) < 320*320 && (e.x - v.x)*v.dir < 0);
+      if(z){ const a = Math.atan2(z.y-v.y, z.x-v.x) + rnd(-0.1, 0.1); G.shots.push({x:v.x - v.dir*10, y:v.y-6, vx:Math.cos(a)*780, vy:Math.sin(a)*780, team:'p', dmg:3, life:0.6}); v.gcool = 0.3; SFX.enemyGun(); }
+    }
     if(v.ph==='out'){
       v.x += v.speed*dt; v.y += (300 - v.y)*Math.min(1, dt*0.8); v.pitch = (v.y - 300)*0.002;
+      if(!S.amb1 && v.x > 2600){ S.amb1 = true; M.ambush(S, 'מטוסי זירו ממריאים מהאי לעבר מטוס החילוץ!'); }
       if(v.x > p.x - 620) v.ph = 'land';
     } else if(v.ph==='land'){
       const tx = p.x - 70, ty = SEA - 6, d = Math.max(1, Math.hypot(tx - v.x, ty - v.y));
@@ -289,15 +317,15 @@ rescue:{
     } else if(v.ph==='water'){
       v.y = SEA - 6 + Math.sin(G.time*3)*0.8;
       if(v.x < p.x - 24) v.x += 25*dt;
-      const threat = S.boats.some(b=>!b.dead && Math.abs(b.x - p.x) < 450);
+      const threat = S.boats.some(b=>!b.dead && Math.abs(b.x - p.x) < 550);
       if(threat){ if(!S.warned){ say('הסירות קרובות מדי – אי אפשר לאסוף את הטייס! השמד אותן', 3); S.warned = true; } }
       else { S.warned = false; S.pick += dt; }
-      if(S.pick >= 4){ p.aboard = true; v.ph = 'takeoff'; v.speed = 20; say('הטייס על הסיפון! לווה את מטוס החילוץ חזרה לנושאת', 5); SFX.pickup(); }
+      if(S.pick >= 6){ p.aboard = true; v.ph = 'takeoff'; v.speed = 20; say('הטייס על הסיפון! לווה את מטוס החילוץ חזרה לנושאת', 5); SFX.pickup(); }
     } else if(v.ph==='takeoff'){
       v.speed = Math.min(150, v.speed + 55*dt); v.x += v.speed*dt;
       if(Math.random() < dt*10) G.fx.push({type:'wake', x:v.x-14, y:SEA+2, t:0, max:1.2});
       if(v.speed > 110){ v.y -= 60*dt; v.pitch = 0.25; }
-      if(v.y < SEA - 140){ v.ph = 'home'; v.dir = -1; v.pitch = 0; }
+      if(v.y < SEA - 140){ v.ph = 'home'; v.dir = -1; v.pitch = 0; M.ambush(S, 'מארב! מטוסי זירו רודפים אחרי מטוס החילוץ בדרך חזרה'); }
     } else if(v.ph==='home'){
       v.x -= v.speed*dt; v.y += (280 - v.y)*Math.min(1, dt*0.6);
       if(v.x < C.x + C.len*0.8) specialEnd(true, 'הטייס חולץ בשלום! מטוס החילוץ חזר לנושאת');
@@ -306,12 +334,12 @@ rescue:{
   air(S){ const v = S.vip; return v && !v.dead && v.ph!=='water' ? [{o:v, x:v.x, y:v.y, vx:v.dir*v.speed, vy:0}] : []; },
   friend(S, s){
     const v = S.vip; if(!v || v.dead || dist2(s.x, s.y, v.x, v.y) > 18*18) return false;
-    s.life = 0; v.hp -= s.dmg; v.flash = 0.1; spark(s.x, s.y);
+    s.life = 0; v.hp -= s.dmg*0.6; v.flash = 0.1; spark(s.x, s.y);           // armour plate behind the crew
     if(v.hp <= 0){ v.dead = true; boom(v.x, v.y, 40, true); specialEnd(false, 'מטוס החילוץ הופל.'); }
     return true;
   },
-  bullet(S, s){ for(const b of S.boats) if(!b.dead && Math.abs(s.x-b.x) < 19 && s.y > SEA-15 && s.y < SEA+4){ s.life = 0; hurtBoat(b, s.dmg); spark(s.x, s.y); return true; } return false; },
-  blast(S, x, y, r, dmg, team){ if(team==='p') for(const b of S.boats) if(!b.dead && Math.abs(x-b.x) < r+18 && y > SEA-r-16) hurtBoat(b, dmg); },
+  bullet(S, s){ for(const b of S.boats) if(!b.dead && boatHit(b, s.x, s.y)){ s.life = 0; hurtBoat(b, s.dmg); spark(s.x, s.y); return true; } return false; },
+  blast(S, x, y, r, dmg, team){ if(team==='p') for(const b of S.boats) if(!b.dead && boatHit(b, x, y, r)) hurtBoat(b, dmg); },
   draw(ctx, S){
     const p = S.pilot;
     if(!p.aboard){
@@ -338,9 +366,9 @@ rescue:{
   hud(S){
     const p = S.pilot, v = S.vip;
     let line;
-    if(!v) line = `הגן על הטייס שבמים · מטוס החילוץ ממריא בעוד ${Math.ceil(35 - S.t)}`;
+    if(!v) line = `הגן על הטייס שבמים · מטוס החילוץ ממריא בעוד ${Math.ceil(30 - S.t)}`;
     else if(v.ph==='out' || v.ph==='land') line = 'מטוס החילוץ בדרך לטייס – לווה אותו';
-    else if(v.ph==='water') line = S.warned ? 'סירות קרובות מונעות את החילוץ – השמד אותן!' : `אוסף את הטייס... ${Math.max(0, Math.ceil(4 - S.pick))}`;
+    else if(v.ph==='water') line = S.warned ? 'סירות קרובות מונעות את החילוץ – השמד אותן!' : `אוסף את הטייס... ${Math.max(0, Math.ceil(6 - S.pick))}`;
     else line = 'הטייס על הסיפון! לווה את מטוס החילוץ חזרה לנושאת';
     return [line, `הטייס: ${p.aboard ? 'נאסף' : pct(p.hp, p.max)} · מטוס החילוץ: ${v ? pct(v.hp, v.max) : 'על הסיפון'}`];
   },
@@ -450,12 +478,12 @@ convoy:{
     }
   },
   bullet(S, s){
-    for(const b of S.boats) if(!b.dead && Math.abs(s.x-b.x) < 19 && s.y > SEA-15 && s.y < SEA+4){ s.life = 0; hurtBoat(b, s.dmg); spark(s.x, s.y); return true; }
+    for(const b of S.boats) if(!b.dead && boatHit(b, s.x, s.y)){ s.life = 0; hurtBoat(b, s.dmg); spark(s.x, s.y); return true; }
     return false;
   },
   blast(S, x, y, r, dmg, team){
     if(team==='p'){
-      for(const b of S.boats) if(!b.dead && Math.abs(x-b.x) < r+18 && y > SEA-r-16) hurtBoat(b, dmg);
+      for(const b of S.boats) if(!b.dead && boatHit(b, x, y, r)) hurtBoat(b, dmg);
       for(const sb of S.subs) if(!sb.dead && Math.abs(x-sb.x) < r+34 && y > SEA-24) hurtSub(sb, dmg*1.1);   // a "depth charge"
     } else {
       for(const sh of S.convoy) if(!sh.dead && Math.abs(x-sh.x) < sh.w/2 + r*0.5 && y > SEA-60) hurtShip(sh, dmg*0.45, 'פגיעת פצצה!');
