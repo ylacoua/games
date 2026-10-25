@@ -273,7 +273,10 @@ function updateProjectiles(dt){
     }
     const near = !P.dead && dist2(f.x,f.y,P.x,P.y) < 30*30;
     if(f.fuse<=0 || near){
-      f.dead=true; G.fx.push({type:'flak', x:f.x, y:f.y, t:0, max:0.7, r:f.big?34:24}); SFX.flak();
+      f.dead=true; G.fx.push({type:'flak', x:f.x, y:f.y, t:0, max:1.1, r:f.big?40:30}); SFX.flak();
+      // hot fragments spraying out, and a burst close by rocks the aircraft
+      for(let i=0;i<(f.big?8:5);i++){ const a=rnd(0,Math.PI*2), sp=rnd(60,170); G.debris.push({x:f.x,y:f.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:0,vr:0,life:rnd(0.25,0.5),c:Math.random()<.5?'#ffd27a':'#ff8a3a',spark:true}); }
+      if(!P.dead){ const d = Math.hypot(f.x-P.x, f.y-P.y); if(d < 170) G.shake = Math.max(G.shake||0, (1 - d/170)*(f.big?0.6:0.4)); }
       if(!P.dead && dist2(f.x,f.y,P.x,P.y) < (f.big?58:46)**2) damagePlayer(f.dmg);
       for(const w of G.wingmen) if(!w.dead && w.state!=='wait' && dist2(f.x,f.y,w.x,w.y)<44*44) hurtWing(w, f.dmg*0.8);
     }
@@ -418,6 +421,7 @@ function spark(x,y){ if(G.debris.length > DEBRIS_MAX) return; G.debris.push({x,y
 function puff(x,y,c,s,life=1){ if(G.fx.length > FX_MAX) return; G.fx.push({type:'smoke', x, y, c, s, t:0, max:life, vx:rnd(-10,10), vy:rnd(-25,-8)}); }
 
 function updateFx(dt){
+  if(G.shake > 0) G.shake = Math.max(0, G.shake - dt*1.6);
   for(const f of G.fx){ f.t+=dt; if(f.type==='smoke'){ f.x+=f.vx*dt+G.weather.wind*0.3*dt; f.y+=f.vy*dt; } if(f.type==='text') f.y-=30*dt; }
   G.fx = G.fx.filter(f=>f.t<f.max);
   for(const d of G.debris){ d.vy+=400*dt; d.x+=d.vx*dt; d.y+=d.vy*dt; d.r+=d.vr*dt; d.life-=dt; if(d.y>groundY(d.x)){ d.y=groundY(d.x); d.vx*=0.5; d.vy*=-0.2; } }

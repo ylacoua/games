@@ -97,7 +97,9 @@ function update(dt, vw){
 let last = performance.now(), smoothDt = 1/60;
 const STEP = 1/60;
 function frame(now){
+  requestAnimationFrame(frame);                        // scheduled first, so one bad frame can never stop the game loop
   let real = Math.min(0.1, Math.max(0, (now-last)/1000)); last = now;
+  if(!CW || !CH){ if(window.innerWidth && window.innerHeight) resize(); return; }   // minimised / zero-size window: nothing to draw
   if(Math.abs(real - smoothDt) < smoothDt*0.25) real = smoothDt = smoothDt*0.9 + real*0.1;   // de-jitter normal frames
   if(G){
     const vw = viewMetrics(CW, CH).vw;
@@ -109,7 +111,6 @@ function frame(now){
     }
     render(ctx, CW, CH);
   } else drawTitleBackdrop(now/1000);
-  requestAnimationFrame(frame);
 }
 
 // animated ocean behind the menus

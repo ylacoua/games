@@ -15,9 +15,11 @@ function viewMetrics(cw, ch){
 }
 
 function render(ctx, cw, ch){
-  const {top, scale, vw} = viewMetrics(cw, ch);
+  const vm = viewMetrics(cw, ch), {scale, vw} = vm;
   const hs = ch/H, hvw = cw/hs;                       // fixed screen-space scale for HUD and overlays
-  const camX = G.cam.x, W = G.weather, sky = SKY[W.time];
+  // a flak burst close to the aircraft jolts the view for a moment
+  const shk = G.shake > 0 ? G.shake*7 : 0, top = vm.top + (shk ? rnd(-shk, shk) : 0);
+  const camX = G.cam.x + (shk ? rnd(-shk, shk) : 0), W = G.weather, sky = SKY[W.time];
   const stormy = W.rain>0.5 && W.time!=='night';
   // sky, in world coordinates so it darkens toward the stratosphere
   ctx.setTransform(scale,0,0,scale,-camX*scale,-top*scale);
@@ -276,9 +278,16 @@ function drawFx(ctx, f){
       const g = ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,r);
       g.addColorStop(0,`rgba(255,240,180,${1-k})`); g.addColorStop(0.5,`rgba(255,140,40,${0.85*(1-k)})`); g.addColorStop(1,'rgba(120,40,10,0)');
       ctx.fillStyle=g; ctx.beginPath(); ctx.arc(f.x,f.y,r,0,7); ctx.fill(); break; }
-    case 'flak':
-      ctx.fillStyle=`rgba(40,40,40,${0.8*(1-k)})`; ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(0.5+k*0.6),0,7); ctx.fill();
-      if(k<0.2){ ctx.fillStyle='rgba(255,200,90,.9)'; ctx.beginPath(); ctx.arc(f.x,f.y,f.r*0.4,0,7); ctx.fill(); } break;
+    case 'flak': {
+      // an air burst: a fireball that flashes and rolls out, then a dirty black cloud hangs where it was
+      ctx.fillStyle=`rgba(32,30,28,${0.8*(1-k)})`; ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(0.5+k*0.7),0,7); ctx.fill();
+      if(k < 0.45){
+        const q = k/0.45, rr = f.r*(0.35 + q*0.85), g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
+        g.addColorStop(0, `rgba(255,248,210,${1-q})`); g.addColorStop(0.35, `rgba(255,190,70,${0.95*(1-q)})`);
+        g.addColorStop(0.7, `rgba(230,90,30,${0.7*(1-q)})`); g.addColorStop(1, 'rgba(160,40,20,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, 7); ctx.fill();
+      }
+      break; }
     case 'smoke':
       ctx.fillStyle=f.c; ctx.globalAlpha=0.5*(1-k); ctx.beginPath(); ctx.arc(f.x,f.y,f.s*(0.6+k),0,7); ctx.fill(); ctx.globalAlpha=1; break;
     case 'splash':
@@ -295,6 +304,7 @@ function drawFx(ctx, f){
 
 // Night: a dark layer with holes cut out wherever there is light
 function drawDarkness(ctx, cw, ch, scale, camX, alpha, top){
+  if(!cw || !ch) return;                               // window minimised / hidden: nothing to draw into
   if(!darkCv) darkCv = document.createElement('canvas');
   if(darkCv.width!==cw || darkCv.height!==ch){ darkCv.width=cw; darkCv.height=ch; }
   const d = darkCv.getContext('2d');
@@ -309,7 +319,7 @@ function drawDarkness(ctx, cw, ch, scale, camX, alpha, top){
   for(let i=0;i<6;i++) hole(G.carrier.x+40+i*90, DECK_Y, 40, 0.5);
   for(const f of G.fx){
     if(f.type==='boom') hole(f.x,f.y,f.r*4*(1-f.t/f.max)+20,1);
-    else if(f.type==='flak' && f.t<0.2) hole(f.x,f.y,60,0.8);
+    else if(f.type==='flak' && f.t<0.35) hole(f.x,f.y,90*(1-f.t/0.35)+30,0.9);    // air bursts light up the night sky
   }
   for(const s of G.shots) hole(s.x,s.y,12,0.6);
   for(const dr of G.drops) if(dr.kind==='rocket') hole(dr.x,dr.y,30,0.8);

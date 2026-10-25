@@ -18,18 +18,58 @@ function gunTarget(x, y, range){
   return null;
 }
 
+// "Dark Game" searchlight lock: once a beam has held the aircraft for a moment it LOCKS ON and follows it
+// exactly, and every AA gun on that island opens up at once. A manoeuvre breaks the lock (loop, Immelmann,
+// split-S, hammerhead and turn-around always; barrel roll 70%, air brake 50%); the lights shaken off are
+// blinded for SEARCH_BLIND seconds, then sweep for the aircraft again.
+const SEARCH_BLIND = 7;
+// Only a manoeuvre begun after the light locked on counts (one already under way when caught does not),
+// so constant aerobatics are not a permanent shield.
+function shakesLight(s, P){
+  const fresh = o => o && !(s.ignore || []).includes(o);
+  if(fresh(P.mv) || fresh(P.vl) || fresh(P.loop)) return true;
+  if(fresh(P.br)){ if(s.brTry !== P.br){ s.brTry = P.br; s.brOk = Math.random() < 0.7; } return s.brOk; }
+  if(P.brk > 0 && !s.bkIgnore){ if(!s.bkTry){ s.bkTry = true; s.bkOk = Math.random() < 0.5; } return s.bkOk; }
+  if(!(P.brk > 0)){ s.bkTry = false; s.bkIgnore = false; }
+  return false;
+}
+
 function updateGround(dt){
   const P = G.player, lvl = G.idx, night = G.weather.time==='night';
-  let lit = false;
+  const lockMode = !!(G.special && G.special.M.lockMode);
+  let lit = false, shaken = false;
   for(const s of G.structures){
     if(s.dead) continue;
     s.flash = Math.max(0,(s.flash||0)-dt); s.muzzle = Math.max(0,(s.muzzle||0)-dt);
     if(s.type==='light'){
-      const dx = P.x-s.x;
+      const dx = P.x-s.x, want = Math.atan2(P.y-(s.y-s.h), dx);
       // a working radar on the same island ("Dark Game" mission) cues the light: longer reach, faster slew
       const radar = G.special && G.structures.some(r=>r.type==='radar' && !r.dead && r.island===s.island);
-      if(night && !P.dead && Math.abs(dx)<(radar?1500:950) && !P.onDeck){   // searchlights only lock on in the dark
-        const want = Math.atan2(P.y-(s.y-s.h), dx);
+      const inReach = night && !P.dead && Math.abs(dx)<(radar?1500:950) && !P.onDeck;   // searchlights only work in the dark
+      if(lockMode){
+        s.blind = Math.max(0, (s.blind||0) - dt);
+        if(s.lock){
+          if(!inReach || shakesLight(s, P)){
+            // shaken off: every light on this island loses the aircraft and has to search for it again
+            for(const l of G.structures) if(l.type==='light' && l.island===s.island){ l.lock = false; l.lockT = 0; l.blind = SEARCH_BLIND; }
+            if(inReach) shaken = true;
+          }
+          else { s.aim = want; lit = true; }
+          continue;
+        }
+        if(inReach && s.blind <= 0){
+          const d = wrapA(want-s.aim);
+          s.aim += clamp(d, -(radar?1.3:0.6)*dt, (radar?1.3:0.6)*dt);
+          s.lockT = Math.abs(d) < 0.07 ? (s.lockT||0) + dt : 0;
+          if(s.lockT > (radar ? 0.25 : 0.7)){
+            s.lock = true; lit = true; s.ignore = [P.mv, P.vl, P.loop, P.br].filter(Boolean); s.bkIgnore = P.brk > 0;
+            for(const g of G.structures) if(!g.dead && g.island===s.island && (g.type==='aa' || g.type==='biggun')) g.cool = Math.min(g.cool, rnd(0.05, 0.5));
+            if(!P.lit){ say('זרקור ננעל עליך! כל הנ"מ באי פותח באש – בצע תמרון כדי להשתחרר', 2.5); SFX.alarm(); }
+          }
+        } else s.aim = -Math.PI/2 + Math.sin(G.time*(s.blind > 0 ? 1.6 : 0.5)+s.x)*0.8;   // searching (blinded: sweeping fast)
+        continue;
+      }
+      if(inReach){
         const d = wrapA(want-s.aim);
         s.aim += clamp(d, -(radar?1.3:0.55)*dt, (radar?1.3:0.55)*dt);
         if(Math.abs(d)<0.07) lit = true;
@@ -38,18 +78,22 @@ function updateGround(dt){
     }
     if(s.type!=='aa' && s.type!=='biggun') continue;
     const big = s.type==='biggun';
-    const tg = gunTarget(s.x, s.y, big?1000:740);
+    // locked by a searchlight on this island: longer reach, rapid fire, tight aim
+    const locked = lockMode && G.structures.some(l=>l.type==='light' && l.lock && !l.dead && l.island===s.island);
+    const tg = locked && !P.dead && !P.onDeck ? (()=>{ const v=playerVel(P); return Math.hypot(P.x-s.x, P.y-s.y) < 1300 ? {x:P.x,y:P.y,vx:v.vx,vy:v.vy,isP:true} : null; })()
+                      : gunTarget(s.x, s.y, big?1000:740);
     if(!tg){ s.cool = Math.max(s.cool, 0.6); continue; }
     s.aim = Math.atan2(tg.y-(s.y-s.h), tg.x-s.x);
     s.cool -= dt;
     if(s.cool<=0){
       let err = night ? 95 : 55;
-      if(tg.isP && P.lit) err = 18;
+      if(tg.isP && P.lit) err = locked ? 22 : 18;
       err *= G.weather.rain>0.5 ? 1.25 : 1;
       fireFlak(s.x, s.y-s.h, tg.x, tg.y, tg.vx, tg.vy, err, big?18:8+lvl, big); s.muzzle = 0.1;
-      s.cool = big ? rnd(2.2,2.9) : rnd(1.5,2.3) - lvl*0.12;
+      s.cool = locked ? rnd(0.3, 0.55) : big ? rnd(2.2,2.9) : rnd(1.5,2.3) - lvl*0.12;
     }
   }
+  if(shaken && !lit) say(`השתחררת מהזרקורים! הם יחפשו אותך שוב בעוד ${SEARCH_BLIND} שניות`, 2.5);
   P.lit = lit;
 
   for(const sh of G.ships){
