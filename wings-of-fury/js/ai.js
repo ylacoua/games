@@ -441,15 +441,16 @@ function zeroAI(e, dt, lvl){
   if(e.ace && e.retreat){
     const R = e.retreat; R.t += dt;
     if(R.ph==='climb'){
-      e.speed += (e.base*1.1 - e.speed)*Math.min(1, dt*2);
-      steer(e, P.x + (e.x < P.x ? -650 : 650), CEIL + 260, 2.2, dt);
-      if(R.t > 5 || e.y < CEIL + 320){ R.ph = 'dive'; e.sunDive = true; say('האס צולל עליך מתוך השמש! קשה לראות אותו בסנוור', 3); }
+      e.speed += (e.base*1.15 - e.speed)*Math.min(1, dt*2);
+      steer(e, P.x + (e.x < P.x ? -550 : 550), Math.max(CEIL + 260, P.y - 650), 2.4, dt);
+      if(R.t > 3.5 || e.y < Math.max(CEIL + 320, P.y - 600)){ R.ph = 'dive'; e.sunDive = true; say('האס צולל עליך מתוך השמש! קשה לראות אותו בסנוור', 3); }
     } else {
-      e.speed += (e.base*1.35 - e.speed)*Math.min(1, dt*2);
-      steerAngle(e, Math.atan2(tg.y + tg.vy*0.4 - e.y, tg.x + tg.vx*0.4 - e.x), turn*1.2, dt);
+      e.speed += (e.base*1.4 - e.speed)*Math.min(1, dt*2);
+      steerAngle(e, Math.atan2(tg.y + tg.vy*0.4 - e.y, tg.x + tg.vx*0.4 - e.x), turn*1.25, dt);
       e.cool -= dt;
-      if(e.cool<=0 && tg.d<560 && aimedAt(e, tg.x, tg.y) < 0.25){ shootFrom(e, 'e', 4+lvl*0.6); SFX.enemyGun(); e.cool = 0.1; }
-      if(tg.d < 180 || e.y > tg.y + 40 || R.t > 12){ e.retreat = null; e.sunDive = false; }
+      if(e.cool<=0 && tg.d<640 && aimedAt(e, tg.x, tg.y) < 0.3){ shootFrom(e, 'e', (4+lvl*0.6)*1.3); SFX.enemyGun(); e.cool = 0.08; }
+      // pull out of the dive after the pass, and never fly into the sea doing it
+      if(tg.d < 140 || e.y > tg.y + 60 || e.y > groundY(e.x) - 210 || R.t > 10){ e.retreat = null; e.sunDive = false; }
     }
     return;
   }
@@ -461,10 +462,11 @@ function zeroAI(e, dt, lvl){
     let c = chasedBy(e);
     if(c && Math.abs(wrapA(Math.atan2(c.y-e.y, c.x-e.x) - e.a)) < 1.9) c = null;
     e.chasedT = c ? (e.chasedT||0) + dt : 0;
-    if(e.chasedT < (e.ace ? 0.2 : 0.5)) c = null;
+    if(e.chasedT < 0.5) c = null;
     // a hit makes it break off - but a Zero pressing home an attack from someone's tail mostly holds on
+    // (the ace almost never lets go once it is on someone's tail)
     const committed = tg.d < 450 && aimedAt(e, tg.x, tg.y) < 0.6;
-    if((c && Math.random() < dt*(e.ace ? 5 : 2.5)) || (e.flash>0 && Math.random() < (committed ? (e.ace ? 0.12 : 0.04) : 0.3))){
+    if((c && Math.random() < dt*(e.ace ? 3 : 2.5)) || (e.flash>0 && Math.random() < (committed ? (e.ace ? 0.02 : 0.04) : (e.ace ? 0.15 : 0.3)))){
       const ref = c ? c.a : e.a + Math.PI;
       // defensive manoeuvres: hard turns, climbs and dives, plus the aerobatic ones (maneuvers.js), each only
       // when there is the height and speed for it
@@ -485,7 +487,7 @@ function zeroAI(e, dt, lvl){
     } else if(tg.d < 110 && aimedAt(e, tg.x, tg.y) > 1.2){
       // only after overshooting (target now beside or behind): extend, then turn back in.
       // A Zero sitting on someone's tail stays there and keeps firing.
-      e.man = 'extend'; e.mt = rnd(0.7, 1.1); e.extendA = e.a + rnd(-0.5, 0.5);
+      e.man = 'extend'; e.mt = e.ace ? rnd(0.35, 0.6) : rnd(0.7, 1.1); e.extendA = e.a + rnd(-0.5, 0.5);   // the ace turns back in at once
     }
   }
   e.brCool = Math.max(0, (e.brCool||0) - dt);
@@ -525,10 +527,11 @@ function zeroAI(e, dt, lvl){
   const weave = tg.d > 560 ? Math.sin(G.time*2.2 + e.phase)*0.35 : 0;
   steerAngle(e, Math.atan2(ty-e.y, tx-e.x) + weave, tg.d < 560 ? turn*1.25 : turn, dt);
   // Fire when the target (its size included) is inside the cone: long bursts with short pauses
-  const cone = 0.1 + Math.atan2(18, Math.max(tg.d, 1));
-  if(e.cool<=0 && tg.d<560 && aimedAt(e, tx, ty) < cone){
-    shootFrom(e, 'e', 3+lvl*0.6); SFX.enemyGun();
-    e.burst++; e.cool = e.burst%8===0 ? rnd(0.6,1.0) : 0.11;
+  // (the ace: longer reach, heavier rounds, longer bursts and hardly a pause between them)
+  const cone = 0.1 + Math.atan2(18, Math.max(tg.d, 1)) + (e.ace ? 0.05 : 0), range = e.ace ? 640 : 560;
+  if(e.cool<=0 && tg.d<range && aimedAt(e, tx, ty) < cone){
+    shootFrom(e, 'e', (3+lvl*0.6)*(e.ace ? 1.3 : 1)); SFX.enemyGun();
+    e.burst++; e.cool = e.ace ? (e.burst%12===0 ? rnd(0.3,0.5) : 0.09) : (e.burst%8===0 ? rnd(0.6,1.0) : 0.11);
   }
 }
 

@@ -710,14 +710,14 @@ ace:{
   goals:['הפל את האס היפני','שלושה מטוסים בלבד – אין מטוסי כנף','היזהר מהצלילה מתוך השמש: כשהאס נעלם בסנוור, התחמק'],
   tip:'כשהאס מטפס אל השמש – אל תרדוף אחריו למעלה. התכונן: גלגול חבית או ספליט S ברגע שהוא צולל עליך.',
   setup(S){
-    G.L = 4800; S.spawnT = 6; S.next = [0.7, 0.4];
+    G.L = 4800; S.spawnT = 6; S.next = [0.5];              // one break-off into the sun, at half damage
     say('האס היפני בדרך. הוא מנענע כנפיים: זה אתגר לדו-קרב', 5);
   },
   update(S, dt){
     if(!S.ace){
       S.spawnT -= dt;
       if(S.spawnT <= 0){
-        S.ace = {type:'zero', x:G.L - 150, y:80, a:Math.PI, speed:265, full:270, hp:320, max:320, size:16, cool:1.5, burst:0, evade:0, dead:false, ace:true, skin:SKINS.ace};
+        S.ace = {type:'zero', x:G.L - 150, y:80, a:Math.PI, speed:285, full:295, hp:320, max:320, size:16, cool:1.5, burst:0, evade:0, dead:false, ace:true, skin:SKINS.ace};
         G.enemies.push(S.ace); say('האס כאן!', 2.5); SFX.alarm();
       }
       return;
