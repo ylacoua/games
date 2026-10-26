@@ -70,10 +70,9 @@ function update(dt, vw){
   if(G.special){ specialUpdate(dt); if(!G || G.state==='over') return; }
   SFX.setEngine(!P.dead && (P.speed>5 || P.throttle>0), P.speed);
 
-  if(!G.complete && !G.tutorial && !G.ground && !G.special && primariesLeft()===0){
-    G.complete = true; SFX.pickup();
-    say('כל המטרות הושמדו! חזור לנושאת ונחת כדי לסיים', 6);
-  }
+  // all targets down: campaign missions end with a counter-attack on the carrier (extras.js)
+  if(!G.complete && !G.tutorial && !G.ground && !G.special && primariesLeft()===0) campaignEndgame();
+  repairCrews();
   if(G.carrier.hp<=0){ boom(G.carrier.x+G.carrier.len/2, DECK_Y, 120, true); UI.result(false, 'נושאת המטוסים הוטבעה.'); return; }
   if(P.dead){
     G.endT -= dt;

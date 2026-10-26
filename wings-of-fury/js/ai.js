@@ -44,7 +44,7 @@ function updateGround(dt){
     if(s.type==='light'){
       const dx = P.x-s.x, want = Math.atan2(P.y-(s.y-s.h), dx);
       // a working radar on the same island ("Dark Game" mission) cues the light: longer reach, faster slew
-      const radar = G.special && G.structures.some(r=>r.type==='radar' && !r.dead && r.island===s.island);
+      const radar = G.special && darkRadarOn(s.island);   // a radar station, or the mobile radar truck, on this island
       const inReach = night && !P.dead && Math.abs(dx)<(radar?1500:950) && !P.onDeck;   // searchlights only work in the dark
       if(lockMode){
         s.blind = Math.max(0, (s.blind||0) - dt);
@@ -76,7 +76,7 @@ function updateGround(dt){
       } else s.aim = -Math.PI/2 + Math.sin(G.time*0.5+s.x)*0.7;
       continue;
     }
-    if(s.type!=='aa' && s.type!=='biggun') continue;
+    if((s.type!=='aa' && s.type!=='biggun') || s.hidden) continue;   // camouflaged guns hold their fire
     const big = s.type==='biggun';
     // locked by a searchlight on this island: longer reach, rapid fire, tight aim
     const locked = lockMode && G.structures.some(l=>l.type==='light' && l.lock && !l.dead && l.island===s.island);
@@ -243,7 +243,7 @@ function shootFrom(e, team, dmg, spd=760){
 function launchSites(){
   const sites = [];
   G.islands.forEach((is,i)=>{
-    if(is.strip && !is.captured && G.structures.some(s=>s.island===i && !s.dead)) sites.push({kind:'island', x:(is.strip.x0+is.strip.x1)/2, is});
+    if(is.strip && !is.captured && G.structures.some(s=>s.island===i && !s.dead && !s.hidden)) sites.push({kind:'island', x:(is.strip.x0+is.strip.x1)/2, is});
   });
   for(const sh of G.ships) if(sh.type==='jcarrier' && !sh.dead) sites.push({kind:'carrier', x:sh.x, sh});
   return sites;
@@ -307,7 +307,7 @@ function updateSpawns(dt, viewW){
       for(let i=0;i<n;i++) launchFrom(site, 'zero', i*1.6);
       say(site.kind==='carrier' ? 'מטוסי זירו ממריאים מהנושאת היפנית!' : (n>1 ? 'מטוסי זירו ממריאים מהאי!' : 'מטוס זירו ממריא מהאי!'), 2.5);
     }
-    G.zeroT = def.zeroEvery*rnd(0.65,1.0);
+    G.zeroT = def.zeroEvery*rnd(0.65,1.0)*escalation();   // campaign: fighters come more often as the mission drags on
   }
   if(def.bombers){
     G.bomberT -= dt;
@@ -536,6 +536,7 @@ function zeroAI(e, dt, lvl){
 }
 
 function bettyAI(e, dt){
+  if(e.torpRun){ bettyTorpRun(e, dt); return; }            // torpedo attack (specials.js)
   const C = G.carrier;
   if(e.cruiseY == null) e.cruiseY = Math.random() < 0.45 ? CEIL + rnd(150, 350) : 170;   // some bomb from high altitude
   steer(e, e.x>C.x ? C.x-2000 : -2000, e.cruiseY, 0.6, dt);
@@ -603,7 +604,7 @@ function nearestEnemyPlane(x, y, range){
 function nearestGroundTarget(x, range, preferAA, skip){   // skip: targets another wingman already took
   let best=null, bd=range;
   for(const s of G.structures){
-    if(s.dead || !s.primary || (skip && skip.has(s))) continue;
+    if(s.dead || s.hidden || !s.primary || (skip && skip.has(s))) continue;
     let d = Math.abs(s.x-x); if(preferAA && s.type!=='aa') d += 400;
     if(d<bd){ bd=d; best={x:s.x, y:s.y-s.h/2, gy:s.y, obj:s}; }
   }

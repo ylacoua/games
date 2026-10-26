@@ -75,12 +75,12 @@ const UI = {
         return `<button class="item ${next?'next':''}" data-act="brief" data-v="${i}" ${locked?'disabled':''}>
           <span class="num">${i+1}</span><span class="txt"><b>${L.name}</b>
           <small>${time[L.time]}${L.rain?' · גשם':''}${L.wind?' · רוח':''}${L.storm?' · סערה':''} · תגמול $${L.reward}</small></span>
-          ${L.boss?'<span class="pill boss">בוס</span>':''}${done?'<span class="pill ok">✓ הושלמה</span>':locked?'<span class="pill">🔒 נעולה</span>':''}</button>`;}).join('');
+          ${L.boss?'<span class="pill boss">בוס</span>':''}${savedStars(i)?`<span class="stars" title="הכוכבים שלך">${starStr(savedStars(i))}</span>`:''}${done?'<span class="pill ok">✓ הושלמה</span>':locked?'<span class="pill">🔒 נעולה</span>':''}</button>`;}).join('');
       return `<h2>משימות הקמפיין</h2><p class="sub">האוקיינוס השקט, 1944. כל משימה שמושלמת פותחת את הבאה.</p><div class="list">${rows}</div>`;
     }
     if(p==='extra'){
       const row = (k, L, icon) => `<button class="item" data-act="brief" data-v="${k}"><span class="num">${icon}</span>
-        <span class="txt"><b>${L.name}</b><small>${L.goals[0]} · תגמול $${L.reward}</small></span></button>`;
+        <span class="txt"><b>${L.name}</b><small>${L.goals[0]} · תגמול $${L.reward}</small></span>${savedStars(k)?`<span class="stars">${starStr(savedStars(k))}</span>`:''}</button>`;
       const won = k => SAVE.won && SAVE.won[k] ? ' ✓' : '';
       return `<h2>משימות נוספות</h2><p class="sub">משימות מיוחדות שאפשר לשחק בכל שלב, וכל הכסף שמרוויחים בהן נשמר. כל ניצחון פותח סקין.</p>
         <div class="list">${row('def', DEFENSE, '⚓')}${row('gnd', GROUND, '⚑')}
@@ -107,9 +107,19 @@ const UI = {
       <h2 style="margin-top:8px">תדריך: ${L.name}</h2>
       <div class="row" style="margin:8px 0">${cond.map(c=>`<span class="pill">${c}</span>`).join('')}${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${L.reward}</span>${skinFor(k) ? `<span class="pill">🎨 פותח סקין: ${skinFor(k).name}</span>` : ''}</div>
       <p class="sub">${L.brief}</p>
-      <h3>מה צריך לעשות</h3><ol class="goals">${L.goals.map(g=>`<li>${g}</li>`).join('')}</ol>
+      <h3>מה צריך לעשות</h3><ol class="goals">${this.goalsFor(k, L).map(g=>`<li>${g}</li>`).join('')}</ol>
+      ${starGoalsHTML(k)}
       ${L.tip?`<p class="tip"><b>טיפ:</b> ${L.tip}</p>`:''}
       <div class="row" style="margin-top:16px;justify-content:flex-end"><button data-act="menu">חזרה</button><button class="primary" data-act="hangar" data-v="${k}">המשך לחדר התדריכים</button></div>`);
+  },
+  // campaign missions also end with the counter-attack, and from mission 4 the enemy repairs its AA
+  goalsFor(k, L){
+    if(typeof k!=='number') return L.goals;
+    const g = L.goals.slice(0, -1);
+    g.push('כשכל המטרות הושמדו – מתקפת נגד של מפציצים וזירו יוצאת לנושאת: הדוף אותה');
+    if(k >= 3) g.push('מהר: תותח נ"מ שהושמד משוקם אחרי דקה וחצי, כל עוד יש בונקר באותו אי');
+    g.push(L.goals[L.goals.length-1]);
+    return g;
   },
 
   hangar(i){
@@ -225,7 +235,7 @@ const UI = {
       <div class="stats" style="font-size:15px;margin-bottom:16px"><span>גלים ששרדת</span><span>${waves} מתוך ${DEFENSE_WAVES}</span>
       <span>בונוסי גלים</span><span>$${D.bonus}</span><span>השמדות</span><span>${G.kills}</span>
       ${win ? `<span>תגמול ניצחון</span><span>$${DEFENSE.reward}</span>` : ''}<span>סה"כ הרווחת</span><span>$${gain}</span></div>
-      ${win ? this.newSkinNote('def', skinWasOpen) : ''}
+      ${win ? starsHTML(rateMission('def')) + this.newSkinNote('def', skinWasOpen) : ''}
       <div class="row"><button class="primary" data-act="defense">שחק שוב</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
@@ -240,7 +250,7 @@ const UI = {
       ${S.bonus ? `<span>מתוכו בונוסים</span><span>$${S.bonus}</span>` : ''}
       ${win ? `<span>תגמול</span><span>$${M.reward}</span>` : '<span>שלל שנשמר</span><span>50%</span>'}<span>השמדות</span><span>${G.kills}</span>
       <span>סה"כ הרווחת</span><span>$${gain}</span></div>
-      ${win ? this.newSkinNote(S.id, skinWasOpen) : ''}
+      ${win ? starsHTML(rateMission(S.id)) + this.newSkinNote(S.id, skinWasOpen) : ''}
       <div class="row" style="margin-top:12px"><button class="primary" data-act="hangar" data-v="${S.id}">${win ? 'שחק שוב' : 'נסה שוב'}</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
@@ -257,7 +267,7 @@ const UI = {
       <span>כוחות ששרדו</span><span>${S.inf + usUnits().filter(u=>u.type==='inf').length} חיילים, ${S.tanks + usUnits().filter(u=>u.type==='tank').length} טנקים</span>
       <span>השמדות</span><span>${G.kills}</span>${win ? `<span>תגמול ניצחון</span><span>$${GROUND.reward}</span>` : '<span>שלל שנשמר</span><span>50%</span>'}
       <span>סה"כ הרווחת</span><span>$${gain}</span></div>
-      ${win ? this.newSkinNote('gnd', skinWasOpen) : ''}
+      ${win ? starsHTML(rateMission('gnd')) + this.newSkinNote('gnd', skinWasOpen) : ''}
       <div class="row"><button class="primary" data-act="ground">שחק שוב</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
 
@@ -329,7 +339,7 @@ const UI = {
       <div class="stats" style="font-size:15px;margin-bottom:16px"><span>שלל מהמשימה</span><span>$${G.earned}</span>
       ${win?`<span>תגמול</span><span>$${L.reward}</span>`:'<span>שלל שנשמר</span><span>50%</span>'}<span>השמדות</span><span>${G.kills}</span>
       <span>כנפיים ששרדו</span><span>${G.wingmen.filter(w=>!w.dead).length}/${G.wingmen.length}</span><span>סה"כ הרווחת</span><span>$${gain}</span></div>
-      ${win ? this.newSkinNote(G.idx, skinWasOpen) : ''}
+      ${win ? starsHTML(rateMission(G.idx)) + this.newSkinNote(G.idx, skinWasOpen) : ''}
       <div class="row" style="margin-top:12px">${win&&!last?`<button class="primary" data-act="level" data-v="${G.idx+1}">למשימה הבאה</button>`:''}
       <button class="${win?'':'primary'}" data-act="level" data-v="${G.idx}">${win?'שחק שוב':'נסה שוב'}</button><button data-act="menu">תפריט ראשי</button></div>`);
   },
@@ -419,7 +429,7 @@ function drawHUD(ctx, vw, worldVW){
   ctx.textAlign='left'; ctx.direction='ltr'; ctx.fillStyle='#e8b33a'; ctx.font='18px "Secular One", Rubik, sans-serif'; ctx.fillText('$'+G.earned, 18, 24);
   ctx.textAlign='right'; ctx.direction='rtl'; ctx.font='13px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
   ctx.fillText(G.training ? 'אימון · מטוסים: ∞' : `מטוסים: ${'✈'.repeat(Math.max(0,G.lives))}`, 178, 44);
-  ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.special ? G.special.M.short(G.special) : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : G.ground ? `איים שנכבשו: ${G.islands.filter(is=>is.captured).length}/3` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
+  ctx.fillText(G.complete ? 'חזור לנושאת ונחת!' : G.special ? G.special.M.short(G.special) : G.counter ? `מתקפת נגד: ${counterLeft()} מטוסים` : G.defense && G.defense.phase===1 ? `גל ${Math.max(1,G.defense.wave)} מתוך ${DEFENSE_WAVES}` : G.ground ? `איים שנכבשו: ${G.islands.filter(is=>is.captured).length}/3` : `מטרות נותרו: ${primariesLeft()}`, 178, 62);
   if(G.wingmen.length){ const alive=G.wingmen.filter(w=>!w.dead).length; ctx.fillText(`כנפיים ${alive}/${G.wingmen.length}: ${({escort:'ליווי', attack:'תקיפה', defend:'הגנת נושאת'})[G.wingMode]} (C)`, 178, 80); }
   { // carrier strength gauge: green, amber below 60%, red below 30%
     const k = clamp(G.carrier.hp/G.carrier.max, 0, 1);

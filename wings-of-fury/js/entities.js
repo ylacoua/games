@@ -192,7 +192,7 @@ function dropOrd(P){
 
 function crashPlayer(reason){
   const P = G.player; if(P.dead) return;
-  P.dead=true; P.loop=null; P.vl=null; P.mv=null; P.br=null; G.lives--;
+  P.dead=true; P.loop=null; P.vl=null; P.mv=null; P.br=null; G.lives--; G.lost = (G.lost||0) + 1;   // G.lost: for the star rating
   boom(P.x, Math.min(P.y, groundY(P.x)-4), 50, true, true); SFX.planeBoom();
   if(overSea(P.x) && P.y>SEA-20) splash(P.x);
   for(let i=0;i<10;i++) G.debris.push({x:P.x,y:P.y,vx:rnd(-160,160),vy:rnd(-260,-40),r:rnd(0,6),vr:rnd(-8,8),life:2.5,c:G.stats.color});
@@ -368,11 +368,11 @@ function earn(type, x, y){
 }
 
 function hitStruct(s, d, kind){
-  if(s.dead) return;
+  if(s.dead || s.hidden) return;                           // hidden: camouflaged until spotted ("Ticking Clock")
   if(kind==='gun') d *= ({bunker:0.15, biggun:0.12, core:0.08, aa:0.6, barracks:0.45, fuel:1, light:1, arty:0.3, radar:0.5})[s.type] ?? 0.5;
   s.hp -= d; s.flash = 0.1;
   if(s.hp<=0){
-    s.dead=true; earn(s.type, s.x, s.y-s.h);
+    s.dead=true; s.deadT = G.time; earn(s.type, s.x, s.y-s.h);   // deadT: repair crews may rebuild it (extras.js)
     boom(s.x, s.y-s.h/2, s.type==='core'?110:50, true);
     for(let i=0;i<6;i++) G.debris.push({x:s.x,y:s.y-s.h/2,vx:rnd(-140,140),vy:rnd(-280,-80),r:0,vr:rnd(-9,9),life:2,c:'#5d5546'});
     if(s.type==='bunker'||s.type==='barracks') for(let i=0;i<(s.type==='barracks'?6:3);i++) spawnSoldier(s.x+rnd(-15,15));

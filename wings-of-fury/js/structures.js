@@ -50,6 +50,12 @@ function drawStruct(ctx, s){
   const x=s.x, y=s.y, w=s.w, h=s.h, night = G.weather.time==='night';
   drawFooting(ctx, s);
   if(s.dead){ drawRubble(ctx, s); return; }
+  if(s.hidden){                                       // under camouflage netting: just a low green mound
+    ctx.fillStyle = night ? '#24301f' : '#4f6b37'; ctx.beginPath(); ctx.ellipse(x, y, w*0.55, h*0.45, 0, Math.PI, 0); ctx.fill();
+    ctx.strokeStyle='rgba(30,40,20,.5)'; ctx.lineWidth=0.6; ctx.beginPath();
+    for(let i=-2;i<=2;i++){ ctx.moveTo(x + i*w*0.18, y); ctx.lineTo(x + i*w*0.1, y - h*0.4); }
+    ctx.stroke(); return;
+  }
   ctx.save();
   withFlash(ctx, s.flash>0, ()=>{                    // hit flash on the building only, not a box around it
   switch(s.type){
