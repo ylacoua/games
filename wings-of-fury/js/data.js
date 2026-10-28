@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.52';
+const GAME_VERSION = '1.53';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -127,8 +127,21 @@ function skinUnlockText(id){
 // the skin object to paint the player's aircraft with (null = the type's standard scheme)
 const playerSkin = () => (SAVE.skin && SAVE.skin !== 'standard' && SAVE.skins && SAVE.skins[SAVE.skin]) ? SKINS[SAVE.skin] : null;
 
+// Difficulty, chosen on the home screen and fixed for the length of a mission (G.diffKey). Multipliers:
+// dmg - damage the player's aircraft takes · agility - enemy fighters' turn rate · fire - pause between their
+// bursts · aaErr / aaRate - flak aim error and time between shots · spawn - time between fighter launches ·
+// lives - aircraft added or removed · reward - money paid out at the end of a mission
+const DIFFICULTY = {
+  easy:   {name:'קל',   note:'פחות נזק, אויבים איטיים יותר, 2 מטוסים נוספים · תגמול 75%', dmg:0.6, agility:0.85, fire:1.4, aaErr:1.5, aaRate:1.3, spawn:1.4, lives:2, reward:0.75},
+  normal: {name:'רגיל', note:'האיזון המקורי של המשחק', dmg:1, agility:1, fire:1, aaErr:1, aaRate:1, spawn:1, lives:0, reward:1},
+  hard:   {name:'קשה',  note:'יותר נזק, אויבים חדים ורבים יותר, מטוס אחד פחות · תגמול 130%', dmg:1.3, agility:1.12, fire:0.8, aaErr:0.8, aaRate:0.85, spawn:0.8, lives:-1, reward:1.3}
+};
+const diffKey = () => (G && G.diffKey) || (SAVE && SAVE.difficulty) || 'normal';
+const diff = () => DIFFICULTY[diffKey()] || DIFFICULTY.normal;
+const payout = g => Math.round(g * diff().reward);
+
 function defaultSave(){ return {money:0, owned:{hellcat:true}, plane:'hellcat', up:{engine:0,armor:0,guns:0,payload:0,fuel:0}, unlocked:1, best:{},
-  skins:{standard:true}, skin:'standard', won:{}}; }
+  skins:{standard:true}, skin:'standard', won:{}, difficulty:'normal'}; }
 function loadSave(){
   try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if(s && s.owned) return Object.assign(defaultSave(), s); }catch(e){}
   return defaultSave();

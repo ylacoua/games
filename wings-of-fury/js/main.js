@@ -96,6 +96,7 @@ function update(dt, vw){
 let last = performance.now(), smoothDt = 1/60;
 const STEP = 1/60;
 function frame(now){
+  if(window.__noLoop) return;                          // tests.html drives update() itself
   requestAnimationFrame(frame);                        // scheduled first, so one bad frame can never stop the game loop
   let real = Math.min(0.1, Math.max(0, (now-last)/1000)); last = now;
   if(!CW || !CH){ if(window.innerWidth && window.innerHeight) resize(); return; }   // minimised / zero-size window: nothing to draw

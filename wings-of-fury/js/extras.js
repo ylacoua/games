@@ -32,7 +32,7 @@ function rateMission(key){
   const d = STAR3[starKey(key)];
   const s2 = (G.lost||0) <= 1;
   let s3 = false; try{ s3 = !!(d && d.ok()); }catch(e){}
-  const n = 1 + (s2?1:0) + (s3?1:0), bonus = (s2 ? 500 : 0) + (s3 ? 1000 : 0);
+  const n = 1 + (s2?1:0) + (s3?1:0), bonus = payout((s2 ? 500 : 0) + (s3 ? 1000 : 0));
   SAVE.stars = SAVE.stars || {};
   const prev = SAVE.stars[key] || 0; if(n > prev) SAVE.stars[key] = n;
   SAVE.money += bonus; storeSave();
@@ -42,7 +42,7 @@ function rateMission(key){
 function starsHTML(r){
   const line = (ok, t, b) => `<li class="${ok?'ok':''}">${ok?'★':'☆'} ${t}${ok && b ? ` · +$${b}` : ''}</li>`;
   return `<div class="stars-res"><div class="big">${starStr(r.n)}</div><ul>
-    ${line(true, 'המשימה הושלמה')}${line(r.s2, STAR2_TEXT, 500)}${line(r.s3, r.t3, 1000)}</ul>
+    ${line(true, 'המשימה הושלמה')}${line(r.s2, STAR2_TEXT, payout(500))}${line(r.s3, r.t3, payout(1000))}</ul>
     ${r.bonus ? `<p class="note">בונוס כוכבים: $${r.bonus}</p>` : ''}${r.best > r.n ? `<p class="note">השיא שלך במשימה: ${starStr(r.best)}</p>` : ''}</div>`;
 }
 // the star objectives, for a briefing

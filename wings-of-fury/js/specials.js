@@ -15,7 +15,7 @@ function specialDef(id){
 function specialSetup(id){
   const M = SPECIALS[id];
   G.special = {id, M, t:0, endT:0, bonus:0};
-  if(M.lives) G.lives = M.lives;
+  if(M.lives) G.lives = Math.max(2, M.lives + diff().lives);
   M.setup(G.special);
 }
 function specialUpdate(dt){

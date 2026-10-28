@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>כנפי הרעם – בדיקות</title>
+<style>
+  :root{ --bg:#0e1a2b; --panel:#16263d; --line:#2c4262; --text:#efe6cf; --dim:#8fa3b8; --ok:#5fae6b; --bad:#d9534f; --warn:#e8b33a; }
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 Rubik, system-ui, Arial, sans-serif}
+  main{max-width:1000px;margin:0 auto;padding:16px}
+  h1{font-size:24px;margin:0 0 4px;color:var(--warn)}
+  #summary{font-size:17px;margin:8px 0 14px}
+  table{width:100%;border-collapse:collapse;background:var(--panel)}
+  th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right;vertical-align:top}
+  th{color:var(--dim);font-weight:500;font-size:13px}
+  td.st{width:28px;font-size:18px} .ok{color:var(--ok)} .bad{color:var(--bad)} .run{color:var(--warn)}
+  td.info{color:var(--dim);font-size:13px;word-break:break-word}
+  td.ms{width:70px;color:var(--dim);font-size:13px;font-variant-numeric:tabular-nums}
+  pre{white-space:pre-wrap;color:#ffb0a8;font-size:12px;margin:4px 0 0}
+  /* the game's own elements are needed by its scripts, but stay out of sight */
+  #game{position:fixed;left:0;top:0;width:320px;height:180px;opacity:0;pointer-events:none}
+  #ui,#title,#touch{display:none}
+</style>
+</head>
+<body>
+<main>
+  <h1>כנפי הרעם – בדיקות אוטומטיות</h1>
+  <p style="color:var(--dim);margin:0">כל המשימות רצות בסימולציה מואצת, עם קיצורי דרך שמשלימים את המטרות. הבדיקות לא נוגעות בשמירה של המשחק.</p>
+  <div id="summary">טוען את המשחק…</div>
+  <table><thead><tr><th></th><th>בדיקה</th><th>תוצאה</th><th>זמן</th></tr></thead><tbody id="rows"></tbody></table>
+</main>
+<!-- elements the game's scripts expect -->
+<canvas id="game"></canvas><div id="touch"></div><div id="ui"></div>
+<div id="title"><span id="ver"></span><button id="musicBtn" type="button"></button></div>
+<script>
+  // Load the game's scripts in the same order as index.html (read from it, so this page never goes stale),
+  // without its game loop, then run the tests.
+  window.__noLoop = true;
+  (async () => {
+    const html = await (await fetch('index.html', {cache:'no-store'})).text();
+    const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
+    for(const src of [...srcs, 'js/tests.js']){
+      await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = src + '?t=' + Date.now(); s.onload = ok; s.onerror = () => fail(new Error('לא נטען: ' + src)); document.body.appendChild(s); });
+    }
+    runAllTests();
+  })().catch(e => { document.getElementById('summary').textContent = 'שגיאה בטעינה: ' + e.message; });
+</script>
+</body>
+</html>

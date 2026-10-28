@@ -64,7 +64,8 @@ function newLevel(idx, loadout, def){
     shots:[], drops:[], flak:[], fx:[], debris:[], clouds:[], rain:[],
     carrier:{x:150, len:520, hp:400, max:400, hit:0},
     weather:{time:L.time, rain:L.rain, wind:L.wind, storm:L.storm, flash:0, gust:0},
-    earned:0, kills:0, lives:L.training?99:5, training:!!L.training, state:'deck', msg:[], zeroT:L.zeroEvery*0.8, bomberT:30, bossSpawned:false, boss:null,
+    diffKey: SAVE.difficulty || 'normal',                    // difficulty stays fixed for the whole mission
+    earned:0, kills:0, lives:L.training?99:Math.max(2, 5 + (DIFFICULTY[SAVE.difficulty||'normal']||DIFFICULTY.normal).lives), training:!!L.training, state:'deck', msg:[], zeroT:L.zeroEvery*0.8, bomberT:30, bossSpawned:false, boss:null,
     complete:false, wingMode:'escort', loadout, stats:st, paused:false, endT:0
   };
   // islands

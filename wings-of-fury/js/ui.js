@@ -53,9 +53,13 @@ const UI = {
                  ['extra','משימות נוספות','10 משימות מיוחדות'],['keys','תפעול המשחק','מקשים ולחצנים']]
       .map(([k,t,s])=>`<button class="navbtn ${p===k?'on':''}" data-act="home" data-v="${k}" aria-expanded="${p===k}"><b>${t}</b><small>${s}</small></button>`).join('');
     const reset = `<button class="link" data-act="reset">איפוס התקדמות</button>`;
+    const cur = SAVE.difficulty || 'normal';
+    const diffSel = `<div class="diff"><span class="lbl">רמת קושי</span><div class="seg" role="radiogroup" aria-label="רמת קושי">
+      ${Object.entries(DIFFICULTY).map(([k,d])=>`<button role="radio" aria-checked="${cur===k}" class="${cur===k?'on':''}" data-act="diff" data-v="${k}">${d.name}</button>`).join('')}</div>
+      <small>${DIFFICULTY[cur].note}</small></div>`;
     this.root.innerHTML = `<div class="home">
       <header class="home-title"><h1>כנפי הרעם</h1><p class="welcome">ברוכים הבאים טייסים</p></header>
-      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${nav}${reset}</nav>
+      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${diffSel}${nav}${reset}</nav>
       ${p ? `<section class="home-panel" aria-live="polite">${this.homePanelHTML(p)}</section>` : ''}
     </div>`;
     this.bind();
@@ -105,7 +109,7 @@ const UI = {
       : [];
     this.show(`<div class="spread"><span class="pill">${tag}</span>${this.money()}</div>
       <h2 style="margin-top:8px">תדריך: ${L.name}</h2>
-      <div class="row" style="margin:8px 0">${cond.map(c=>`<span class="pill">${c}</span>`).join('')}${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${L.reward}</span>${skinFor(k) ? `<span class="pill">🎨 פותח סקין: ${skinFor(k).name}</span>` : ''}</div>
+      <div class="row" style="margin:8px 0">${cond.map(c=>`<span class="pill">${c}</span>`).join('')}${L.boss?'<span class="pill boss">משימת בוס</span>':''}<span class="pill">תגמול $${payout(L.reward)}</span><span class="pill">רמת קושי: ${diff().name}</span>${skinFor(k) ? `<span class="pill">🎨 פותח סקין: ${skinFor(k).name}</span>` : ''}</div>
       <p class="sub">${L.brief}</p>
       <h3>מה צריך לעשות</h3><ol class="goals">${this.goalsFor(k, L).map(g=>`<li>${g}</li>`).join('')}</ol>
       ${starGoalsHTML(k)}
@@ -226,7 +230,7 @@ const UI = {
 
   // end of a Carrier Defense game: all money earned is kept (wave bonuses are part of it)
   defenseResult(win, reason){
-    const D = G.defense, gain = G.earned + (win ? DEFENSE.reward : 0);
+    const D = G.defense, gain = payout(G.earned + (win ? DEFENSE.reward : 0));
     const skinWasOpen = skinUnlocked(skinFor('def').id);
     SAVE.money += gain; if(win){ SAVE.won = SAVE.won || {}; SAVE.won.def = true; } storeSave();
     const waves = D.phase===2 ? DEFENSE_WAVES : Math.max(0, D.state==='between' ? D.wave : D.wave-1);
@@ -241,7 +245,7 @@ const UI = {
 
   // end of a special mission: reward and mission bonus on a win (half the loot otherwise), and its skin
   specialResult(win, reason){
-    const S = G.special, M = S.M, gain = win ? G.earned + M.reward : Math.round(G.earned*0.5);
+    const S = G.special, M = S.M, gain = payout(win ? G.earned + M.reward : G.earned*0.5);
     const sk = skinFor(S.id), skinWasOpen = !sk || skinUnlocked(sk.id);
     SAVE.money += gain; if(win){ SAVE.won = SAVE.won || {}; SAVE.won[S.id] = true; } storeSave();
     this.show(`<h1 style="font-size:40px">${win ? 'המשימה הושלמה!' : 'המשימה נכשלה'}</h1>
@@ -256,7 +260,7 @@ const UI = {
 
   // end of a Ground Support game: money earned is kept, the victory reward is added on success
   groundResult(win, reason){
-    const S = G.ground, gain = win ? G.earned + GROUND.reward : Math.round(G.earned*0.5);
+    const S = G.ground, gain = payout(win ? G.earned + GROUND.reward : G.earned*0.5);
     const skinWasOpen = skinUnlocked(skinFor('gnd').id);
     SAVE.money += gain; if(win){ SAVE.won = SAVE.won || {}; SAVE.won.gnd = true; } storeSave();
     const taken = G.islands.filter(is=>is.captured).length;
@@ -328,7 +332,7 @@ const UI = {
     if(G.special){ this.specialResult(win, reason); return; }
     if(G.defense){ this.defenseResult(win, reason); return; }
     if(G.ground){ this.groundResult(win, reason); return; }
-    const L = G.def, gain = win ? G.earned + L.reward : Math.round(G.earned*0.5);
+    const L = G.def, gain = payout(win ? G.earned + L.reward : G.earned*0.5);
     SAVE.money += gain;
     const sk = skinFor(G.idx), skinWasOpen = !sk || skinUnlocked(sk.id);
     if(win){ SAVE.best[G.idx]=true; SAVE.unlocked = Math.max(SAVE.unlocked, Math.min(LEVELS.length, G.idx+2)); }
@@ -352,6 +356,7 @@ const UI = {
         if(!this.confirmReset){ this.confirmReset=true; const b=this.root.querySelector('[data-act="reset"]'); b.textContent='לחץ שוב לאישור המחיקה'; return; }
         SAVE = defaultSave(); storeSave(); this.lo=null; this.mainMenu(); break;
       case 'home': this.homePanel = this.homePanel===v ? null : v; this.mainMenu(); break;
+      case 'diff': if(DIFFICULTY[v]){ SAVE.difficulty = v; storeSave(); } this.mainMenu(); break;
       case 'brief': G=null; this.briefing(missionKey(v)); break;
       case 'level': G=null; this.briefing(+v); break;          // e.g. "next mission" after a win: briefing first
       case 'hangar': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar(missionKey(v)); break;

@@ -88,9 +88,9 @@ function updateGround(dt){
     if(s.cool<=0){
       let err = night ? 95 : 55;
       if(tg.isP && P.lit) err = locked ? 22 : 18;
-      err *= G.weather.rain>0.5 ? 1.25 : 1;
+      err *= (G.weather.rain>0.5 ? 1.25 : 1) * diff().aaErr;
       fireFlak(s.x, s.y-s.h, tg.x, tg.y, tg.vx, tg.vy, err, big?18:8+lvl, big); s.muzzle = 0.1;
-      s.cool = locked ? rnd(0.3, 0.55) : big ? rnd(2.2,2.9) : rnd(1.5,2.3) - lvl*0.12;
+      s.cool = (locked ? rnd(0.3, 0.55) : big ? rnd(2.2,2.9) : rnd(1.5,2.3) - lvl*0.12) * diff().aaRate;
     }
   }
   if(shaken && !lit) say(`השתחררת מהזרקורים! הם יחפשו אותך שוב בעוד ${SEARCH_BLIND} שניות`, 2.5);
@@ -120,8 +120,8 @@ function updateGround(dt){
       t.aim = Math.atan2(tg.y-ty, tg.x-tx);
       t.cool -= dt;
       if(t.cool<=0){
-        fireFlak(tx, ty, tg.x, tg.y, tg.vx, tg.vy, (night?90:55)*(tg.isP&&P.lit?0.3:1), sh.type==='battleship'?14:9+lvl, sh.type==='battleship');
-        t.cool = sh.type==='battleship' ? rnd(1.3,2.0) : rnd(1.8,2.6);
+        fireFlak(tx, ty, tg.x, tg.y, tg.vx, tg.vy, (night?90:55)*(tg.isP&&P.lit?0.3:1)*diff().aaErr, sh.type==='battleship'?14:9+lvl, sh.type==='battleship');
+        t.cool = (sh.type==='battleship' ? rnd(1.3,2.0) : rnd(1.8,2.6)) * diff().aaRate;
       }
     }
   }
@@ -307,7 +307,7 @@ function updateSpawns(dt, viewW){
       for(let i=0;i<n;i++) launchFrom(site, 'zero', i*1.6);
       say(site.kind==='carrier' ? 'מטוסי זירו ממריאים מהנושאת היפנית!' : (n>1 ? 'מטוסי זירו ממריאים מהאי!' : 'מטוס זירו ממריא מהאי!'), 2.5);
     }
-    G.zeroT = def.zeroEvery*rnd(0.65,1.0)*escalation();   // campaign: fighters come more often as the mission drags on
+    G.zeroT = def.zeroEvery*rnd(0.65,1.0)*escalation()*diff().spawn;   // campaign: fighters come more often as the mission drags on
   }
   if(def.bombers){
     G.bomberT -= dt;
@@ -435,7 +435,7 @@ function zeroAI(e, dt, lvl){
   // Strike-role Zeros (about half of each flight) go for the carrier itself, even when fighters are about;
   // they still break and jink if someone gets on their tail.
   if(e.role==='strike' && G.def.mode==='defense') tg = {x:cmid, y:DECK_Y-12, vx:0, vy:0, d:Math.hypot(cmid-e.x, DECK_Y-12-e.y)};
-  const turn = 2.5 + lvl*0.12 + (e.ace ? 0.7 : 0);
+  const turn = (2.5 + lvl*0.12 + (e.ace ? 0.7 : 0)) * diff().agility;
   // The ace ("Ace vs Ace"): each time it is badly hurt it breaks away, climbs high into the sun, and dives
   // back on its opponent out of the glare.
   if(e.ace && e.retreat){
@@ -531,7 +531,7 @@ function zeroAI(e, dt, lvl){
   const cone = 0.1 + Math.atan2(18, Math.max(tg.d, 1)) + (e.ace ? 0.05 : 0), range = e.ace ? 640 : 560;
   if(e.cool<=0 && tg.d<range && aimedAt(e, tx, ty) < cone){
     shootFrom(e, 'e', (3+lvl*0.6)*(e.ace ? 1.3 : 1)); SFX.enemyGun();
-    e.burst++; e.cool = e.ace ? (e.burst%12===0 ? rnd(0.3,0.5) : 0.09) : (e.burst%8===0 ? rnd(0.6,1.0) : 0.11);
+    e.burst++; e.cool = (e.ace ? (e.burst%12===0 ? rnd(0.3,0.5) : 0.09) : (e.burst%8===0 ? rnd(0.6,1.0) : 0.11)) * diff().fire;
   }
 }
 
