@@ -14,8 +14,8 @@ const STRUCT = {
 };
 
 function makeStruct(type, x){
-  const d = STRUCT[type];
-  return {type, x, w:d.w, h:d.h, hp:d.hp, max:d.hp, primary:d.primary, dead:false, cool:rnd(1,3), y:groundY(x), aim:-Math.PI/2, spawn:0};
+  const d = STRUCT[type], hp = Math.round(d.hp * diff().structHp);   // buildings are tougher on harder levels
+  return {type, x, w:d.w, h:d.h, hp, max:hp, primary:d.primary, dead:false, cool:rnd(1,3), y:groundY(x), aim:-Math.PI/2, spawn:0};
 }
 
 // Each island gets a few rounded hills on its plateau (made the first time the island's ground is queried,

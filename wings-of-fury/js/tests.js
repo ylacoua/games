@@ -57,17 +57,43 @@ test('שמירה ישנה משודרגת עם כל השדות החדשים', asy
   assert(s.skins && s.skins.standard && s.skin==='standard' && s.won && s.difficulty==='normal', 'חסרים שדות בשמירה');
   return 'skins, skin, won, difficulty – קיימים';
 });
-test('רמות קושי: נזק, חיים ותגמול', async () => {
-  const loss = {};
-  for(const k of ['easy','normal','hard']){
+const LEVELS_D = Object.keys(DIFFICULTY);                   // easy, normal, hard, expert
+test('רמות קושי: נזק, עמידות אויבים, מטוסים, תיקון ותגמול', async () => {
+  const loss = {}, zhp = {}, shp = {};
+  for(const k of LEVELS_D){
     freshSave(k); launch(0); fly(); const P = G.player; P.inv = 0; const hp0 = P.hp; damagePlayer(10); loss[k] = hp0 - P.hp;
     assert(G.lives === Math.max(2, 5 + DIFFICULTY[k].lives), `מספר מטוסים שגוי ב-${k}`);
+    const z = launchFrom({kind:'island', x:G.islands[0].strip.x0, is:G.islands[0]}, 'zero'); update(1/60, 1200); zhp[k] = z.max;
+    shp[k] = G.structures.find(s=>s.type==='bunker').max;
   }
-  assert(loss.easy < loss.normal && loss.normal < loss.hard, `נזק לא מדורג: ${JSON.stringify(loss)}`);
+  for(let i=1;i<LEVELS_D.length;i++){
+    const a = LEVELS_D[i-1], b = LEVELS_D[i];
+    assert(loss[a] < loss[b], `נזק לא מדורג: ${JSON.stringify(loss)}`);
+    assert(zhp[a] < zhp[b], `עמידות זירו לא מדורגת: ${JSON.stringify(zhp)}`);
+    assert(shp[a] < shp[b], `עמידות מבנים לא מדורגת: ${JSON.stringify(shp)}`);
+  }
+  // expert: landing repairs only half of the damage
+  freshSave('expert'); launch(0); fly(); G.player.hp = G.player.max*0.2; UI.crashed = false; UI.act('takeoff');
+  assert(Math.abs(G.player.hp/G.player.max - 0.6) < 0.01, 'תיקון חלקי ברמת מומחה לא עובד');
   // outside a mission the menu setting counts; inside one, the difficulty it was started on
-  G = null; freshSave('hard'); assert(payout(1000) === 1300, 'תגמול ברמה קשה'); freshSave('easy'); assert(payout(1000) === 750, 'תגמול ברמה קלה');
+  G = null; freshSave('hard'); assert(payout(1000) === 1500, 'תגמול ברמה קשה'); freshSave('easy'); assert(payout(1000) === 750, 'תגמול ברמה קלה');
   launch(0); SAVE.difficulty = 'hard'; assert(payout(1000) === 750, 'שינוי רמת קושי באמצע משימה השפיע עליה'); G = null;
-  return `נזק מ-10: קל ${loss.easy.toFixed(1)} · רגיל ${loss.normal.toFixed(1)} · קשה ${loss.hard.toFixed(1)}`;
+  return LEVELS_D.map(k=>`${DIFFICULTY[k].name}: נזק ${loss[k].toFixed(1)}, זירו ${Math.round(zhp[k])}, בונקר ${shp[k]}`).join(' · ');
+});
+// a pilot who never evades or shoots back, circling over the first island: how long does he last?
+test('רמות קושי: זמן הישרדות של טייס פסיבי יורד מרמה לרמה', async () => {
+  const pilot = (P, alt) => { for(const k in keys) keys[k] = false; keys.KeyW = true;
+    const want = clamp((P.y - alt)/150, -0.35, 0.35);
+    if(!P.loop && !P.vl && !P.mv){ if(P.p < want-0.04) keys.ArrowUp = true; else if(P.p > want+0.04) keys.ArrowDown = true; }
+    const is = G.islands[0]; if(P.x > is.x1+250 && P.f>0 && !P.loop) keys.ArrowLeft = true; if(P.x < is.x0-350 && P.f<0 && !P.loop) keys.ArrowRight = true; };
+  const sec = {};
+  for(const k of LEVELS_D){
+    freshSave(k); launch(3); fly(G.islands[0].x0 - 300, 280); let t = 0;
+    await sim(180, tt => { t = tt; const P = G.player; if(P.dead) return true; P.fuel = P.maxFuel; pilot(P, 280); }, 0);
+    sec[k] = t; for(const kk in keys) keys[kk] = false;
+  }
+  for(let i=1;i<LEVELS_D.length;i++) assert(sec[LEVELS_D[i]] < sec[LEVELS_D[i-1]], `לא מדורג: ${JSON.stringify(sec)}`);
+  return LEVELS_D.map(k=>`${DIFFICULTY[k].name}: ${sec[k].toFixed(0)} שנ'`).join(' · ') + ' (משימה 4)';
 });
 test('סקינים: נפתחים בניצחון ונקנים', async () => {
   freshSave(); assert(!skinUnlocked('olive'), 'סקין פתוח לפני ניצחון');
@@ -81,9 +107,9 @@ test('סקינים: נפתחים בניצחון ונקנים', async () => {
 
 // ---------- every mission starts and runs (on every difficulty) ----------
 const ALL = [...LEVELS.map((_,i)=>i), 'def', 'gnd', ...SPECIAL_ORDER];
-test('כל המשימות עולות ורצות 25 שניות בלי שגיאות (×3 רמות קושי)', async () => {
+test('כל המשימות עולות ורצות 25 שניות בלי שגיאות (×4 רמות קושי)', async () => {
   let n = 0;
-  for(const d of ['easy','normal','hard']) for(const k of ALL){
+  for(const d of LEVELS_D) for(const k of ALL){
     freshSave(d); launch(k, {wing: (SPECIALS[k] && SPECIALS[k].noWing) ? [] : ['wildcat','helldiver']}); fly();
     await sim(25, t => { god(); keys.Space = (t*60|0) % 90 < 30; });
     keys.Space = false; n++;

@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.53';
+const GAME_VERSION = '1.54';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -128,13 +128,20 @@ function skinUnlockText(id){
 const playerSkin = () => (SAVE.skin && SAVE.skin !== 'standard' && SAVE.skins && SAVE.skins[SAVE.skin]) ? SKINS[SAVE.skin] : null;
 
 // Difficulty, chosen on the home screen and fixed for the length of a mission (G.diffKey). Multipliers:
-// dmg - damage the player's aircraft takes · agility - enemy fighters' turn rate · fire - pause between their
-// bursts · aaErr / aaRate - flak aim error and time between shots · spawn - time between fighter launches ·
-// lives - aircraft added or removed · reward - money paid out at the end of a mission
+// dmg - damage the player's aircraft takes · enemyHp - toughness of enemy aircraft and ships · structHp -
+// toughness of buildings and guns · extra - enemy fighters allowed in the air at once (added) · agility - enemy
+// fighters' turn rate · fire - pause between their bursts · aaErr / aaRate - flak aim error and time between
+// shots · spawn - time between fighter launches · lives - aircraft added or removed · repair - share of the
+// damage fixed on landing · reward - money paid out at the end of a mission
 const DIFFICULTY = {
-  easy:   {name:'קל',   note:'פחות נזק, אויבים איטיים יותר, 2 מטוסים נוספים · תגמול 75%', dmg:0.6, agility:0.85, fire:1.4, aaErr:1.5, aaRate:1.3, spawn:1.4, lives:2, reward:0.75},
-  normal: {name:'רגיל', note:'האיזון המקורי של המשחק', dmg:1, agility:1, fire:1, aaErr:1, aaRate:1, spawn:1, lives:0, reward:1},
-  hard:   {name:'קשה',  note:'יותר נזק, אויבים חדים ורבים יותר, מטוס אחד פחות · תגמול 130%', dmg:1.3, agility:1.12, fire:0.8, aaErr:0.8, aaRate:0.85, spawn:0.8, lives:-1, reward:1.3}
+  easy:   {name:'קל',     note:'פחות נזק, אויבים חלשים ואיטיים יותר, 2 מטוסים נוספים · תגמול 75%',
+           dmg:0.6, enemyHp:0.8, structHp:0.85, extra:-1, agility:0.85, fire:1.4, aaErr:1.5, aaRate:1.3, spawn:1.4, lives:2, repair:1, reward:0.75},
+  normal: {name:'רגיל',   note:'האיזון המקורי של המשחק',
+           dmg:1, enemyHp:1, structHp:1, extra:0, agility:1, fire:1, aaErr:1, aaRate:1, spawn:1, lives:0, repair:1, reward:1},
+  hard:   {name:'קשה',    note:'נזק כפול כמעט, אויבים עמידים ורבים יותר, נ"מ מדויק, 3 מטוסים בלבד · תגמול 150%',
+           dmg:1.8, enemyHp:1.7, structHp:1.4, extra:2, agility:1.15, fire:0.7, aaErr:0.7, aaRate:0.7, spawn:0.65, lives:-2, repair:1, reward:1.5},
+  expert: {name:'מומחה',  note:'לטייסים ותיקים: אויבים קשוחים ומהירים, אש צפופה, 2 מטוסים בלבד, הנחיתה מתקנת רק חצי מהנזק · תגמול 200%',
+           dmg:2.5, enemyHp:2.4, structHp:1.8, extra:4, agility:1.28, fire:0.55, aaErr:0.5, aaRate:0.55, spawn:0.45, lives:-3, repair:0.5, reward:2}
 };
 const diffKey = () => (G && G.diffKey) || (SAVE && SAVE.difficulty) || 'normal';
 const diff = () => DIFFICULTY[diffKey()] || DIFFICULTY.normal;

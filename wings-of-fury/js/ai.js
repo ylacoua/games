@@ -97,6 +97,7 @@ function updateGround(dt){
   P.lit = lit;
 
   for(const sh of G.ships){
+    if(!sh.hpScaled){ sh.hpScaled = true; const m = diff().enemyHp; sh.hp *= m; sh.max *= m; for(const t of sh.turrets){ t.hp *= m; t.max *= m; } }
     if(sh.dead){
       // sinking: smoke from the break, foam and air bubbles boiling up, a few secondary explosions early on
       sh.sink += dt*0.12;
@@ -300,7 +301,7 @@ function updateSpawns(dt, viewW){
   const airborne = !P.dead && !P.onDeck;
   const alive = G.enemies.filter(e=>!e.dead && e.type==='zero').length;
   G.zeroT -= dt;
-  if(G.zeroT<=0 && airborne && P.x>1200 && alive < 4+lvl){
+  if(G.zeroT<=0 && airborne && P.x>1200 && alive < Math.max(2, 4 + lvl + diff().extra)){
     const site = nearestSite(launchSites(), P.x);
     if(site){
       const n = 1 + (Math.random()<0.25+lvl*0.1 ? 1 : 0);
@@ -346,6 +347,8 @@ function updateEnemies(dt){
   const P = G.player, lvl = G.idx;
   for(const e of G.enemies){
     if(e.dead) continue;
+    // toughness for the difficulty level, applied once whichever way the aircraft was created
+    if(!e.hpScaled){ e.hpScaled = true; const m = diff().enemyHp; e.hp *= m; e.max = (e.max || e.hp/m) * m; }
     e.flash = Math.max(0,(e.flash||0)-dt);
     if(e.takeoff){ takeoffStep(e, dt); continue; }
     if(e.type==='zero') zeroAI(e, dt, lvl);

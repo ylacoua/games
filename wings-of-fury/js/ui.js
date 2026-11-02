@@ -305,7 +305,7 @@ const UI = {
     const ords = Object.keys(ORD).map(k=>`<button class="card ${lo.ord===k?'sel':''}" data-act="dord" data-v="${k}" style="text-align:right"><b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
     const livesTxt = G.training ? 'ללא הגבלה' : `${G.lives} מתוך 5`;
     this.show(`<h2>${this.crashed?'מטוס חלופי':'על סיפון הנושאת'}</h2>
-      <p class="sub">${this.crashed?'הטייס חולץ מהמים. בחר מטוס חלופי מהסיפון.':'המטוס תוקן, תודלק וחומש מחדש.'}
+      <p class="sub">${this.crashed?'הטייס חולץ מהמים. בחר מטוס חלופי מהסיפון.':(diff().repair < 1 ? 'המטוס תודלק וחומש מחדש, אבל תוקן רק בחלקו.' : 'המטוס תוקן, תודלק וחומש מחדש.')}
       ${done?'כל המטרות הושמדו!':`נותרו ${left} מטרות.`} מטוסים שנותרו: ${livesTxt} · נושאת: ${Math.round(G.carrier.hp/G.carrier.max*100)}%</p>
       <h3>בחר מטוס</h3><div class="grid" style="margin:8px 0 16px">${planes}</div>
       <h3>בחר חימוש</h3><div class="grid" style="margin:8px 0 16px">${ords}</div>
@@ -387,7 +387,11 @@ const UI = {
       case 'takeoff': {
         G.stats = planeStats(G.loadout.plane, G.loadout.up);
         if(this.crashed) restoreWingmen();
-        const lives=G.lives; resetPlayer(); G.lives=lives; this.crashed=false; this.hide();
+        // after a landing the ground crew repairs the damage - on "expert" only part of it
+        const old = G.player, frac = !this.crashed && old && old.max ? clamp(old.hp/old.max, 0, 1) : 1;
+        const lives=G.lives; resetPlayer(); G.lives=lives;
+        if(frac < 1){ const P = G.player; P.hp = P.max * (frac + (1-frac)*diff().repair); }
+        this.crashed=false; this.hide();
         say(`${G.stats.name} מוכן להמראה. W / → להגברת מצערת`,3); break; }
       case 'finish': this.result(true); break;
       case 'abort': this.result(false, 'נטשת את המשימה.'); break;
