@@ -139,8 +139,9 @@ function tutorialUpdate(dt){
 function drawTutorial(ctx, vw){
   const T = G.tutorial; if(!T) return;
   const w = Math.min(620, vw-40), x = (vw-w)/2, y = 120;   // below the side gauges, so nothing is covered on narrow screens
-  const text = T.done ? 'כל הכבוד! השיעור הושלם.' : T.steps[T.step].text;
-  ctx.save(); ctx.direction='rtl'; ctx.textAlign='right'; ctx.textBaseline='top';
+  const text = tr(T.done ? 'כל הכבוד! השיעור הושלם.' : T.steps[T.step].text);   // translated whole, before it is wrapped
+  const en = isEn(), tx = en ? x+14 : x+w-14;                 // English reads from the left edge
+  ctx.save(); ctx.direction=en?'ltr':'rtl'; ctx.textAlign=en?'left':'right'; ctx.textBaseline='top';
   ctx.font='16px Rubik, sans-serif';
   // wrap the instruction to the panel width
   const words = text.split(' '), lines = []; let line = '';
@@ -149,13 +150,13 @@ function drawTutorial(ctx, vw){
   const hgt = 40 + lines.length*22;
   // light, see-through panel so the game stays visible behind it; a soft text shadow keeps the words readable
   ctx.fillStyle='rgba(20,34,52,.28)'; ctx.fillRect(x, y, w, hgt);
-  ctx.fillStyle='rgba(232,179,58,.7)'; ctx.fillRect(x+w-3, y, 3, hgt);
+  ctx.fillStyle='rgba(232,179,58,.7)'; ctx.fillRect(en ? x : x+w-3, y, 3, hgt);
   ctx.shadowColor='rgba(0,0,0,.75)'; ctx.shadowBlur=4; ctx.shadowOffsetY=1;
   ctx.font='13px Rubik, sans-serif'; ctx.fillStyle='#e8b33a';
-  ctx.fillText(`הדרכה · ${T.lesson.name} · שלב ${Math.min(T.step+1, T.steps.length)} מתוך ${T.steps.length}`, x+w-14, y+10);
+  ctx.fillText(`הדרכה · ${T.lesson.name} · שלב ${Math.min(T.step+1, T.steps.length)} מתוך ${T.steps.length}`, tx, y+10);
   ctx.font='16px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
-  lines.forEach((l,i)=>ctx.fillText(l, x+w-14, y+32+i*22));
+  lines.forEach((l,i)=>ctx.fillText(l, tx, y+32+i*22));
   // progress pips
-  for(let i=0;i<T.steps.length;i++){ ctx.fillStyle = i < T.step || T.done ? '#7fd08a' : i===T.step ? '#f2c75a' : 'rgba(255,255,255,.35)'; ctx.fillRect(x+14+i*16, y+12, 10, 4); }
+  for(let i=0;i<T.steps.length;i++){ ctx.fillStyle = i < T.step || T.done ? '#7fd08a' : i===T.step ? '#f2c75a' : 'rgba(255,255,255,.35)'; ctx.fillRect(en ? x+w-14-(T.steps.length-i)*16 : x+14+i*16, y+12, 10, 4); }
   ctx.restore();
 }

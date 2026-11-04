@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="he">
+<html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -18,7 +18,7 @@
 html,body{height:100%;margin:0;background:var(--navy);color:var(--paper);font-family:var(--body);overflow:hidden}
 #game{position:fixed;inset:0;width:100%;height:100%;display:block;background:var(--navy)}
 .screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;
-  background:rgba(8,14,24,.78);direction:rtl;overflow-y:auto;z-index:5}
+  background:rgba(8,14,24,.78);overflow-y:auto;z-index:5}
 .board{width:min(980px,100%);max-height:100%;overflow-y:auto;background:var(--navy2);border:2px solid #2c4262;
   border-radius:6px;padding:20px 22px;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 h1,h2,h3{font-family:var(--display);font-weight:400;margin:0;text-wrap:balance}
@@ -46,7 +46,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tabs button.on{background:var(--paper);color:var(--ink)}
 .money{font-family:var(--display);font-size:22px;color:var(--signal);font-variant-numeric:tabular-nums}
 .levels{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
-.lvl{text-align:right;display:flex;flex-direction:column;gap:3px;padding:10px}
+.lvl{text-align:start;display:flex;flex-direction:column;gap:3px;padding:10px}
 .lvl small{color:var(--steel);font-size:12px}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;color:var(--steel)}
 .keys span b.mv{all:unset;color:var(--signal);font-weight:700}
@@ -62,16 +62,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
 #title{position:fixed;inset:0;z-index:10;background:#05090f;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center}
 #title .blur{position:absolute;inset:-40px;background:url("img/title.jpg") center/cover;filter:blur(24px) brightness(.45)}
 #title img{position:relative;max-width:100%;max-height:100%;object-fit:contain;display:block}
-#title .press{position:absolute;left:0;right:0;bottom:calc(6% + env(safe-area-inset-bottom,0px));text-align:center;direction:rtl;
+#title .press{position:absolute;left:0;right:0;bottom:calc(6% + env(safe-area-inset-bottom,0px));text-align:center;
   font-family:var(--display);font-size:clamp(20px,3.6vw,38px);color:#fff4d6;letter-spacing:.02em;
   text-shadow:0 0 6px #000,0 2px 0 #7a1f12,0 0 18px rgba(232,179,58,.7);animation:blink 1.1s steps(1,end) infinite}
 @keyframes blink{50%{opacity:0}}
-#title .credits{position:absolute;right:16px;top:calc(14px + env(safe-area-inset-top,0px));direction:rtl;display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+#title .credits{position:absolute;right:16px;top:calc(14px + env(safe-area-inset-top,0px));display:flex;flex-direction:column;align-items:flex-end;gap:2px;
   font-family:var(--body);font-size:clamp(12px,1.4vw,15px);color:rgba(255,244,214,.85);text-shadow:0 1px 3px #000}
 #title .credits b{font-family:var(--display);font-weight:400;letter-spacing:.06em;color:var(--signal)}
 #musicBtn{position:absolute;top:calc(14px + env(safe-area-inset-top,0px));left:14px;background:rgba(8,14,24,.7);border-color:rgba(232,179,58,.6);color:var(--signal);font-size:14px}
 /* Home screen: the canvas sunset with flying planes shows through; side menu on the right, its panel beside it */
-.home{position:fixed;inset:0;z-index:5;direction:rtl;display:grid;grid-template-columns:minmax(230px,280px) minmax(0,620px) 1fr;
+.home{position:fixed;inset:0;z-index:5;display:grid;grid-template-columns:minmax(230px,280px) minmax(0,620px) 1fr;
   grid-template-rows:auto minmax(0,1fr);gap:14px 22px;padding:clamp(14px,3vh,30px) clamp(16px,3vw,40px) 20px;
   background:linear-gradient(to left,rgba(8,14,24,.82),rgba(8,14,24,.45) 55%,rgba(8,14,24,.15));overflow:hidden}
 .home-title{grid-column:1/-1;text-align:center;text-shadow:0 3px 0 #5a1d10,0 0 24px rgba(0,0,0,.6)}
@@ -79,8 +79,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .welcome{margin:6px 0 0;font-family:var(--display);font-size:clamp(18px,2.6vw,28px);color:#fff4d6;letter-spacing:.03em}
 .home-nav{display:flex;flex-direction:column;gap:10px;align-self:start}
 .home-nav .money{text-align:center;margin-bottom:2px;text-shadow:0 2px 6px #000}
-.navbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:right;padding:13px 16px;
-  background:rgba(14,26,43,.86);border:1px solid #3b5679;border-right:4px solid #3b5679;transition:background .15s,border-color .15s}
+.navbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:start;padding:13px 16px;
+  background:rgba(14,26,43,.86);border:1px solid #3b5679;border-inline-start:4px solid #3b5679;transition:background .15s,border-color .15s}
 .navbtn b{font-family:var(--display);font-weight:400;font-size:20px;color:var(--paper)}
 .navbtn small{font-size:12.5px;color:var(--steel)}
 .navbtn.on{border-color:var(--signal);background:rgba(29,49,80,.95)}
@@ -91,7 +91,7 @@ button.link:hover{background:none;color:var(--paper)}
   border-radius:6px;padding:18px 20px;box-shadow:0 20px 60px rgba(0,0,0,.45);animation:panelIn .18s ease-out}
 @keyframes panelIn{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
 .list{display:flex;flex-direction:column;gap:8px}
-.item{display:flex;align-items:center;gap:12px;text-align:right;padding:10px 12px;background:#0f1d30;border:1px solid #2c4262;border-radius:5px}
+.item{display:flex;align-items:center;gap:12px;text-align:start;padding:10px 12px;background:#0f1d30;border:1px solid #2c4262;border-radius:5px}
 .item:hover:not(:disabled){border-color:var(--signal);background:#14263f}
 .item.next{border-color:var(--signal);box-shadow:inset 0 0 0 1px var(--signal)}
 .item .num{flex:none;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:#22344d;color:var(--signal);font-family:var(--display);font-size:17px}
@@ -105,20 +105,25 @@ button.link:hover{background:none;color:var(--paper)}
 .diff .seg button.on{background:var(--signal);color:var(--ink);border-color:var(--signal);font-weight:700}
 .diff small{font-size:11.5px;color:var(--steel);line-height:1.35}
 @media (max-width:760px){ .home-nav .diff{grid-column:1/-1} }
+/* English: the page reads left to right, so the side menu and its dark backdrop move to the left */
+[dir=ltr] .home{background:linear-gradient(to right,rgba(8,14,24,.82),rgba(8,14,24,.45) 55%,rgba(8,14,24,.15))}
+[dir=ltr] .home-panel{animation-name:panelInL}
+@keyframes panelInL{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+.diff.lang .seg button{font-size:13.5px}
 .stars-res{margin:4px 0 14px;padding:10px 14px;background:#0f1d30;border:1px solid #2c4262;border-radius:5px}
 .stars-res .big{font-size:30px;color:var(--signal);letter-spacing:4px;line-height:1.1}
 .stars-res ul{list-style:none;margin:6px 0 0;padding:0;font-size:14px;color:var(--steel);line-height:1.7}
 .stars-res li.ok{color:var(--paper)} .stars-res li.ok::first-letter{color:var(--signal)}
-.stars-goals{list-style:none;padding-right:0} .stars-goals li{color:var(--steel)}
+.stars-goals{list-style:none;padding-inline-start:0} .stars-goals li{color:var(--steel)}
 .item .stars{flex:none;color:var(--signal);font-size:14px;letter-spacing:1px}
 .skinprev{width:100%;height:auto;aspect-ratio:18/7;background:linear-gradient(#9cc4e4,#d8e8f2);border-radius:4px}
 .board:has(.goals){width:min(700px,100%)}
-.goals{margin:8px 0 6px;padding-right:22px;line-height:1.7;font-size:15px}
+.goals{margin:8px 0 6px;padding-inline-start:22px;line-height:1.7;font-size:15px}
 .goals li::marker{color:var(--signal);font-family:var(--display)}
-.tip{margin:10px 0 0;padding:9px 12px;border-right:3px solid var(--signal);background:#0f1d30;font-size:14px;color:var(--paper);border-radius:3px}
+.tip{margin:10px 0 0;padding:9px 12px;border-inline-start:3px solid var(--signal);background:#0f1d30;font-size:14px;color:var(--paper);border-radius:3px}
 .tip b{color:var(--signal)}
 @media (max-width:760px){
-  .home{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr);overflow-y:auto;background:rgba(8,14,24,.6)}
+  .home,[dir=ltr] .home{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr);overflow-y:auto;background:rgba(8,14,24,.6)}
   .home-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px}
   .home-nav .money,.home-nav .link{grid-column:1/-1}
   .navbtn{padding:10px 12px} .navbtn b{font-size:17px}
@@ -149,6 +154,8 @@ button.link:hover{background:none;color:var(--paper)}
 </div>
 
 <script src="js/data.js"></script>
+<script src="js/lang-en.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/audio.js"></script>
 <script src="js/world.js"></script>
 <script src="js/entities.js"></script>

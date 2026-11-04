@@ -57,9 +57,13 @@ const UI = {
     const diffSel = `<div class="diff"><span class="lbl">רמת קושי</span><div class="seg" role="radiogroup" aria-label="רמת קושי">
       ${Object.entries(DIFFICULTY).map(([k,d])=>`<button role="radio" aria-checked="${cur===k}" class="${cur===k?'on':''}" data-act="diff" data-v="${k}">${d.name}</button>`).join('')}</div>
       <small>${DIFFICULTY[cur].note}</small></div>`;
+    const lg = SAVE.lang === 'en' ? 'en' : 'he';
+    const langSel = `<div class="diff lang"><span class="lbl" data-notr>שפה · Language</span><div class="seg" role="radiogroup" aria-label="Language">
+      <button role="radio" lang="he" dir="rtl" aria-checked="${lg==='he'}" class="${lg==='he'?'on':''}" data-act="lang" data-v="he" data-notr>עברית</button>
+      <button role="radio" lang="en" dir="ltr" aria-checked="${lg==='en'}" class="${lg==='en'?'on':''}" data-act="lang" data-v="en">English</button></div></div>`;
     this.root.innerHTML = `<div class="home">
       <header class="home-title"><h1>כנפי הרעם</h1><p class="welcome">ברוכים הבאים טייסים</p></header>
-      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${diffSel}${nav}${reset}</nav>
+      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${langSel}${diffSel}${nav}${reset}</nav>
       ${p ? `<section class="home-panel" aria-live="polite">${this.homePanelHTML(p)}</section>` : ''}
     </div>`;
     this.bind();
@@ -136,7 +140,7 @@ const UI = {
     let body='';
     if(tab==='mission'){
       const st = planeStats(this.lo.plane);
-      const ords = Object.keys(ORD).map(k=>`<button class="card ${this.lo.ord===k?'sel':''}" data-act="ord" data-v="${k}" style="text-align:right">
+      const ords = Object.keys(ORD).map(k=>`<button class="card ${this.lo.ord===k?'sel':''}" data-act="ord" data-v="${k}" style="text-align:start">
         <b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
       // in Carrier Defense the wingmen are free
       const wprice = k => free ? 0 : WINGMEN[k].cost;
@@ -206,9 +210,9 @@ const UI = {
       time:'day', rain:false, storm:false, wind:0, boss:'', bombers:false, zeros:true, jcarrier:false};
     const t = this.tr, st = planeStats(t.plane, t.up);
     const opt = (act, v, on, label) => `<button class="${on?'on':''}" data-act="${act}" data-v="${v}">${label}</button>`;
-    const planes = Object.keys(PLANES).map(k=>`<button class="card ${t.plane===k?'sel':''}" data-act="tplane" data-v="${k}" style="text-align:right">
+    const planes = Object.keys(PLANES).map(k=>`<button class="card ${t.plane===k?'sel':''}" data-act="tplane" data-v="${k}" style="text-align:start">
       <b>${PLANES[k].name}</b><p>${PLANES[k].desc}</p></button>`).join('');
-    const ords = Object.keys(ORD).map(k=>`<button class="card ${t.ord===k?'sel':''}" data-act="tord" data-v="${k}" style="text-align:right"><b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
+    const ords = Object.keys(ORD).map(k=>`<button class="card ${t.ord===k?'sel':''}" data-act="tord" data-v="${k}" style="text-align:start"><b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
     const wings = Object.keys(WINGMEN).map(k=>{const n=t.wing.filter(x=>x===k).length;
       return `<div class="card"><b>${WINGMEN[k].name}</b><p>${WINGMEN[k].desc}</p><div class="row">
       <button data-act="twadd" data-v="${k}" ${t.wing.length>=MAX_WINGMEN?'disabled':''}>+ הוסף</button><button data-act="twdel" data-v="${k}" ${n?'':'disabled'}>− הסר</button><span class="note">בטייסת: ${n}</span></div></div>`;}).join('');
@@ -300,9 +304,9 @@ const UI = {
     const lo = G.loadout, st = planeStats(lo.plane, lo.up), done = G.complete, left = primariesLeft();
     const avail = Object.keys(PLANES).filter(k=>G.training || SAVE.owned[k]);
     const planes = avail.map(k=>{const b=PLANES[k];
-      return `<button class="card ${lo.plane===k?'sel':''}" data-act="dplane" data-v="${k}" style="text-align:right">
+      return `<button class="card ${lo.plane===k?'sel':''}" data-act="dplane" data-v="${k}" style="text-align:start">
       <b>${b.name}</b><p>${b.desc}</p></button>`;}).join('');
-    const ords = Object.keys(ORD).map(k=>`<button class="card ${lo.ord===k?'sel':''}" data-act="dord" data-v="${k}" style="text-align:right"><b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
+    const ords = Object.keys(ORD).map(k=>`<button class="card ${lo.ord===k?'sel':''}" data-act="dord" data-v="${k}" style="text-align:start"><b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
     const livesTxt = G.training ? 'ללא הגבלה' : `${G.lives} מתוך 5`;
     this.show(`<h2>${this.crashed?'מטוס חלופי':'על סיפון הנושאת'}</h2>
       <p class="sub">${this.crashed?'הטייס חולץ מהמים. בחר מטוס חלופי מהסיפון.':(diff().repair < 1 ? 'המטוס תודלק וחומש מחדש, אבל תוקן רק בחלקו.' : 'המטוס תוקן, תודלק וחומש מחדש.')}
@@ -354,7 +358,8 @@ const UI = {
       case 'menu': G=null; this.mainMenu(); break;
       case 'reset':
         if(!this.confirmReset){ this.confirmReset=true; const b=this.root.querySelector('[data-act="reset"]'); b.textContent='לחץ שוב לאישור המחיקה'; return; }
-        SAVE = defaultSave(); storeSave(); this.lo=null; this.mainMenu(); break;
+        { const lg = SAVE.lang; SAVE = defaultSave(); SAVE.lang = lg || 'he'; } storeSave(); this.lo=null; this.mainMenu(); break;
+      case 'lang': setLang(v); this.mainMenu(); break;
       case 'home': this.homePanel = this.homePanel===v ? null : v; this.mainMenu(); break;
       case 'diff': if(DIFFICULTY[v]){ SAVE.difficulty = v; storeSave(); } this.mainMenu(); break;
       case 'brief': G=null; this.briefing(missionKey(v)); break;

@@ -95,6 +95,32 @@ test('רמות קושי: זמן הישרדות של טייס פסיבי יורד
   for(let i=1;i<LEVELS_D.length;i++) assert(sec[LEVELS_D[i]] < sec[LEVELS_D[i-1]], `לא מדורג: ${JSON.stringify(sec)}`);
   return LEVELS_D.map(k=>`${DIFFICULTY[k].name}: ${sec[k].toFixed(0)} שנ'`).join(' · ') + ' (משימה 4)';
 });
+test('שפה: באנגלית אין עברית בתפריטים ובתצוגת הטיסה, והכיוון משמאל לימין', async () => {
+  const HEB = /[֐-׿]/, left = new Set(), tick = () => new Promise(r => setTimeout(r, 0));
+  const scan = () => { const w = document.createTreeWalker(UI.root, NodeFilter.SHOW_TEXT); let t;
+    while((t = w.nextNode())) if(HEB.test(t.nodeValue) && !t.parentElement.closest('[data-notr]')) left.add(t.nodeValue.trim()); };
+  const C = CanvasRenderingContext2D.prototype, fill = C.fillText;
+  C.fillText = function(t, ...a){ if(typeof t==='string' && HEB.test(tr(t))) left.add('קנבס: ' + tr(t)); return fill.call(this, t, ...a); };
+  try{
+    freshSave(); setLang('en');
+    assert(document.documentElement.dir==='ltr', 'הכיוון לא התחלף ל-ltr');
+    for(const p of ['tut','camp','extra','keys']){ UI.homePanel = p; G = null; UI.mainMenu(); await tick(); scan(); }
+    const keysL = [...LEVELS.keys(), 'def', 'gnd', ...Object.keys(SPECIALS)];
+    for(const k of keysL){
+      G = null; UI.briefing(k); await tick(); scan(); UI.act('hangar', String(k)); await tick(); scan();
+      for(const t of ['planes','upgrades','skins']){ UI.tab = t; UI.hangar(k); await tick(); scan(); }
+      launch(k); fly(); await sim(8, () => god(), 6);
+    }
+    launch(0); fly(); killStructs(); for(const sh of G.ships) killShip(sh);
+    await sim(60, () => { god(); if(G.counter) for(const e of G.counter) if(!e.dead){ e.hp = 0; hurtEnemy(e, 1); } return G.complete; });
+    land(); await tick(); scan();
+    assert(/Mission complete|Victory/.test(resultTitle()), 'מסך הסיום לא באנגלית: ' + resultTitle());
+    assert(!left.size, 'נשארה עברית: ' + [...left].slice(0, 6).join(' | '));
+    setLang('he'); G = null; UI.homePanel = null; UI.mainMenu(); await tick();
+    assert(document.documentElement.dir==='rtl' && /כנפי הרעם/.test(UI.root.textContent), 'החזרה לעברית נכשלה');
+  } finally { C.fillText = fill; SAVE.lang = 'he'; applyLang(); }
+  return 'כל המסכים, ' + Object.keys(LANG_EN).length + ' מחרוזות במילון';
+});
 test('סקינים: נפתחים בניצחון ונקנים', async () => {
   freshSave(); assert(!skinUnlocked('olive'), 'סקין פתוח לפני ניצחון');
   SAVE.best[0] = true; assert(skinUnlocked('olive'), 'הסקין לא נפתח אחרי ניצחון');

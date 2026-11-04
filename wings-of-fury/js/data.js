@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.54';
+const GAME_VERSION = '1.55';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -148,7 +148,7 @@ const diff = () => DIFFICULTY[diffKey()] || DIFFICULTY.normal;
 const payout = g => Math.round(g * diff().reward);
 
 function defaultSave(){ return {money:0, owned:{hellcat:true}, plane:'hellcat', up:{engine:0,armor:0,guns:0,payload:0,fuel:0}, unlocked:1, best:{},
-  skins:{standard:true}, skin:'standard', won:{}, difficulty:'normal'}; }
+  skins:{standard:true}, skin:'standard', won:{}, difficulty:'normal', lang:'he'}; }
 function loadSave(){
   try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if(s && s.owned) return Object.assign(defaultSave(), s); }catch(e){}
   return defaultSave();
