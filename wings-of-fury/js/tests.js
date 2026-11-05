@@ -121,6 +121,20 @@ test('שפה: באנגלית אין עברית בתפריטים ובתצוגת �
   } finally { C.fillText = fill; SAVE.lang = 'he'; applyLang(); }
   return 'כל המסכים, ' + Object.keys(LANG_EN).length + ' מחרוזות במילון';
 });
+test('שיירה: מטוסי הכנף בתקיפה חופשית מטביעים סירות וצוללות', async () => {
+  freshSave(); launch('convoy', {wing:['wildcat','helldiver','helldiver']}); fly(); G.wingMode = 'attack';
+  const S = G.special, P = G.player; let boats = 0, subs = 0;
+  const hb = hurtBoat, hs = hurtSub;
+  hurtBoat = (b, d) => { const was = b.dead; hb(b, d); if(!was && b.dead) boats++; };
+  hurtSub  = (b, d) => { const was = b.dead; hs(b, d); if(!was && b.dead) subs++; };
+  try{
+    // the player stays high above the convoy and does not fire: every kill is the wingmen's
+    await sim(110, () => { god(); P.ammo = 0; P.ord = 0; P.x = Math.max(...S.convoy.map(s=>s.x)); P.y = -900; P.a = 0; return !!G.special.endT; }, 0);
+  } finally { hurtBoat = hb; hurtSub = hs; }
+  assert(boats > 0, 'מטוסי הכנף לא הטביעו אף סירה');
+  assert(subs > 0, 'המפציצים לא השמידו אף צוללת');
+  return `${boats} סירות, ${subs} צוללות`;
+});
 test('סקינים: נפתחים בניצחון ונקנים', async () => {
   freshSave(); assert(!skinUnlocked('olive'), 'סקין פתוח לפני ניצחון');
   SAVE.best[0] = true; assert(skinUnlocked('olive'), 'הסקין לא נפתח אחרי ניצחון');

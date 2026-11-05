@@ -604,8 +604,13 @@ function nearestEnemyPlane(x, y, range){
   for(const e of G.enemies){ if(e.dead || e.takeoff || !inPlay(e.x)) continue; const d=dist2(x,y,e.x,e.y); if(d<bd){bd=d;best=e;} }
   return best;
 }
-function nearestGroundTarget(x, range, preferAA, skip){   // skip: targets another wingman already took
+function nearestGroundTarget(x, range, preferAA, skip, bomber){   // skip: targets another wingman already took
   let best=null, bd=range;
+  // special missions: their own surface threats (torpedo boats; submarines for bombers) come first
+  for(const t of specialTargets(bomber)){
+    if(skip && skip.has(t.obj)) continue; const d = (t.prio != null ? t.prio : Math.abs(t.x-x)) - 400;
+    if(d<bd){ bd=d; best=t; }
+  }
   for(const s of G.structures){
     if(s.dead || s.hidden || !s.primary || (skip && skip.has(s))) continue;
     let d = Math.abs(s.x-x); if(preferAA && s.type!=='aa') d += 400;
@@ -655,8 +660,8 @@ function pickEnemy(w, claimed, around){
 function stickyGround(w, range, preferAA, claimed){
   const alive = o => o && !o.dead && (o.hp == null || o.hp > 0);
   let g = null;
-  if(w.gt && alive(w.gt.obj) && !claimed.has(w.gt.obj)){ const o = w.gt.obj; g = {x:o.x, y:w.gt.y, gy:w.gt.gy, obj:o}; }
-  else { g = nearestGroundTarget(w.x, range, preferAA, claimed); w.run = null; }
+  if(w.gt && alive(w.gt.obj) && !claimed.has(w.gt.obj)){ const o = w.gt.obj; g = {x:o.x, y:w.gt.y, gy:w.gt.gy, obj:o, sea:w.gt.sea}; }
+  else { g = nearestGroundTarget(w.x, range, preferAA, claimed, w.role==='bomber'); w.run = null; }
   w.gt = g; if(g) claimed.add(g.obj);
   return g;
 }
@@ -787,7 +792,16 @@ function updateWingmen(dt){
         tgt = ok(w.tgt) ? w.tgt : pickEnemy(w, claimed, mode==='defend' ? cx : null);
         w.tgt = tgt; if(tgt) claimed.add(tgt);
       }
-      if(!tgt && mode==='defend'){ patrolCarrier(w, dt, maxS); }
+      // free attack in a mission with surface threats (the convoy's torpedo boats, the downed pilot's boats):
+      // a wingman goes for a boat when it is nearer than his aircraft, and every second wingman takes boats first
+      let naval = null;
+      if(attack && specialTargets(false).length){
+        const g = stickyGround(w, 3000, false, claimed);
+        if(g && g.sea && (!tgt || (w.slot||0)%2===1 || Math.abs(g.x-w.x) < Math.hypot(tgt.x-w.x, tgt.y-w.y))) naval = g;
+        else if(g){ claimed.delete(g.obj); w.gt = null; }
+      }
+      if(naval){ if(tgt){ claimed.delete(tgt); w.tgt = null; } attackRun(w, naval, dt, maxS, false); }
+      else if(!tgt && mode==='defend'){ patrolCarrier(w, dt, maxS); }
       else if(tgt){
         w.speed = maxS;
         const d = Math.hypot(tgt.x-w.x, tgt.y-w.y), lead = d/760;
@@ -800,7 +814,7 @@ function updateWingmen(dt){
       } else { w.run = null; followLeader(w, dt, maxS); }
     } else { // bomber (out of bombs is handled above)
       // bombers: each picks its own target in free attack; in carrier defense they stay on patrol over the carrier
-      const g = mode==='attack' ? stickyGround(w, 99999, false, claimed) : mode==='escort' ? nearestGroundTarget(P.x, 950) : null;
+      const g = mode==='attack' ? stickyGround(w, 99999, false, claimed) : mode==='escort' ? nearestGroundTarget(P.x, 950, false, null, true) : null;
       if(!g){ w.run = null; if(mode==='defend') patrolCarrier(w, dt, maxS); else followLeader(w, dt, maxS); continue; }
       attackRun(w, g, dt, maxS, true);
     }

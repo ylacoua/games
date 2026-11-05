@@ -243,6 +243,20 @@ function drawFreighter(ctx, sh){
 }
 
 // --- submarines ---
+// surface targets of the current special mission, for the wingmen (nearestGroundTarget): torpedo boats for
+// everyone, submarines only for bombers (bullets cannot reach a submarine, a bomb bursting in the water can)
+// guard: the x positions being protected (the convoy's ships, the pilot in the water) - the threat closest to
+// them is taken first (prio = its distance to them)
+function seaTargets(S, bomber, guard){
+  const out = [], prio = x => guard && guard.length ? Math.min(...guard.map(g => Math.abs(g - x))) : null;
+  for(const b of S.boats || []) if(!b.dead && inPlay(b.x)) out.push({x:b.x, y:SEA - BOAT_H*0.5, gy:SEA - BOAT_H, obj:b, sea:true, prio:prio(b.x)});
+  if(bomber) for(const sb of S.subs || []) if(!sb.dead && inPlay(sb.x)) out.push({x:sb.x, y:SEA - 4, gy:SEA, obj:sb, sea:true, prio:prio(sb.x)});
+  return out;
+}
+function specialTargets(bomber){
+  const S = G && G.special;
+  return S && S.M && S.M.targets ? S.M.targets(S, bomber) : [];
+}
 function hurtSub(sb, d){
   if(sb.dead) return;
   sb.hp -= d; sb.flash = 0.3;
@@ -397,6 +411,7 @@ rescue:{
     if(v.hp <= 0){ v.dead = true; boom(v.x, v.y, 40, true); specialEnd(false, 'מטוס החילוץ הופל.'); }
     return true;
   },
+  targets(S, bomber){ return seaTargets(S, bomber, S.pilot && !S.pilot.aboard ? [S.pilot.x] : null); },
   bullet(S, s){ for(const b of S.boats) if(!b.dead && boatHit(b, s.x, s.y)){ s.life = 0; hurtBoat(b, s.dmg); spark(s.x, s.y); return true; } return false; },
   blast(S, x, y, r, dmg, team){ if(team==='p') for(const b of S.boats) if(!b.dead && boatHit(b, x, y, r)) hurtBoat(b, dmg); },
   draw(ctx, S){
@@ -610,6 +625,7 @@ convoy:{
     for(const m of S.mines) if(!m.dead && Math.abs(s.x - m.x) < 7 && s.y > SEA-12 && s.y < SEA+3){ s.life = 0; SPECIALS.convoy.blowMine(m); return true; }
     return false;
   },
+  targets(S, bomber){ return seaTargets(S, bomber, S.convoy.filter(s=>!s.dead && !s.safe).map(s=>s.x)); },
   blowMine(m){ m.dead = true; G.fx.push({type:'column', x:m.x, y:SEA, t:0, max:1.4}); boom(m.x, SEA-6, 34, true); G.earned += 50; G.fx.push({type:'text', x:m.x, y:SEA-40, t:0, max:1.2, text:'+$50'}); },
   blast(S, x, y, r, dmg, team){
     if(team==='p'){
