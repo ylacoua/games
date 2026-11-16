@@ -437,7 +437,7 @@ function shakeOffset(){
 // thinned out first once the scene is busy.
 const FX_MAX = 320, DEBRIS_MAX = 260;
 function boom(x,y,r,big,quiet){   // quiet: the caller plays its own sound (aircraft explosions)
-  G.fx.push({type:'boom', x, y, r, t:0, max:big?0.9:0.6});
+  G.fx.push({type:'boom', x, y, r, t:0, max:big?1.2:0.75});   // the fireball's dark cloud lingers a little
   addTraumaAt(x, y, big ? 0.5 : 0.25, big ? 380 : 230);       // a blast close to the aircraft rocks the view
   const busy = G.debris.length > DEBRIS_MAX*0.6;
   for(let i=0;i<(big?18:9)*(busy?0.4:1);i++){
@@ -445,6 +445,11 @@ function boom(x,y,r,big,quiet){   // quiet: the caller plays its own sound (airc
     G.debris.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s-80,r:0,vr:0,life:rnd(0.4,1),c:Math.random()<.5?'#ffcf5a':'#ff7a2a',spark:true});
   }
   for(let i=0;i<(big?6:3);i++) puff(x+rnd(-r/3,r/3), y+rnd(-r/3,r/3), '#2b2b2b', rnd(10,18), 1.6);
+  // big blasts throw out a few burning chunks that trail smoke as they fall
+  if(big && !busy) for(let i=0;i<3;i++){ const a = rnd(-Math.PI*0.9, -Math.PI*0.1), s = rnd(140,260);
+    G.debris.push({x, y, vx:Math.cos(a)*s, vy:Math.sin(a)*s, r:rnd(0,6), vr:rnd(-10,10), life:rnd(0.9,1.5), c:'#3a2d22', smoke:true, burn:true}); }
+  // a blast on land leaves a scorch mark on the ground
+  if(!overSea(x) && y > groundY(x) - 30){ const sc = (G.scorch ||= []); sc.push({x, w: r*(big ? 0.9 : 0.6)}); if(sc.length > 60) sc.shift(); }
   if(!quiet) SFX.boom(big);
 }
 function splash(x){ G.fx.push({type:'splash', x, y:SEA, t:0, max:0.9}); SFX.splash(); }

@@ -9,8 +9,12 @@ let darkCv = null;
 
 // Camera framing: the sea stays at the bottom of the screen; as the player climbs the view's top edge
 // rises with them, so the whole picture zooms out.
+// VIEW_ZOOM brings the camera 10% closer: aircraft and targets read bigger, and what is cut off is the empty sky
+// at the top of the low-altitude view (the sea line stays at the bottom; climbing still zooms out as before).
+const VIEW_ZOOM = 1.1;
 function viewMetrics(cw, ch){
-  const top = G ? G.cam.top : 0, viewH = Math.min(H - top, H*2.2), scale = ch/viewH;
+  const top0 = G ? G.cam.top : 0, full = Math.min(H - top0, H*2.2);
+  const viewH = full / VIEW_ZOOM, top = top0 + full - viewH, scale = ch/viewH;
   return {top, viewH, scale, vw: cw/scale};
 }
 
@@ -37,13 +41,21 @@ function renderScene(ctx, cw, ch){
   g.addColorStop(0, W.time==='night' ? '#000208' : stormy ? '#232a31' : '#173a68');
   g.addColorStop((0-skyTop)/(SEA-skyTop), stormy?'#3d4854':sky.top); g.addColorStop(1, stormy?'#7d8892':sky.bot);
   ctx.fillStyle=g; ctx.fillRect(camX-10,top-10,vw+20,SEA-top+10);
-  // stars, sun and moon stay fixed on the screen
+  // stars, sun and moon stay fixed on the screen. They sit below the HUD panels (which end ~115 px down):
+  // the day sun and the moon used to hide behind the top-right panel.
   ctx.setTransform(hs,0,0,hs,0,0);
-  if(W.time==='night'){ ctx.fillStyle='#fff'; for(let i=0;i<90;i++){ const sx=((i*397.3 - camX*0.05)%hvw+hvw)%hvw, sy=(i*131.7)%(SEA-120); ctx.globalAlpha=0.3+0.5*((i*7)%5)/5; ctx.fillRect(sx,sy,1.5,1.5);} ctx.globalAlpha=1;
-    ctx.fillStyle='#e9e6d4'; ctx.beginPath(); ctx.arc(hvw*0.8, 90, 22, 0, 7); ctx.fill(); }
-  else if(!stormy){ ctx.fillStyle = W.time==='day'?'rgba(255,250,220,.9)':'rgba(255,200,140,.9)'; ctx.beginPath(); ctx.arc(W.time==='dawn'?hvw*0.15:hvw*0.85, W.time==='day'?80:SEA-90, 34, 0, 7); ctx.fill(); }
+  const sun = celestial(W, stormy, hvw);
+  if(W.time==='night'){ ctx.fillStyle='#fff'; for(let i=0;i<90;i++){ const sx=((i*397.3 - camX*0.05)%hvw+hvw)%hvw, sy=(i*131.7)%(SEA-120); ctx.globalAlpha=0.3+0.5*((i*7)%5)/5; ctx.fillRect(sx,sy,1.5,1.5);} ctx.globalAlpha=1; }
+  if(sun){
+    const halo = ctx.createRadialGradient(sun.x, sun.y, sun.r*0.6, sun.x, sun.y, sun.r*4.5);   // soft glow around it
+    halo.addColorStop(0, sun.glow); halo.addColorStop(1, 'rgba(255,240,200,0)');
+    ctx.fillStyle = halo; ctx.fillRect(sun.x - sun.r*4.5, sun.y - sun.r*4.5, sun.r*9, sun.r*9);
+    ctx.fillStyle = sun.c; ctx.beginPath(); ctx.arc(sun.x, sun.y, sun.r, 0, 7); ctx.fill();
+  }
   // world
   ctx.setTransform(scale,0,0,scale,-camX*scale,-top*scale);
+  drawFarIslands(ctx, camX, vw, W);                    // low hills on the horizon, barely moving: depth
+  drawHaze(ctx, camX, vw, top, W, sky, stormy);         // the air thickens toward the horizon
   // distant clouds with horizontal parallax, spread through every altitude band
   for(const c of G.clouds){
     if(c.y < top-60) continue;
@@ -54,9 +66,11 @@ function renderScene(ctx, cw, ch){
   ctx.save();
   const x0 = camX-100, x1 = camX+vw+100;
   drawSea(ctx, x0, x1, sky, W);
+  if(sun) drawGlint(ctx, camX + sun.x*hs/scale, x0, x1, sun, W);   // the sun's (or moon's) path on the water
   for(const is of G.islands) if(is.x1>x0 && is.x0<x1) drawIsland(ctx, is, x0, x1);
   drawCarrier(ctx, G.carrier);
   if(G.carrier2) drawCarrier(ctx, G.carrier2);
+  drawSmokePillars(ctx, x0, x1, W);                    // destroyed targets keep burning: tall smoke behind them
   for(const s of G.structures) if(s.x>x0-100 && s.x<x1+100) drawStruct(ctx, s);
   for(const sh of G.ships) if(sh.x+sh.w>x0 && sh.x-sh.w<x1) drawShip(ctx, sh);
   drawRemains(ctx);
@@ -96,7 +110,9 @@ function renderScene(ctx, cw, ch){
   for(const d of G.debris){
     ctx.fillStyle=d.c;
     if(d.spark){ ctx.globalAlpha=Math.min(1,d.life*3); ctx.fillRect(d.x-1.5,d.y-1.5,3,3); }
-    else { ctx.save(); ctx.translate(d.x,d.y); ctx.rotate(d.r); ctx.fillRect(-4,-2,8,4); ctx.restore(); }
+    else { ctx.save(); ctx.translate(d.x,d.y); ctx.rotate(d.r); ctx.fillRect(-4,-2,8,4);
+      if(d.burn){ ctx.fillStyle = `rgba(255,${150+Math.floor(Math.random()*80)},40,.9)`; ctx.fillRect(-2,-3,4,3); }   // still on fire
+      ctx.restore(); }
     ctx.globalAlpha=1;
   }
   for(const f of G.fx) drawFx(ctx, f);
@@ -108,6 +124,9 @@ function renderScene(ctx, cw, ch){
   const vw0 = vw; { const vw = hvw; ctx.setTransform(hs,0,0,hs,0,0);
   if(sky.dark>0 && sky.dark<=0.3){ ctx.fillStyle=`rgba(40,20,60,${sky.dark})`; ctx.fillRect(0,0,vw,H); }
   if(stormy){ ctx.fillStyle='rgba(30,40,50,.18)'; ctx.fillRect(0,0,vw,H); }
+  // a soft darkening toward the screen edges frames the action, like the title painting (not at night: the dark
+  // layer already does it)
+  if(W.time!=='night') drawVignette(ctx, vw, stormy);
   // rain
   if(W.rain>0){
     ctx.strokeStyle='rgba(190,210,230,.45)'; ctx.lineWidth=1; ctx.beginPath();
@@ -131,16 +150,117 @@ function renderScene(ctx, cw, ch){
   }
 }
 
+// sun / moon on the screen (HUD units), or null in a storm. Kept clear of the HUD panels in the top corners.
+function celestial(W, stormy, hvw){
+  if(W.time==='night') return {x:hvw*0.78, y:165, r:22, c:'#e9e6d4', glow:'rgba(220,225,255,.16)', glint:'rgba(220,230,255,.35)'};
+  if(stormy) return null;
+  if(W.time==='day')  return {x:hvw*0.84, y:175, r:32, c:'rgba(255,250,220,.95)', glow:'rgba(255,248,215,.35)', glint:'rgba(255,250,225,.55)'};
+  return {x: W.time==='dawn' ? hvw*0.15 : hvw*0.85, y:SEA-90, r:34, c:'rgba(255,200,140,.95)', glow:'rgba(255,170,110,.4)', glint:'rgba(255,190,130,.6)'};
+}
+
+// Clouds: a shaded underside under a lit top, so they read as volumes rather than flat cut-outs
 function drawCloud(ctx, x, y, s, W){
-  ctx.fillStyle = W.time==='night' ? 'rgba(60,70,95,.35)' : W.rain>0.5 ? 'rgba(90,100,110,.7)' : W.time==='day' ? 'rgba(255,255,255,.75)' : 'rgba(255,190,160,.45)';
-  ctx.beginPath();
-  ctx.ellipse(x, y, 60*s, 16*s, 0, 0, 7); ctx.ellipse(x-30*s, y+4*s, 34*s, 12*s, 0, 0, 7); ctx.ellipse(x+28*s, y-6*s, 38*s, 15*s, 0, 0, 7);
+  const night = W.time==='night', rain = W.rain>0.5;
+  const top = night ? 'rgba(60,70,95,.35)' : rain ? 'rgba(90,100,110,.7)' : W.time==='day' ? 'rgba(255,255,255,.8)' : 'rgba(255,195,165,.5)';
+  const base = night ? 'rgba(30,36,52,.35)' : rain ? 'rgba(55,62,70,.7)' : W.time==='day' ? 'rgba(196,210,226,.8)' : 'rgba(150,100,120,.45)';
+  ctx.fillStyle = base; ctx.beginPath();
+  ctx.ellipse(x, y+3*s, 62*s, 15*s, 0, 0, 7); ctx.ellipse(x-30*s, y+7*s, 34*s, 11*s, 0, 0, 7); ctx.ellipse(x+28*s, y-2*s, 38*s, 14*s, 0, 0, 7);
   ctx.fill();
+  ctx.fillStyle = top; ctx.beginPath();
+  ctx.ellipse(x, y-1*s, 56*s, 14*s, 0, 0, 7); ctx.ellipse(x-30*s, y+2*s, 30*s, 10*s, 0, 0, 7); ctx.ellipse(x+28*s, y-8*s, 34*s, 13*s, 0, 0, 7);
+  ctx.ellipse(x+6*s, y-12*s, 26*s, 11*s, 0, 0, 7);
+  ctx.fill();
+}
+
+// A destroyed target keeps burning for a while: a column of smoke rises from it, leans with the wind, widens and
+// thins out. Drawn from time alone (no particles), so it costs a few circles and looks the same at any frame rate.
+// It is tall for the first half minute and dies down over the next.
+function drawSmokePillars(ctx, x0, x1, W){
+  const N = 16, wind = W.wind*0.6 + 14, night = W.time==='night';   // enough overlapping puffs to read as one column
+  for(const s of G.structures){
+    if(!s.dead || s.deadT == null || s.x < x0-200 || s.x > x1+200) continue;
+    const age = G.time - s.deadT; if(age > 60 || age < 0) continue;
+    const life = age < 30 ? Math.min(1, age*1.5) : 1 - (age-30)/30, seed = (s.x*0.013) % 1;
+    const base = s.y - 6, tall = 150 + (s.w||30)*1.5;
+    for(let i=0;i<N;i++){
+      const p = (G.time*0.16 + i/N + seed) % 1;              // 0 at the fire, 1 at the top, then it starts again
+      const y = base - p*tall*life, x = s.x + p*p*wind*3 + Math.sin(G.time*0.9 + i*2.1)*4*p;
+      const r = 9 + p*34, a = (night ? 0.32 : 0.26)*(1-p)*life*Math.min(1, p*6);
+      ctx.fillStyle = `rgba(${night ? '18,18,22' : '42,40,38'},${a})`; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+    }
+  }
+}
+
+// Distant islands: low blue-grey hills sitting on the horizon. They move at 12% of the camera's speed, so they
+// read as far away; generated once per mission from the level length.
+function drawFarIslands(ctx, camX, vw, W){
+  if(!G.far){
+    G.far = []; let x = -800;
+    while(x < G.L*0.12 + 4000){ G.far.push({x, w:rnd(160,460), h:rnd(8,26), bump:rnd(0,6)}); x += rnd(700,1600); }
+  }
+  const col = {day:'rgba(92,128,156,.55)', dawn:'rgba(110,100,140,.55)', dusk:'rgba(95,72,110,.6)', night:'rgba(16,22,38,.8)'}[W.time];
+  ctx.fillStyle = W.rain>0.5 && W.time!=='night' ? 'rgba(90,100,110,.45)' : col;
+  const shift = camX*0.88;                              // world x = own x + 88% of the camera: 12% parallax
+  for(const f of G.far){
+    const x = f.x + shift; if(x + f.w < camX - 50 || x > camX + vw + 50) continue;
+    ctx.beginPath(); ctx.moveTo(x, SEA+1);
+    ctx.quadraticCurveTo(x + f.w*0.25, SEA - f.h*1.1, x + f.w*0.45, SEA - f.h);
+    ctx.quadraticCurveTo(x + f.w*0.6, SEA - f.h - f.bump, x + f.w*0.75, SEA - f.h*0.7);
+    ctx.quadraticCurveTo(x + f.w*0.9, SEA - f.h*0.3, x + f.w, SEA+1); ctx.fill();
+  }
+}
+
+// The vignette is painted once into a small offscreen image (per screen shape and weather) and then stretched over
+// the screen: a full-screen radial gradient every frame cost ~1.7 ms at 1600x900.
+let vigCv = null, vigKey = '';
+function drawVignette(ctx, vw, stormy){
+  const w = 256, h = Math.max(32, Math.round(256*H/vw)), key = h + (stormy ? 's' : '');
+  if(key !== vigKey){
+    vigCv = vigCv || document.createElement('canvas'); vigCv.width = w; vigCv.height = h; vigKey = key;
+    const v = vigCv.getContext('2d'), vg = v.createRadialGradient(w/2, h*0.55, Math.min(w, h)*0.45, w/2, h*0.55, Math.max(w, h)*0.8);
+    vg.addColorStop(0, 'rgba(10,14,24,0)'); vg.addColorStop(1, `rgba(10,14,24,${stormy ? .35 : .24})`);
+    v.fillStyle = vg; v.fillRect(0, 0, w, h);
+  }
+  ctx.drawImage(vigCv, 0, 0, vw, H);
+}
+
+// Haze: a band of the horizon colour fading up from the sea, which softens the hard sea/sky line
+function drawHaze(ctx, camX, vw, top, W, sky, stormy){
+  if(W.time==='night') return;
+  const hz = stormy ? '125,136,146' : W.time==='day' ? '225,236,242' : W.time==='dawn' ? '245,180,130' : '235,140,100';
+  const g = ctx.createLinearGradient(0, SEA-90, 0, SEA);
+  g.addColorStop(0, `rgba(${hz},0)`); g.addColorStop(1, `rgba(${hz},${stormy ? .5 : .45})`);
+  ctx.fillStyle = g; ctx.fillRect(camX-10, SEA-90, vw+20, 90);
+}
+
+// The sun's path on the sea: short bright dashes under it, widening and thinning toward the viewer
+function drawGlint(ctx, sx, x0, x1, sun, W){
+  if(sx < x0-200 || sx > x1+200) return;
+  ctx.fillStyle = sun.glint;
+  for(let i=0;i<14;i++){
+    const y = SEA + 3 + i*5.5, spread = 14 + i*9, wob = Math.sin(G.time*1.7 + i*1.9);
+    for(let j=0;j<3;j++){
+      const x = sx + Math.sin(i*12.9898 + j*78.233)*spread + wob*4;
+      const len = (10 + (i*j)%9) * (1 - i/18);
+      ctx.globalAlpha = (1 - i/14) * (0.55 + 0.45*Math.sin(G.time*3 + i + j*2));
+      ctx.fillRect(x - len/2, y, len, 1.6);
+    }
+  }
+  ctx.globalAlpha = 1;
 }
 
 function drawSea(ctx, x0, x1, sky, W){
   const g = ctx.createLinearGradient(0,SEA,0,H); g.addColorStop(0,sky.sea1); g.addColorStop(1,sky.sea2);
   ctx.fillStyle=g; ctx.fillRect(x0,SEA,x1-x0,H-SEA);
+  // a light line where the far sea meets the sky, and darker swell bands that drift slowly
+  ctx.fillStyle = W.time==='night' ? 'rgba(120,140,180,.12)' : 'rgba(235,245,250,.28)'; ctx.fillRect(x0, SEA, x1-x0, 1.5);
+  ctx.fillStyle = 'rgba(0,20,40,.10)';
+  for(let row=0; row<3; row++){
+    const yy = SEA + 16 + row*24, ph = G.time*0.6 + row*2;
+    ctx.beginPath(); ctx.moveTo(x0, yy+12);
+    for(let x = Math.floor(x0/40)*40; x <= x1+40; x += 40) ctx.lineTo(x, yy + Math.sin(x*0.012 + ph)*3);
+    ctx.lineTo(x1+40, yy+12); ctx.closePath(); ctx.fill();
+  }
   ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1.5; ctx.beginPath();
   const amp = W.rain>0.5?3:1.5;
   for(let row=0;row<4;row++){
@@ -157,12 +277,37 @@ function drawIsland(ctx, is, vx0=-Infinity, vx1=Infinity){
   ctx.beginPath(); ctx.moveTo(a, SEA+2);
   for(let x=a; x<=b; x+=8) ctx.lineTo(x, groundY(x));
   ctx.lineTo(b, SEA+2); ctx.closePath();
-  ctx.fillStyle = G.weather.time==='night' ? '#3c3829' : '#c8b07a'; ctx.fill();
+  const night = G.weather.time==='night';
+  ctx.fillStyle = night ? '#3c3829' : '#c8b07a'; ctx.fill();
+  // shading on the same outline: the sand darkens toward the base (and lightens at the crest), so the island has
+  // volume; then a band of wet, darker sand at the waterline and a few scattered stones and tufts
+  const sh = ctx.createLinearGradient(0, SEA - (is.h || 110), 0, SEA);
+  sh.addColorStop(0, night ? 'rgba(255,255,255,0)' : 'rgba(255,250,230,.18)'); sh.addColorStop(0.55, 'rgba(0,0,0,0)');
+  sh.addColorStop(1, night ? 'rgba(0,0,0,.3)' : 'rgba(90,60,25,.32)');
+  ctx.fillStyle = sh; ctx.fill();
+  ctx.fillStyle = night ? 'rgba(0,0,0,.25)' : 'rgba(110,85,45,.35)'; ctx.fillRect(a, SEA-5, b-a, 7);
+  if(!is.specks){ is.specks = []; for(let x = is.x0 + 12; x < is.x1 - 12; x += rnd(9, 26)) is.specks.push({x, d:rnd(4, 40), r:rnd(0.8, 2.2), c:Math.random() < 0.6}); }
+  for(const dark of [true, false]){                    // one path per colour: two fills instead of one per speck
+    ctx.fillStyle = dark ? (night ? 'rgba(0,0,0,.25)' : 'rgba(120,95,55,.45)') : (night ? 'rgba(255,255,255,.05)' : 'rgba(255,245,215,.35)');
+    ctx.beginPath();
+    for(const sp of is.specks){
+      if(sp.c !== dark || sp.x < a || sp.x > b) continue;
+      const y = groundY(sp.x) + sp.d; if(y > SEA-4) continue;
+      ctx.moveTo(sp.x + sp.r*1.6, y); ctx.ellipse(sp.x, y, sp.r*1.6, sp.r, 0, 0, 7);
+    }
+    ctx.fill();
+  }
   const ga = Math.max(is.x0+is.slope*0.6, a), gb = Math.min(is.x1-is.slope*0.6, b);
   ctx.beginPath();
   for(let x=ga; x<=gb; x+=8) ctx.lineTo(x, groundY(x)+1);
   for(let x=gb; x>=ga; x-=8) ctx.lineTo(x, groundY(x)+9);
   ctx.fillStyle = G.weather.time==='night' ? '#24331f' : '#5f8a3c'; ctx.fill();
+  // scorch marks where bombs and burning targets hit the ground
+  if(G.scorch){
+    ctx.fillStyle = G.weather.time==='night' ? 'rgba(10,10,8,.6)' : 'rgba(40,32,24,.55)';
+    for(const sc of G.scorch) if(sc.x > a-sc.w && sc.x < b+sc.w && sc.x > is.x0 && sc.x < is.x1){
+      ctx.beginPath(); ctx.ellipse(sc.x, groundY(sc.x)+2, sc.w, 3.2, 0, 0, 7); ctx.fill(); }
+  }
   // airstrip: enemy fighters take off from it while the island still has a working building; cratered once it is dead
   if(is.strip){
     const idx = G.islands.indexOf(is), active = G.structures.some(s=>s.island===idx && !s.dead);
@@ -181,7 +326,7 @@ function drawIsland(ctx, is, vx0=-Infinity, vx1=Infinity){
     for(let x = is.x0 + is.slope*0.5; x < is.x1 - is.slope*0.5; x += rnd(28,60))
       is.trees.push({x, s:rnd(0.7,1.35), palm: Math.random() < 0.35, hue: Math.floor(rnd(0,3))});
   }
-  const night = G.weather.time==='night', greens = night ? ['#1f2d1a','#243320','#1a2716'] : ['#2f6a2c','#3c7a32','#2a5b28'];
+  const greens = night ? ['#1f2d1a','#243320','#1a2716'] : ['#2f6a2c','#3c7a32','#2a5b28'];
   for(const tr of is.trees){
     if(tr.x < vx0-40 || tr.x > vx1+40) continue;
     const gy = groundY(tr.x), s = tr.s;
@@ -296,10 +441,21 @@ function drawFx(ctx, f){
   const k = f.t/f.max;
   switch(f.type){
     case 'boom':{
+      // 1) a dark cloud that grows out of the fireball and lingers after it
+      if(k > 0.25){ const q = (k-0.25)/0.75; ctx.fillStyle = `rgba(38,34,30,${0.55*(1-q)})`;
+        ctx.beginPath(); ctx.arc(f.x, f.y - q*f.r*0.6, f.r*(0.55 + q*0.6), 0, 7); ctx.fill(); }
+      // 2) the fireball: white-hot centre, orange body, red edge
       const r = f.r*(0.4+k);
       const g = ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,r);
-      g.addColorStop(0,`rgba(255,240,180,${1-k})`); g.addColorStop(0.5,`rgba(255,140,40,${0.85*(1-k)})`); g.addColorStop(1,'rgba(120,40,10,0)');
-      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(f.x,f.y,r,0,7); ctx.fill(); break; }
+      g.addColorStop(0,`rgba(255,244,200,${1-k})`); g.addColorStop(0.45,`rgba(255,150,45,${0.9*(1-k)})`);
+      g.addColorStop(0.8,`rgba(200,60,20,${0.5*(1-k)})`); g.addColorStop(1,'rgba(120,40,10,0)');
+      ctx.fillStyle=g; ctx.beginPath(); ctx.arc(f.x,f.y,r,0,7); ctx.fill();
+      // 3) the first instant: a white flash bigger than the fireball
+      if(k < 0.12){ const q = k/0.12; ctx.fillStyle = `rgba(255,252,235,${0.9*(1-q)})`; ctx.beginPath(); ctx.arc(f.x, f.y, f.r*(0.7 + q*0.3), 0, 7); ctx.fill(); }
+      // 4) big blasts: a shockwave ring racing outward
+      if(f.r >= 40 && k < 0.3){ const q = k/0.3; ctx.strokeStyle = `rgba(255,240,215,${0.45*(1-q)*(1-q)})`; ctx.lineWidth = 3*(1-q) + 0.5;
+        ctx.beginPath(); ctx.arc(f.x, f.y, f.r*(0.6 + q*1.8), 0, 7); ctx.stroke(); }
+      break; }
     case 'flak': {
       // an air burst: a fireball that flashes and rolls out, then a dirty black cloud hangs where it was
       ctx.fillStyle=`rgba(32,30,28,${0.8*(1-k)})`; ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(0.5+k*0.7),0,7); ctx.fill();

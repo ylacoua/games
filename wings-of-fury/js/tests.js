@@ -125,6 +125,19 @@ test('צליל: ערוצים נפרדים, מחוון בריבוע, השתקה �
     return 'חישוב העוצמות (אין WebAudio בדפדפן הזה)';
   } finally { SAVE.vol = keep; SFX.muted = muted; }
 });
+test('גרפיקה: שמש מחוץ ללוחות, סימני חריכה מוגבלים, עמודי עשן, כל מזג אוויר מצויר', async () => {
+  // the sun and moon stay below the HUD panels (which end ~115 px down in HUD units)
+  for(const time of ['day','dawn','dusk','night']){ const s = celestial({time, rain:0}, false, 1067); assert(s && s.y - s.r*1.2 > 115, `השמש מוסתרת ב-${time}`); }
+  freshSave(); launch(0); fly();
+  const is = G.islands[0], mid = (is.x0 + is.x1)/2;
+  for(let i=0;i<90;i++) boom(mid + (i%9)*10, groundY(mid) - 2, 50, true, true);
+  assert(G.scorch.length > 0 && G.scorch.length <= 60, `סימני חריכה: ${G.scorch && G.scorch.length}`);
+  killStructs(s => s.island === 0); G.time += 5;
+  for(const time of ['day','dawn','dusk','night']){ G.weather.time = time; for(const rain of [0, 1]){ G.weather.rain = rain; render(ctx, CW || 320, CH || 180); } }
+  assert(G.far && G.far.length > 3, 'אין איים רחוקים');
+  G = null;
+  return 'שמש/ירח מתחת ללוחות · חריכה ≤ 60 · 8 מצבי מזג אוויר';
+});
 test('קצב פריימים: הגשם והעשן לא תלויים במספר הציורים בשנייה', async () => {
   freshSave(); launch(0); fly();
   G.weather.rain = 1;
