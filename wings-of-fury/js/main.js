@@ -21,20 +21,67 @@ function tapS(){
   const now = performance.now();
   if(now - lastS < 300 && G && G.player){ G.player.brakeReq = true; lastS = 0; } else lastS = now;
 }
+// one-shot actions on the moment a key (or gamepad button) goes down
+function pressAction(code){
+  if(code==='KeyS') tapS();
+  if(!G) return;
+  if(code==='Escape' || code==='KeyP'){ if(G.paused){ G.paused=false; UI.hide(); } else UI.pause(); }
+  if(code==='KeyM') say(SFX.toggleMute() ? 'צליל כבוי' : 'צליל פועל', 1.5);
+  if(code==='KeyC') toggleWingMode();
+  if(code==='Enter' && G.state==='rearm') UI.act('takeoff');
+}
+const kbHeld = {};                                     // keys held on the keyboard (the gamepad must not release them)
 window.addEventListener('keydown', e=>{
   SFX.init();
   if(GAME_KEYS.includes(e.code) && G && !UI.open()) e.preventDefault();
-  if(e.repeat) { keys[e.code]=true; return; }
-  keys[e.code] = true;
-  if(e.code==='KeyS') tapS();
-  if(!G) return;
-  if(e.code==='Escape' || e.code==='KeyP'){ if(G.paused){ G.paused=false; UI.hide(); } else UI.pause(); }
-  if(e.code==='KeyM') say(SFX.toggleMute() ? 'צליל כבוי' : 'צליל פועל', 1.5);
-  if(e.code==='KeyC') toggleWingMode();
-  if(e.code==='Enter' && G.state==='rearm') UI.act('takeoff');
+  keys[e.code] = kbHeld[e.code] = true;
+  if(e.repeat) return;
+  pressAction(e.code);
 });
-window.addEventListener('keyup', e=>{ keys[e.code]=false; });
-window.addEventListener('blur', ()=>{ for(const k in keys) keys[k]=false; });
+window.addEventListener('keyup', e=>{ kbHeld[e.code] = false; if(!padHeld[e.code]) keys[e.code]=false; });
+// leaving the window (Alt+Tab, another app on top, a hidden tab) releases every key and pauses the flight,
+// so the aircraft is never left flying with nobody at the controls
+function autoPause(){
+  for(const k in keys) keys[k] = false;
+  for(const k in kbHeld) kbHeld[k] = false;
+  if(G && !G.paused && !window.__noLoop) UI.pause();      // tests.html drives the game itself
+}
+window.addEventListener('blur', autoPause);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden) autoPause(); });
+
+// ---- Gamepad (standard mapping: Xbox / PlayStation / most USB pads) ----
+// The pad presses the same keys as the keyboard, so everything in the game works with it unchanged:
+// left stick or D-pad = arrows · A / RT = guns · B = ordnance · X = barrel roll · Y = wingmen order ·
+// RB = more throttle · LB / LT = less throttle (twice quickly = air brake) · Start = pause · Back = mute.
+// On the carrier deck A launches. The left stick has a round dead zone so diagonals are not clipped.
+const PAD_BUTTONS = {0:'Space', 7:'Space', 1:'KeyX', 2:'KeyZ', 3:'KeyC', 5:'KeyW', 4:'KeyS', 6:'KeyS', 9:'Escape', 8:'KeyM',
+                     12:'ArrowUp', 13:'ArrowDown', 14:'ArrowLeft', 15:'ArrowRight'};
+const PAD_DEAD = 0.3;
+const padHeld = {};
+function pollGamepad(){
+  let pads = [];
+  try{ if(navigator.getGamepads) pads = navigator.getGamepads() || []; }catch(e){}   // blocked on some insecure pages
+  const want = {};
+  for(const gp of pads){
+    if(!gp || !gp.connected || gp.mapping !== 'standard') continue;
+    for(const [i, code] of Object.entries(PAD_BUTTONS)){ const b = gp.buttons[i]; if(b && (b.pressed || b.value > 0.5)) want[code] = true; }
+    const x = gp.axes[0] || 0, y = gp.axes[1] || 0, mag = Math.hypot(x, y);
+    if(mag > PAD_DEAD){
+      const nx = x/mag, ny = y/mag;                   // direction only; any push past the dead zone counts in full
+      if(ny < -0.38) want.ArrowUp = true;
+      if(ny >  0.38) want.ArrowDown = true;
+      if(nx < -0.38) want.ArrowLeft = true;
+      if(nx >  0.38) want.ArrowRight = true;
+    }
+  }
+  if(G && G.state==='rearm' && want.Space && !padHeld.Space){ padHeld.Space = true; SFX.init(); pressAction('Enter'); return; }   // A on the deck: launch
+  for(const code in padHeld) if(padHeld[code] && !want[code]){ padHeld[code] = false; if(!kbHeld[code]) keys[code] = false; }
+  for(const code in want) if(!padHeld[code]){
+    padHeld[code] = keys[code] = true; SFX.init();
+    pressAction(code);
+  }
+}
+window.addEventListener('gamepadconnected', e=>{ if(G && e.gamepad.mapping==='standard') say('בקר משחק חובר', 2); });
 
 function toggleWingMode(){
   if(!G || !G.wingmen.length) return;
@@ -101,14 +148,18 @@ function frame(now){
   let real = Math.min(0.1, Math.max(0, (now-last)/1000)); last = now;
   if(!CW || !CH){ if(window.innerWidth && window.innerHeight) resize(); return; }   // minimised / zero-size window: nothing to draw
   if(Math.abs(real - smoothDt) < smoothDt*0.25) real = smoothDt = smoothDt*0.9 + real*0.1;   // de-jitter normal frames
+  pollGamepad();
   if(G){
     const vw = viewMetrics(CW, CH).vw;
     const steps = Math.min(6, Math.ceil(real/STEP - 0.01));
+    const ts = timeScale();                              // < 1 during a hit-stop (entities.js)
     for(let i=0;i<steps;i++){
       const running = G && !G.paused && G.state!=='rearm' && G.state!=='over';
       if(!running) break;
-      update(real/steps * GAME_SPEED, vw);
+      update(real/steps * GAME_SPEED * ts, vw);
     }
+    feelTick(real);                                      // shake and hit-stop run on real time
+    if(!G) { drawTitleBackdrop(now/1000); return; }
     render(ctx, CW, CH);
   } else drawTitleBackdrop(now/1000);
 }

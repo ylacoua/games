@@ -7,6 +7,7 @@ const TESTS = [];
 const test = (name, fn) => TESTS.push({name, fn});
 
 // ---------- helpers ----------
+const realStoreSave = storeSave;                             // tested only against a fake storage
 storeSave = () => {};                                        // never touch the player's saved game
 function freshSave(diffKey='normal'){ SAVE = defaultSave(); SAVE.money = 1e6; SAVE.unlocked = LEVELS.length; SAVE.difficulty = diffKey; }
 function launch(key, o={}){
@@ -56,6 +57,69 @@ test('שמירה ישנה משודרגת עם כל השדות החדשים', asy
   const s = Object.assign(defaultSave(), old);
   assert(s.skins && s.skins.standard && s.skin==='standard' && s.won && s.difficulty==='normal', 'חסרים שדות בשמירה');
   return 'skins, skin, won, difficulty – קיימים';
+});
+test('שמירה: גרסה, שדות חסרים בעומק, גיבוי ושחזור משמירה פגומה', async () => {
+  const store = {d:{}, getItem(k){ return k in this.d ? this.d[k] : null; }, setItem(k, v){ this.d[k] = String(v); }};
+  // a v1 save (no version) from before a new upgrade existed: `up.fuel` and `shake` must be filled in
+  store.d[SAVE_KEY] = JSON.stringify({money:700, owned:{hellcat:true, corsair:true}, plane:'corsair', up:{engine:2, armor:1, guns:0, payload:0}, unlocked:3, best:{0:true}});
+  let s = loadSave(store);
+  assert(s.version === SAVE_VERSION && s.money === 700 && s.up.engine === 2 && s.up.fuel === 0 && s.owned.corsair, 'המרת שמירה ישנה נכשלה');
+  assert(typeof s.shake === 'number' && typeof s.flashes === 'boolean' && s.skins.standard, 'חסרות הגדרות אפקטים בשמירה ישנה');
+  // a field of the wrong type falls back to its default instead of breaking the game
+  store.d[SAVE_KEY] = JSON.stringify({version:2, money:'oops', owned:{hellcat:true}, up:null});
+  s = loadSave(store);
+  assert(s.money === 0 && s.up.engine === 0, 'שדה פגום לא הוחלף בברירת מחדל');
+  // two writes: the first good save becomes the backup; a damaged main save then loads the backup
+  const keep = SAVE;
+  try{
+    store.d = {};
+    SAVE = defaultSave(); SAVE.money = 111; realStoreSave(store);
+    SAVE = defaultSave(); SAVE.money = 222; realStoreSave(store);
+    assert(JSON.parse(store.d[SAVE_KEY + '.bak']).money === 111, 'לא נשמר גיבוי');
+    store.d[SAVE_KEY] = '{"money": 3';                       // cut off in the middle of a write
+    s = loadSave(store);
+    assert(s.money === 111, 'השמירה הפגומה לא שוחזרה מהגיבוי');
+    assert(store.d[SAVE_KEY + '.corrupt'] === '{"money": 3', 'העותק הפגום לא נשמר בצד');
+    assert(SAVE_NOTICE && SAVE_NOTICE.includes('גיבוי'), 'אין הודעה לשחקן על שחזור השמירה');
+  } finally { SAVE = keep; SAVE_NOTICE = null; }
+  return `גרסה ${SAVE_VERSION}, השלמת שדות, גיבוי ושחזור`;
+});
+test('תחושה: רעידה דועכת לאפס, עצירת פגיעה לא נערמת, הגדרת רעידה כבויה', async () => {
+  freshSave(); launch(0); fly();
+  feelReset(); FEEL.t = 0.1; addTrauma(1);
+  const o = shakeOffset();
+  assert(Math.abs(o.x) + Math.abs(o.y) > 0.5, 'אין רעידה אחרי פגיעה חזקה');
+  feelTick(0.75);
+  const z = shakeOffset();
+  assert(FEEL.trauma === 0 && z.x === 0 && z.y === 0, 'הרעידה לא חזרה לאפס');
+  hitStop(0.1); hitStop(0.5);
+  assert(FEEL.stopT === 0.1 && timeScale() < 1, 'עצירת פגיעה שנייה האריכה את הראשונה');
+  feelTick(0.11);
+  assert(timeScale() === 1, 'עצירת הפגיעה לא הסתיימה');
+  const sh = SAVE.shake; SAVE.shake = 0; addTrauma(1);
+  const off = shakeOffset(); SAVE.shake = sh; feelReset();
+  assert(off.x === 0 && off.y === 0, 'הגדרת "רעידה כבויה" לא עובדת');
+  // a nearby bomb rocks the view, a far one does not
+  boom(G.player.x + 60, G.player.y, 50, true); const near = FEEL.trauma; feelReset();
+  boom(G.player.x + 2000, G.player.y, 50, true); const far = FEEL.trauma; feelReset();
+  assert(near > 0.2 && far === 0, `רעידה לפי מרחק שגויה: ${near.toFixed(2)} / ${far}`);
+  G = null;
+  return 'דעיכה, עצירה יחידה, כיבוי, מרחק';
+});
+test('קצב פריימים: הגשם והעשן לא תלויים במספר הציורים בשנייה', async () => {
+  freshSave(); launch(0); fly();
+  G.weather.rain = 1;
+  const y0 = G.rain.map(r => r.y);
+  for(let i = 0; i < 10; i++) render(ctx, CW || 320, CH || 180);
+  assert(G.rain.every((r, i) => r.y === y0[i]), 'הגשם זז בזמן הציור');
+  update(1/60, 1200);
+  assert(G.rain.some((r, i) => r.y !== y0[i]), 'הגשם לא זז בעדכון');
+  // puffs added while drawing are thinned by the frame time: at 4 draws per 1/60 s about a quarter stay
+  G.fx = []; RENDER_FX.drawing = true; RENDER_FX.keep = 0.25;
+  try{ for(let i = 0; i < 200; i++) puff(0, 0, '#444', 6); } finally { RENDER_FX.drawing = false; RENDER_FX.keep = 1; }
+  const kept = G.fx.length; G = null;
+  assert(kept > 20 && kept < 90, `דילול העשן שגוי: ${kept}/200`);
+  return `נשארו ${kept}/200 פסי עשן ב-240Hz`;
 });
 const LEVELS_D = Object.keys(DIFFICULTY);                   // easy, normal, hard, expert
 test('רמות קושי: נזק, עמידות אויבים, מטוסים, תיקון ותגמול', async () => {

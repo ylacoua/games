@@ -26,6 +26,7 @@ const UI = {
       <b>C</b><span>פקודה לכנפיים: ליווי ← תקיפה חופשית ← הגנה על הנושאת</span>
       <b>Z</b><span>גלגול חבית</span>
       <b>Esc</b><span>עצירה · <b>M</b> השתקה</span>
+      <b>🎮</b><span>בקר משחק: סטיק שמאלי או חצים לטיסה · A או RT מקלעים · B חימוש · X גלגול חבית · Y פקודה לכנפיים · RB / LB מצערת · Start עצירה</span>
     </div>
     <p class="note">נחיתה: התקרב לנושאת נמוך, במצערת נמוכה ובאף כמעט ישר. מהירות מתחת ל-225 וזווית קטנה.</p>`;
   },
@@ -61,9 +62,16 @@ const UI = {
     const langSel = `<div class="diff lang"><span class="lbl" data-notr>שפה · Language</span><div class="seg" role="radiogroup" aria-label="Language">
       <button role="radio" lang="he" dir="rtl" aria-checked="${lg==='he'}" class="${lg==='he'?'on':''}" data-act="lang" data-v="he" data-notr>עברית</button>
       <button role="radio" lang="en" dir="ltr" aria-checked="${lg==='en'}" class="${lg==='en'?'on':''}" data-act="lang" data-v="en">English</button></div></div>`;
+    // effects: screen shake strength and full-screen flashes (also lowered by the system's "reduce motion")
+    const sh = SAVE.shake >= 1 ? 1 : SAVE.shake > 0 ? 0.5 : 0;
+    const fxSel = `<div class="diff"><span class="lbl">רעידת מסך</span><div class="seg" role="radiogroup" aria-label="רעידת מסך">
+      ${[[1,'מלאה'],[0.5,'מופחתת'],[0,'כבויה']].map(([v,n])=>`<button role="radio" aria-checked="${sh===v}" class="${sh===v?'on':''}" data-act="shake" data-v="${v}">${n}</button>`).join('')}</div>
+      <button role="switch" aria-checked="${!!SAVE.flashes}" data-act="flashes">${SAVE.flashes ? 'הבזקים: פועלים' : 'הבזקים: מופחתים'}</button></div>`;
+    const notice = SAVE_NOTICE ? `<p class="tip" role="alert">${SAVE_NOTICE}</p>` : '';
+    SAVE_NOTICE = null;
     this.root.innerHTML = `<div class="home">
-      <header class="home-title"><h1>כנפי הרעם</h1><p class="welcome">ברוכים הבאים טייסים</p></header>
-      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${langSel}${diffSel}${nav}${reset}</nav>
+      <header class="home-title"><h1>כנפי הרעם</h1><p class="welcome">ברוכים הבאים טייסים</p>${notice}</header>
+      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${langSel}${diffSel}${fxSel}${nav}${reset}</nav>
       ${p ? `<section class="home-panel" aria-live="polite">${this.homePanelHTML(p)}</section>` : ''}
     </div>`;
     this.bind();
@@ -362,6 +370,8 @@ const UI = {
       case 'lang': setLang(v); this.mainMenu(); break;
       case 'home': this.homePanel = this.homePanel===v ? null : v; this.mainMenu(); break;
       case 'diff': if(DIFFICULTY[v]){ SAVE.difficulty = v; storeSave(); } this.mainMenu(); break;
+      case 'shake': SAVE.shake = clamp(+v || 0, 0, 1); storeSave(); this.mainMenu(); break;
+      case 'flashes': SAVE.flashes = !SAVE.flashes; storeSave(); this.mainMenu(); break;
       case 'brief': G=null; this.briefing(missionKey(v)); break;
       case 'level': G=null; this.briefing(+v); break;          // e.g. "next mission" after a win: briefing first
       case 'hangar': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar(missionKey(v)); break;

@@ -339,7 +339,7 @@ function hurtEnemy(e, d){
     e.dead = true; earn(e.type, e.x, e.y);
     boom(e.x, e.y, e.type==='emily'?90:34, e.type!=='zero', true); SFX.planeBoom();
     for(let i=0;i<(e.type==='emily'?14:6);i++) G.debris.push({x:e.x,y:e.y,vx:Math.cos(e.a)*e.speed*0.6+rnd(-90,90),vy:rnd(-150,40),r:0,vr:rnd(-8,8),life:2.2,c:e.type==='zero'?'#c9c3a8':'#556b4a',smoke:true});
-    if(e.type==='emily') say('"אמילי" הופלה!',4);
+    if(e.type==='emily'){ say('"אמילי" הופלה!',4); hitStop(0.12); addTrauma(0.7); }
   }
 }
 
@@ -900,5 +900,8 @@ function updateWeather(dt){
   const W = G.weather;
   W.gust = Math.sin(G.time*0.7)*W.wind*0.35;
   W.flash = Math.max(0, W.flash - dt*2.5);
+  // rain falls in game time (it used to move once per drawn frame, so it fell 2.4x faster on a 144 Hz screen);
+  // 1.27/s of the screen height at GAME_SPEED 0.85 keeps the old look at 60 Hz
+  if(W.rain > 0) for(const r of G.rain) r.y = (r.y + 1.27*r.v*dt) % 1;
   if(W.storm && Math.random() < dt/7){ W.flash = 1; setTimeout(()=>SFX.thunder(), rnd(200,900)); }
 }

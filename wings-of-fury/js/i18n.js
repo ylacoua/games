@@ -177,5 +177,12 @@ function setLang(l){
 }
 // English titles for the in-game alert names that are built from parts
 Object.assign(LANG_EN, {'הדרכה:':'Training:', 'רוח':'Wind', 'סערה':'Storm', 'כוכבים':'Stars', 'עלות הכנפיים למשימה':'Wingmen cost for this mission','שיעור:':'Lesson:', 'למעלה':'Up', 'למטה':'Down', 'האט':'Slow down', 'ירי':'Fire',
-  'עצור':'Pause', 'פקודה':'Order', 'כנפי הרעם: מטוס הלקט מעל נושאת מטוסים בקרב מול מטוסי זירו':'Wings of Fury: a Hellcat over an aircraft carrier fighting Zeros'});
+  'עצור':'Pause', 'פקודה':'Order',
+  // v1.57: effects settings, save recovery, gamepad
+  'רעידת מסך':'Screen shake', 'מלאה':'Full', 'מופחתת':'Reduced', 'כבויה':'Off', 'הבזקים: פועלים':'Flashes: on', 'הבזקים: מופחתים':'Flashes: reduced',
+  'השמירה נפגמה ושוחזרה מהגיבוי האחרון':'Your save was damaged and has been restored from the last backup',
+  'השמירה נפגמה ואין גיבוי, המשחק מתחיל מחדש. העותק הפגום נשמר בצד':'Your save was damaged and no backup was found, so the game starts over. The damaged copy was kept aside',
+  'בקר משחק חובר':'Gamepad connected',
+  'בקר משחק: סטיק שמאלי או חצים לטיסה · A או RT מקלעים · B חימוש · X גלגול חבית · Y פקודה לכנפיים · RB / LB מצערת · Start עצירה':
+    'Gamepad: left stick or D-pad to fly · A or RT guns · B ordnance · X barrel roll · Y wingmen order · RB / LB throttle · Start pause', 'כנפי הרעם: מטוס הלקט מעל נושאת מטוסים בקרב מול מטוסי זירו':'Wings of Fury: a Hellcat over an aircraft carrier fighting Zeros'});
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyLang); else applyLang();

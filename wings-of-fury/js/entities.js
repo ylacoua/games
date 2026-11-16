@@ -139,7 +139,7 @@ function updatePlayer(dt){
     if(!P.loop && !P.vl && !P.mv && Math.abs(P.p)<0.32 && P.speed<225){
       P.deckC = C; G.homeDeck = C;                           // re-arm and take off again from this carrier
       P.onDeck=true; P.landing=true; P.y=DECK_Y-9; P.p=0; P.throttle=0; G.state='landing';
-      SFX.tone(200,120,0.3,0.1,'triangle'); say('נחיתה! וו הבלימה נתפס',2);
+      SFX.tone(200,120,0.3,0.1,'triangle'); say('נחיתה! וו הבלימה נתפס',2); addTrauma(0.3);   // the hook catches: a thump
       return;
     }
     return crashPlayer(Math.abs(P.p)>=0.32 ? 'נחיתה בזווית תלולה מדי' : 'מהיר מדי לנחיתה – הורד מצערת (S)');
@@ -193,7 +193,7 @@ function dropOrd(P){
 function crashPlayer(reason){
   const P = G.player; if(P.dead) return;
   P.dead=true; P.loop=null; P.vl=null; P.mv=null; P.br=null; G.lives--; G.lost = (G.lost||0) + 1;   // G.lost: for the star rating
-  boom(P.x, Math.min(P.y, groundY(P.x)-4), 50, true, true); SFX.planeBoom();
+  boom(P.x, Math.min(P.y, groundY(P.x)-4), 50, true, true); SFX.planeBoom(); addTrauma(0.85);
   if(overSea(P.x) && P.y>SEA-20) splash(P.x);
   for(let i=0;i<10;i++) G.debris.push({x:P.x,y:P.y,vx:rnd(-160,160),vy:rnd(-260,-40),r:rnd(0,6),vr:rnd(-8,8),life:2.5,c:G.stats.color});
   say(reason + (G.lives>0 ? ` · נותרו ${G.lives} מטוסים` : ''), 4);
@@ -203,6 +203,7 @@ function crashPlayer(reason){
 function damagePlayer(d){
   const P=G.player; if(P.dead || P.inv>0 || P.onDeck) return;
   P.hp -= d*PLAYER_DAMAGE*diff().dmg; P.hitT=0.15; SFX.hit();
+  addTrauma(d >= 12 ? 0.35 : 0.15);                          // a flak or bomb hit jolts harder than a bullet
   if(P.hp<=0){ P.hp=0; crashPlayer('המטוס הופל'); }
 }
 
@@ -276,7 +277,7 @@ function updateProjectiles(dt){
       f.dead=true; G.fx.push({type:'flak', x:f.x, y:f.y, t:0, max:1.1, r:f.big?40:30}); SFX.flak();
       // hot fragments spraying out, and a burst close by rocks the aircraft
       for(let i=0;i<(f.big?8:5);i++){ const a=rnd(0,Math.PI*2), sp=rnd(60,170); G.debris.push({x:f.x,y:f.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,r:0,vr:0,life:rnd(0.25,0.5),c:Math.random()<.5?'#ffd27a':'#ff8a3a',spark:true}); }
-      if(!P.dead){ const d = Math.hypot(f.x-P.x, f.y-P.y); if(d < 170) G.shake = Math.max(G.shake||0, (1 - d/170)*(f.big?0.6:0.4)); }
+      addTraumaAt(f.x, f.y, f.big ? 0.55 : 0.4, 170);
       if(!P.dead && dist2(f.x,f.y,P.x,P.y) < (f.big?58:46)**2) damagePlayer(f.dmg);
       for(const w of G.wingmen) if(!w.dead && w.state!=='wait' && dist2(f.x,f.y,w.x,w.y)<44*44) hurtWing(w, f.dmg*0.8);
     }
@@ -377,7 +378,7 @@ function hitStruct(s, d, kind){
     for(let i=0;i<6;i++) G.debris.push({x:s.x,y:s.y-s.h/2,vx:rnd(-140,140),vy:rnd(-280,-80),r:0,vr:rnd(-9,9),life:2,c:'#5d5546'});
     if(s.type==='bunker'||s.type==='barracks') for(let i=0;i<(s.type==='barracks'?6:3);i++) spawnSoldier(s.x+rnd(-15,15));
     if(s.type==='fuel'){ explode(s.x, s.y-10, 95, 90, 'p', 'fuel'); }
-    if(s.type==='core'){ say('מבצר אוקינאווה הושמד!',5); }
+    if(s.type==='core'){ say('מבצר אוקינאווה הושמד!',5); hitStop(0.12); addTrauma(0.8); }
   }
 }
 
@@ -397,9 +398,38 @@ function hitShip(sh, d, kind, x){
   }
   if(sh.hp<=0){
     sh.dead=true; sh.sink=0.001; earn(sh.type, sh.x, SEA-sh.h);
+    if(sh.type==='battleship' || sh.type==='jcarrier'){ hitStop(0.12); addTrauma(0.7); } else { hitStop(0.06); addTrauma(0.4); }
     for(let i=0;i<5;i++) setTimeout(()=>G && boom(sh.x+rnd(-sh.w/2,sh.w/2), SEA-sh.h, 50, true), i*220);
     say(sh.type==='battleship'?'אוניית המערכה טובעת!':sh.type==='jcarrier'?'הנושאת היפנית הוטבעה! לא ימריאו ממנה עוד מטוסים':'משחתת אויב הוטבעה',3);
   }
+}
+
+// ---- feedback: screen shake and hit-stop ----
+// Every impact adds "trauma" (0..1), which drains in real time. The view moves by trauma² - light knocks barely
+// show, heavy ones punch - along summed sine waves at unrelated rates, so it rolls smoothly instead of jumping to
+// a new random spot every frame. The player's "screen shake" setting (SAVE.shake) scales it.
+// Hit-stop: the biggest kills slow the simulation for a few hundredths of a second (real time); a call during an
+// active stop is ignored, so overlapping explosions never stack into a long freeze.
+// Tiers: small 0.1-0.2 (landing, distant blast) · medium 0.3-0.5 (hit, nearby bomb) · large 0.7-1 (shot down, ship sunk).
+const FEEL = {trauma:0, t:0, stopT:0, stopSlow:1};
+function addTrauma(a){ FEEL.trauma = clamp(FEEL.trauma + a, 0, 1); }
+function addTraumaAt(x, y, a, radius){                         // fades with distance from the player's aircraft
+  const P = G.player; if(!P || P.dead) return;
+  const d = Math.hypot(x-P.x, y-P.y); if(d < radius) addTrauma(a*(1 - d/radius));
+}
+function hitStop(dur=0.09, slow=0.1){ if(FEEL.stopT > 0) return; FEEL.stopT = dur; FEEL.stopSlow = slow; }
+function feelTick(real){                                       // once per drawn frame, with the real frame time
+  FEEL.t += real;
+  FEEL.trauma = Math.max(0, FEEL.trauma - 1.4*real);           // a full 1.0 settles in ~0.7 s
+  FEEL.stopT = Math.max(0, FEEL.stopT - real);
+}
+function feelReset(){ FEEL.trauma = 0; FEEL.stopT = 0; }
+const timeScale = () => FEEL.stopT > 0 ? FEEL.stopSlow : 1;
+function shakeOffset(){
+  const k = FEEL.trauma*FEEL.trauma*clamp(SAVE.shake ?? 1, 0, 1);
+  if(k <= 0) return {x:0, y:0};
+  const t = FEEL.t*30;
+  return {x: 10*k*(Math.sin(t*1.7) + 0.5*Math.sin(t*3.1+1))/1.5, y: 8*k*(Math.sin(t*2.3) + 0.5*Math.sin(t*3.7+2))/1.5};
 }
 
 // ---- effects ----
@@ -408,6 +438,7 @@ function hitShip(sh, d, kind, x){
 const FX_MAX = 320, DEBRIS_MAX = 260;
 function boom(x,y,r,big,quiet){   // quiet: the caller plays its own sound (aircraft explosions)
   G.fx.push({type:'boom', x, y, r, t:0, max:big?0.9:0.6});
+  addTraumaAt(x, y, big ? 0.5 : 0.25, big ? 380 : 230);       // a blast close to the aircraft rocks the view
   const busy = G.debris.length > DEBRIS_MAX*0.6;
   for(let i=0;i<(big?18:9)*(busy?0.4:1);i++){
     const a=rnd(0,Math.PI*2), s=rnd(40,big?260:150);
@@ -418,13 +449,15 @@ function boom(x,y,r,big,quiet){   // quiet: the caller plays its own sound (airc
 }
 function splash(x){ G.fx.push({type:'splash', x, y:SEA, t:0, max:0.9}); SFX.splash(); }
 function spark(x,y){ if(G.debris.length > DEBRIS_MAX) return; G.debris.push({x,y,vx:rnd(-60,60),vy:rnd(-80,0),r:0,vr:0,life:0.2,c:'#ffe7a0',spark:true}); }
-function puff(x,y,c,s,life=1){ if(G.fx.length > FX_MAX) return; G.fx.push({type:'smoke', x, y, c, s, t:0, max:life, vx:rnd(-10,10), vy:rnd(-25,-8)}); }
+function puff(x,y,c,s,life=1){ if(G.fx.length > FX_MAX) return;
+  if(RENDER_FX.drawing && RENDER_FX.keep < 1 && Math.random() > RENDER_FX.keep) return;   // see render.js
+ G.fx.push({type:'smoke', x, y, c, s, t:0, max:life, vx:rnd(-10,10), vy:rnd(-25,-8)}); }
 
 function updateFx(dt){
-  if(G.shake > 0) G.shake = Math.max(0, G.shake - dt*1.6);
   for(const f of G.fx){ f.t+=dt; if(f.type==='smoke'){ f.x+=f.vx*dt+G.weather.wind*0.3*dt; f.y+=f.vy*dt; } if(f.type==='text') f.y-=30*dt; }
   G.fx = G.fx.filter(f=>f.t<f.max);
-  for(const d of G.debris){ d.vy+=400*dt; d.x+=d.vx*dt; d.y+=d.vy*dt; d.r+=d.vr*dt; d.life-=dt; if(d.y>groundY(d.x)){ d.y=groundY(d.x); d.vx*=0.5; d.vy*=-0.2; } }
+  for(const d of G.debris){ d.vy+=400*dt; d.x+=d.vx*dt; d.y+=d.vy*dt; d.r+=d.vr*dt; d.life-=dt; if(d.y>groundY(d.x)){ d.y=groundY(d.x); d.vx*=0.5; d.vy*=-0.2; }
+    if(d.smoke && Math.random() < dt*18) puff(d.x, d.y, '#444', 6, 0.8); }   // smoking wreckage: ~18 puffs a second, whatever the screen's refresh rate
   G.debris = G.debris.filter(d=>d.life>0);
   if(G.fx.length > FX_MAX*1.5) G.fx.splice(0, G.fx.length - FX_MAX*1.5);          // drop the oldest
   if(G.debris.length > DEBRIS_MAX*1.5) G.debris.splice(0, G.debris.length - DEBRIS_MAX*1.5);

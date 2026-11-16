@@ -14,12 +14,22 @@ function viewMetrics(cw, ch){
   return {top, viewH, scale, vw: cw/scale};
 }
 
+// Several draw functions (ships' funnels, burning wrecks, tank dust...) add smoke puffs with a fixed chance per
+// drawn frame. While drawing, puff() keeps each one only with chance RENDER_FX.keep = frame time / (1/60 s), so the
+// amount of smoke is the same on a 60, 120 or 144 Hz screen.
+const RENDER_FX = {drawing:false, keep:1, last:0};
 function render(ctx, cw, ch){
+  const now = performance.now();
+  RENDER_FX.keep = RENDER_FX.last ? clamp((now - RENDER_FX.last)/(1000/60), 0.05, 1) : 1;
+  RENDER_FX.last = now; RENDER_FX.drawing = true;
+  try{ renderScene(ctx, cw, ch); } finally { RENDER_FX.drawing = false; }
+}
+function renderScene(ctx, cw, ch){
   const vm = viewMetrics(cw, ch), {scale, vw} = vm;
   const hs = ch/H, hvw = cw/hs;                       // fixed screen-space scale for HUD and overlays
-  // a flak burst close to the aircraft jolts the view for a moment
-  const shk = G.shake > 0 ? G.shake*7 : 0, top = vm.top + (shk ? rnd(-shk, shk) : 0);
-  const camX = G.cam.x + (shk ? rnd(-shk, shk) : 0), W = G.weather, sky = SKY[W.time];
+  // impacts near the aircraft shake the view (trauma-based, see entities.js); camera only, the world never moves
+  const so = shakeOffset(), top = vm.top + so.y;
+  const camX = G.cam.x + so.x, W = G.weather, sky = SKY[W.time];
   const stormy = W.rain>0.5 && W.time!=='night';
   // sky, in world coordinates so it darkens toward the stratosphere
   ctx.setTransform(scale,0,0,scale,-camX*scale,-top*scale);
@@ -86,7 +96,7 @@ function render(ctx, cw, ch){
   for(const d of G.debris){
     ctx.fillStyle=d.c;
     if(d.spark){ ctx.globalAlpha=Math.min(1,d.life*3); ctx.fillRect(d.x-1.5,d.y-1.5,3,3); }
-    else { ctx.save(); ctx.translate(d.x,d.y); ctx.rotate(d.r); ctx.fillRect(-4,-2,8,4); ctx.restore(); if(d.smoke && Math.random()<0.3) puff(d.x,d.y,'#444',6,0.8); }
+    else { ctx.save(); ctx.translate(d.x,d.y); ctx.rotate(d.r); ctx.fillRect(-4,-2,8,4); ctx.restore(); }
     ctx.globalAlpha=1;
   }
   for(const f of G.fx) drawFx(ctx, f);
@@ -102,11 +112,17 @@ function render(ctx, cw, ch){
   if(W.rain>0){
     ctx.strokeStyle='rgba(190,210,230,.45)'; ctx.lineWidth=1; ctx.beginPath();
     const n = Math.floor(G.rain.length*W.rain), slant = W.wind*0.25 - 4;
-    for(let i=0;i<n;i++){ const r=G.rain[i]; r.y=(r.y+0.018*r.v)%1; const rx=((r.x*vw + slant*r.y*10 - camX*0.3)%vw+vw)%vw, ry=r.y*H; ctx.moveTo(rx,ry); ctx.lineTo(rx+slant,ry+16); }
+    for(let i=0;i<n;i++){ const r=G.rain[i]; const rx=((r.x*vw + slant*r.y*10 - camX*0.3)%vw+vw)%vw, ry=r.y*H; ctx.moveTo(rx,ry); ctx.lineTo(rx+slant,ry+16); }
     ctx.stroke();
   }
-  if(W.flash>0){ ctx.fillStyle=`rgba(230,235,255,${W.flash*0.6})`; ctx.fillRect(0,0,vw,H); }
-  if(P.hitT>0){ ctx.fillStyle='rgba(200,40,30,.18)'; ctx.fillRect(0,0,vw,H); }
+  // full-screen flashes; with "flashes: reduced" (or the system's reduce-motion) they become a faint tint,
+  // and the hit warning becomes a red frame around the edge of the screen instead of a full red wash
+  const flashes = SAVE.flashes !== false;
+  if(W.flash>0){ ctx.fillStyle=`rgba(230,235,255,${W.flash*(flashes ? 0.6 : 0.12)})`; ctx.fillRect(0,0,vw,H); }
+  if(P.hitT>0){
+    if(flashes){ ctx.fillStyle='rgba(200,40,30,.18)'; ctx.fillRect(0,0,vw,H); }
+    else { ctx.strokeStyle='rgba(200,40,30,.55)'; ctx.lineWidth=10; ctx.strokeRect(5,5,vw-10,H-10); }
+  }
   drawHUD(ctx, vw, vw0);
   drawTutorial(ctx, vw);
   drawDefenseHUD(ctx, vw);

@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.56';
+const GAME_VERSION = '1.57';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -147,13 +147,61 @@ const diffKey = () => (G && G.diffKey) || (SAVE && SAVE.difficulty) || 'normal';
 const diff = () => DIFFICULTY[diffKey()] || DIFFICULTY.normal;
 const payout = g => Math.round(g * diff().reward);
 
-function defaultSave(){ return {money:0, owned:{hellcat:true}, plane:'hellcat', up:{engine:0,armor:0,guns:0,payload:0,fuel:0}, unlocked:1, best:{},
-  skins:{standard:true}, skin:'standard', won:{}, difficulty:'normal', lang:'he'}; }
-function loadSave(){
-  try{ const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if(s && s.owned) return Object.assign(defaultSave(), s); }catch(e){}
-  return defaultSave();
+// ---- The saved game (localStorage) ----
+// Every save carries a version number. Older saves are upgraded step by step through SAVE_MIGRATIONS, and any
+// field they lack - at any depth, e.g. a new upgrade inside `up` - is filled from defaultSave(). Before each
+// write the previous good save is kept under SAVE_KEY+'.bak'; if the main save cannot be read the backup is
+// loaded, and the damaged text is set aside under SAVE_KEY+'.corrupt' instead of being overwritten.
+const SAVE_VERSION = 2;
+const SAVE_MIGRATIONS = {
+  1: s => s,          // v1 (up to game version 1.56) had no version field; its missing fields come from fillDefaults
+};
+const reducedMotion = () => !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+function defaultSave(){ return {version:SAVE_VERSION, money:0, owned:{hellcat:true}, plane:'hellcat', up:{engine:0,armor:0,guns:0,payload:0,fuel:0}, unlocked:1, best:{},
+  skins:{standard:true}, skin:'standard', won:{}, difficulty:'normal', lang:'he',
+  shake: reducedMotion() ? 0.5 : 1,   // screen shake strength: 1 full, 0.5 reduced, 0 off
+  flashes: !reducedMotion()};         // full-screen flashes (lightning, being hit); off = a soft tint instead
 }
-function storeSave(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(SAVE)); }catch(e){} }
+const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
+function fillDefaults(def, s){
+  for(const k of Object.keys(def)){
+    const d = def[k], v = s[k];
+    if(v === undefined || v === null || (!isObj(d) && typeof v !== typeof d) || (isObj(d) && !isObj(v))) s[k] = d;
+    else if(isObj(d)) fillDefaults(d, v);
+  }
+  return s;
+}
+// text from storage -> a complete, current save; null if it is missing or unreadable
+function parseSave(raw){
+  if(!raw) return null;
+  let s; try{ s = JSON.parse(raw); }catch(e){ return null; }
+  if(!isObj(s) || !isObj(s.owned)) return null;
+  let v = Math.floor(+s.version) || 1;
+  while(v < SAVE_VERSION){ s = (SAVE_MIGRATIONS[v] || (x => x))(s); v++; }
+  s.version = Math.max(v, SAVE_VERSION);            // a save from a newer build is used as it is, best effort
+  return fillDefaults(defaultSave(), s);
+}
+let SAVE_NOTICE = null;                             // shown once on the home screen when a damaged save was found
+function loadSave(store){
+  let raw = null, bak = null;
+  try{ store = store || localStorage; raw = store.getItem(SAVE_KEY); bak = store.getItem(SAVE_KEY + '.bak'); }catch(e){ return defaultSave(); }
+  const s = parseSave(raw); if(s) return s;
+  const b = parseSave(bak);
+  if(raw){
+    try{ store.setItem(SAVE_KEY + '.corrupt', raw); }catch(e){}
+    SAVE_NOTICE = b ? 'השמירה נפגמה ושוחזרה מהגיבוי האחרון' : 'השמירה נפגמה ואין גיבוי, המשחק מתחיל מחדש. העותק הפגום נשמר בצד';
+  }
+  return b || defaultSave();
+}
+function storeSave(store){
+  try{
+    store = store || localStorage;
+    const prev = store.getItem(SAVE_KEY);
+    if(prev && parseSave(prev)) store.setItem(SAVE_KEY + '.bak', prev);   // keep the last good save
+    SAVE.version = SAVE_VERSION;
+    store.setItem(SAVE_KEY, JSON.stringify(SAVE));
+  }catch(e){}
+}
 let SAVE = loadSave();
 
 // effective stats of a plane with upgrades

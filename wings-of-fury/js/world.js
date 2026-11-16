@@ -59,6 +59,7 @@ function overSea(x){ return groundY(x) >= SEA-0.5; }
 function newLevel(idx, loadout, def){
   const L = def || LEVELS[idx];
   const st = planeStats(loadout.plane, loadout.up);
+  feelReset();                                   // no shake or hit-stop carried over from the last mission
   G = {
     idx, def:L, time:0, cam:{x:0, top:0}, islands:[], structures:[], ships:[], soldiers:[], jtanks:[], enemies:[], wingmen:[],
     shots:[], drops:[], flak:[], fx:[], debris:[], clouds:[], rain:[],
