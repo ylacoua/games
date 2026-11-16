@@ -79,6 +79,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .welcome{margin:6px 0 0;font-family:var(--display);font-size:clamp(18px,2.6vw,28px);color:#fff4d6;letter-spacing:.03em}
 .home-nav{display:flex;flex-direction:column;gap:10px;align-self:start;min-height:0;max-height:100%;overflow-y:auto;padding-inline-end:2px}
 .diff button[role=switch]{margin-top:4px;padding:5px 8px;font-size:13px}
+/* gamepad in the menus: always show where the focus is (the browser hides the ring after a programmatic focus) */
+body.pad #ui :focus, body.pad #title :focus{outline:3px solid var(--signal);outline-offset:2px}
+.vols{display:flex;flex-direction:column;gap:8px}
+.vol{display:grid;grid-template-columns:minmax(90px,130px) 1fr 44px;align-items:center;gap:10px;font-size:14px;color:var(--paper)}
+.vol input{width:100%;accent-color:var(--signal);cursor:pointer}
+.vol input:focus-visible{outline:2px solid var(--signal);outline-offset:3px}
+.vol output{font-variant-numeric:tabular-nums;color:var(--steel);font-size:13px;text-align:end}
 .home-nav .money{text-align:center;margin-bottom:2px;text-shadow:0 2px 6px #000}
 .navbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:start;padding:13px 16px;
   background:rgba(14,26,43,.86);border:1px solid #3b5679;border-inline-start:4px solid #3b5679;transition:background .15s,border-color .15s}

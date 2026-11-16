@@ -9,14 +9,41 @@ const ENGINE_PROFILES = {
   avenger:  {base:33, mul:0.12, cutoff:270, vol:0.095, sub:0.70, throb:0.50}
 };
 
+// Mixing: every sound goes into one of three buses, each with its own volume slider (SAVE.vol):
+//   effects (SFX.master: guns, blasts, alarms...) ─┐
+//   engine  (SFX.engineBus)                        ├─> SFX.out (main volume + mute) ─> limiter ─> speakers
+//   music   (SFX.musicBus: the menu theme)         ┘
+// Sliders are 0..1 and squared before use, so the change is heard over the whole travel instead of only near the
+// bottom. The limiter (a fast, hard compressor just under full scale) catches the peaks when many blasts land in
+// the same instant, so they no longer clip and crackle.
+const MAIN_GAIN = 0.5;                   // the game's original overall level, at main volume 100%
 const SFX = {
-  ctx:null, master:null, muted:false, noiseBuf:null, eng:null, profile:ENGINE_PROFILES.hellcat,
+  ctx:null, master:null, engineBus:null, musicBus:null, out:null, limiter:null, muted:false, noiseBuf:null, eng:null, profile:ENGINE_PROFILES.hellcat,
+  vol(k){ const v = (typeof SAVE !== 'undefined' && SAVE.vol && SAVE.vol[k]); return clamp(typeof v === 'number' ? v : 1, 0, 1); },
+  // apply SAVE.vol and the mute switch to the buses (smoothly, so a slider being dragged never clicks)
+  busGains(){
+    const sq = k => this.vol(k)**2;
+    return {out: this.muted ? 0 : MAIN_GAIN*sq('main'), sfx: sq('sfx'), engine: sq('engine'), music: sq('music')};
+  },
+  applyVolumes(){
+    if(!this.ctx) return;
+    const t = this.ctx.currentTime, set = (node, g) => node.gain.setTargetAtTime(g, t, 0.03), g = this.busGains();
+    set(this.out, g.out); set(this.master, g.sfx); set(this.engineBus, g.engine); set(this.musicBus, g.music);
+  },
   init(){
     if(this.ctx) { if(this.ctx.state==='suspended') this.ctx.resume(); return; }
     try{
       const C = window.AudioContext || window.webkitAudioContext; if(!C) return;
       this.ctx = new C();
-      this.master = this.ctx.createGain(); this.master.gain.value = this.muted?0:0.5; this.master.connect(this.ctx.destination);
+      const c = this.ctx;
+      this.limiter = c.createDynamicsCompressor();
+      this.limiter.threshold.value = -3; this.limiter.knee.value = 0; this.limiter.ratio.value = 20;
+      this.limiter.attack.value = 0.002; this.limiter.release.value = 0.2;
+      this.limiter.connect(c.destination);
+      this.out = c.createGain(); this.out.connect(this.limiter);
+      this.master = c.createGain(); this.engineBus = c.createGain(); this.musicBus = c.createGain();
+      for(const b of [this.master, this.engineBus, this.musicBus]) b.connect(this.out);
+      this.applyVolumes();
       const len = this.ctx.sampleRate; this.noiseBuf = this.ctx.createBuffer(1,len,this.ctx.sampleRate);
       const d = this.noiseBuf.getChannelData(0); for(let i=0;i<len;i++) d[i]=Math.random()*2-1;
       this.buildEngine();
@@ -35,7 +62,7 @@ const SFX = {
     const lfo = c.createOscillator(); lfo.type='sine'; const lfoG = c.createGain();
     lfo.connect(lfoG); lfoG.connect(trem.gain);
     const out = c.createGain(); out.gain.value = 0;
-    o1.connect(f); o2.connect(subG); subG.connect(f); f.connect(trem); trem.connect(out); out.connect(this.master);
+    o1.connect(f); o2.connect(subG); subG.connect(f); f.connect(trem); trem.connect(out); out.connect(this.engineBus);
     o1.start(); o2.start(); lfo.start();
     this.eng = {o1, o2, subG, f, lfo, lfoG, out};
     this.applyProfile();
@@ -48,7 +75,7 @@ const SFX = {
     e.subG.gain.setTargetAtTime(p.sub, t, 0.05);
     e.lfoG.gain.setTargetAtTime(p.throb, t, 0.05);
   },
-  toggleMute(){ this.muted=!this.muted; if(this.master) this.master.gain.value=this.muted?0:0.5; return this.muted; },
+  toggleMute(){ this.muted=!this.muted; this.applyVolumes(); return this.muted; },
   setEngine(on, speed){
     if(!this.eng) return;
     const p = this.profile, e = this.eng, t = this.ctx.currentTime, fr = p.base + speed*p.mul;
@@ -284,7 +311,7 @@ const Music = (() => {
     start(){
       SFX.init(); if(!SFX.ctx || playing) return;
       playing = true;
-      bus = SFX.ctx.createGain(); bus.gain.value = 0.5; bus.connect(SFX.master);
+      bus = SFX.ctx.createGain(); bus.gain.value = 0.5; bus.connect(SFX.musicBus);
       step = 0; next = SFX.ctx.currentTime + 0.08;
       timer = setInterval(tick, 25); tick();
     },

@@ -58,9 +58,14 @@ const PAD_BUTTONS = {0:'Space', 7:'Space', 1:'KeyX', 2:'KeyZ', 3:'KeyC', 5:'KeyW
                      12:'ArrowUp', 13:'ArrowDown', 14:'ArrowLeft', 15:'ArrowRight'};
 const PAD_DEAD = 0.3;
 const padHeld = {};
+let padWasMenu = true, padBlocked = {};
 function pollGamepad(){
   let pads = [];
   try{ if(navigator.getGamepads) pads = navigator.getGamepads() || []; }catch(e){}   // blocked on some insecure pages
+  if(!pads.length || ![...pads].some(Boolean)){          // no pad (or it was unplugged): let go of whatever it held
+    for(const code in padHeld) if(padHeld[code]){ padHeld[code] = false; if(!kbHeld[code]) keys[code] = false; }
+    return;
+  }
   const want = {};
   for(const gp of pads){
     if(!gp || !gp.connected || gp.mapping !== 'standard') continue;
@@ -74,13 +79,103 @@ function pollGamepad(){
       if(nx >  0.38) want.ArrowRight = true;
     }
   }
-  if(G && G.state==='rearm' && want.Space && !padHeld.Space){ padHeld.Space = true; SFX.init(); pressAction('Enter'); return; }   // A on the deck: launch
+  // menus, the title, the pause screen and the carrier deck are HTML: there the pad moves the focus instead (padMenu)
+  const menu = !G || UI.open() || !!document.getElementById('title');
+  if(menu){
+    for(const code in padHeld) if(padHeld[code]){ padHeld[code] = false; if(!kbHeld[code]) keys[code] = false; }
+    if(!padWasMenu){ padWasMenu = true; padMenu.held = {...want}; }      // Start that opened the pause screen is not a press there
+    padMenuInput(want);
+    return;
+  }
+  // back in flight: a button still held from the menu (A that pressed "take off") stays ignored until released
+  if(padWasMenu){ padWasMenu = false; padBlocked = {...want}; }
+  for(const c in padBlocked){ if(want[c]) delete want[c]; else delete padBlocked[c]; }
   for(const code in padHeld) if(padHeld[code] && !want[code]){ padHeld[code] = false; if(!kbHeld[code]) keys[code] = false; }
   for(const code in want) if(!padHeld[code]){
     padHeld[code] = keys[code] = true; SFX.init();
     pressAction(code);
   }
 }
+// ---- Gamepad in the HTML menus ----
+// D-pad / stick move the focus to the nearest button in that direction (works for lists, grids and the side menu
+// alike, left-to-right or right-to-left); holding repeats. A presses the focused button (on the title screen:
+// continue), B goes back (pause: resume · home: close the open panel · briefing/hangar: "back"), Start resumes a
+// paused flight. On a volume slider left/right change the value. A gold ring shows the focus while the pad is used.
+const padMenu = {held:{}, rep:{}};
+function padMenuInput(want){
+  const now = performance.now();
+  for(const code of ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space','KeyX','Escape','KeyM']){
+    if(!want[code]){ padMenu.held[code] = false; continue; }
+    const arrow = code.startsWith('Arrow');
+    if(!padMenu.held[code]){ padMenu.held[code] = true; padMenu.rep[code] = now + 380; padMenuPress(code); }
+    else if(arrow && now >= padMenu.rep[code]){ padMenu.rep[code] = now + 110; padMenuPress(code); }
+  }
+}
+function menuFocusables(){
+  const root = document.getElementById('title') || UI.root;
+  return [...root.querySelectorAll('button:not([disabled]), input, [tabindex]:not([tabindex="-1"])')]
+    .filter(el => el.offsetParent !== null || el.getClientRects().length);
+}
+function focusDefault(){
+  const list = menuFocusables(); if(!list.length) return null;
+  const el = list.find(e => e.classList.contains('primary')) || list.find(e => e.classList.contains('next'))
+          || list.find(e => e.classList.contains('navbtn')) || list[0];   // home screen: the first menu entry
+  el.focus(); el.scrollIntoView({block:'nearest'}); return el;
+}
+function menuMove(dx, dy){
+  const list = menuFocusables(), cur = document.activeElement;
+  if(!list.includes(cur)){ focusDefault(); return; }
+  if(cur.matches('input[type=range]') && dx){             // a slider: left/right change the value
+    const rtl = getComputedStyle(cur).direction === 'rtl', step = +cur.step || 1;
+    cur.value = clamp(+cur.value + dx*(rtl ? -1 : 1)*step, +cur.min, +cur.max);
+    cur.dispatchEvent(new Event('input', {bubbles:true})); cur.dispatchEvent(new Event('change', {bubbles:true}));
+    return;
+  }
+  const r = cur.getBoundingClientRect(), cx = r.left + r.width/2, cy = r.top + r.height/2;
+  let best = null, bs = Infinity;
+  for(const el of list){
+    if(el === cur) continue;
+    const q = el.getBoundingClientRect(), x = q.left + q.width/2 - cx, y = q.top + q.height/2 - cy;
+    const along = dx ? x*dx : y*dy; if(along <= 4) continue;  // must lie in the pressed direction
+    const s = along + (dx ? Math.abs(y) : Math.abs(x))*2.5;    // prefer the one most nearly straight ahead
+    if(s < bs){ bs = s; best = el; }
+  }
+  if(best){ best.focus(); best.scrollIntoView({block:'nearest'}); }
+}
+function menuBack(){
+  if(G && G.paused){ pressAction('Escape'); return; }
+  if(!G && UI.homePanel){ const k = UI.homePanel; UI.act('home', k); const b = UI.root.querySelector(`[data-act="home"][data-v="${k}"]`); if(b) b.focus(); return; }
+  if(!G || G.state === 'over'){ const b = UI.root.querySelector('[data-act="menu"]'); if(b) b.click(); }
+}
+function padMenuPress(code){
+  document.body.classList.add('pad'); SFX.init();
+  const title = document.getElementById('title');
+  const prev = document.activeElement && document.activeElement.dataset ? {...document.activeElement.dataset} : {};
+  if(code === 'ArrowUp') menuMove(0, -1);
+  else if(code === 'ArrowDown') menuMove(0, 1);
+  else if(code === 'ArrowLeft') menuMove(-1, 0);
+  else if(code === 'ArrowRight') menuMove(1, 0);
+  else if(code === 'Space' || (code === 'Escape' && title)){       // A (or Start on the title screen)
+    const el = document.activeElement;
+    if(title) title.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true}));
+    else if(menuFocusables().includes(el)){ if(!el.matches('input')) el.click(); }
+    else focusDefault();
+  }
+  else if(code === 'KeyX') menuBack();                              // B
+  else if(code === 'Escape'){ if(G && G.paused) pressAction('Escape'); }   // Start: resume
+  else if(code === 'KeyM') pressAction('KeyM');
+  // after a click the screen may have been rebuilt: keep a focused button for the next press - inside a panel
+  // that was just opened, else on the same button as before (a toggle, a tab), else the screen's main button
+  setTimeout(() => {
+    const list = menuFocusables();
+    if(list.includes(document.activeElement) || (G && !UI.open())) return;
+    const panel = (prev.act === 'home' && UI.homePanel) ? UI.root.querySelector('.home-panel') : null;
+    const same = list.find(e => e.dataset.act && e.dataset.act === prev.act && e.dataset.v === prev.v && e.dataset.vol === prev.vol);
+    const el = (panel && list.find(e => panel.contains(e))) || same;
+    if(el){ el.focus(); el.scrollIntoView({block:'nearest'}); } else focusDefault();
+  }, 0);
+}
+window.addEventListener('mousemove', () => document.body.classList.remove('pad'), {passive:true});
 window.addEventListener('gamepadconnected', e=>{ if(G && e.gamepad.mapping==='standard') say('בקר משחק חובר', 2); });
 
 function toggleWingMode(){
@@ -142,9 +237,35 @@ function update(dt, vw){
 // browser's timestamps is smoothed out; a long gap (tab switched away) is limited to 0.1 s.
 let last = performance.now(), smoothDt = 1/60;
 const STEP = 1/60;
+// ---- F3: frame-time meter ----
+// Shows how long the game's own work takes per frame (simulation + drawing, in ms: average, 95th percentile and
+// worst of the last 2 seconds) against the 16.7 ms budget of a 60 Hz screen, plus the screen's real frame rate and
+// the number of live effects. Measure here before optimizing anything.
+const PERF = {on:false, work:new Float32Array(120), gap:new Float32Array(120), i:0, n:0};
+function perfRecord(work, gap){ PERF.work[PERF.i] = work; PERF.gap[PERF.i] = gap; PERF.i = (PERF.i+1) % 120; PERF.n = Math.min(120, PERF.n+1); }
+function drawPerf(){
+  if(!PERF.on || !PERF.n) return;
+  const w = Array.from(PERF.work.subarray(0, PERF.n)).sort((a,b)=>a-b), g = PERF.gap.subarray(0, PERF.n);
+  const avg = w.reduce((s,v)=>s+v, 0)/w.length, p95 = w[Math.floor(w.length*0.95)], max = w[w.length-1];
+  const fps = 1000/(g.reduce((s,v)=>s+v, 0)/g.length);
+  const lines = [`work ${avg.toFixed(1)} ms · p95 ${p95.toFixed(1)} · max ${max.toFixed(1)} (budget 16.7)`,
+    `${fps.toFixed(0)} fps · ${CW}×${CH}` + (G ? ` · fx ${G.fx.length} · debris ${G.debris.length} · shots ${G.shots.length} · enemies ${G.enemies.length}` : '')];
+  ctx.save();                                          // the HUD's text settings must be untouched next frame
+  ctx.setTransform(1,0,0,1,0,0); ctx.font = '13px monospace'; ctx.direction = 'ltr'; ctx.textAlign = 'left'; ctx.globalAlpha = 1;
+  const wd = Math.max(...lines.map(l => ctx.measureText(l).width)) + 16;
+  ctx.fillStyle = 'rgba(0,0,0,.65)'; ctx.fillRect(8, 8, wd, 44);
+  ctx.fillStyle = p95 > 16.7 ? '#ff8f6b' : '#9be59b'; lines.forEach((l, i) => ctx.fillText(l, 16, 26 + i*18));
+  ctx.restore();
+}
+window.addEventListener('keydown', e=>{ if(e.code==='F3'){ e.preventDefault(); PERF.on = !PERF.on; PERF.n = 0; } });
+
 function frame(now){
   if(window.__noLoop) return;                          // tests.html drives update() itself
   requestAnimationFrame(frame);                        // scheduled first, so one bad frame can never stop the game loop
+  const gapMs = now - last, w0 = performance.now();
+  try{ frameWork(now); } finally { if(PERF.on){ perfRecord(performance.now() - w0, gapMs); drawPerf(); } }
+}
+function frameWork(now){
   let real = Math.min(0.1, Math.max(0, (now-last)/1000)); last = now;
   if(!CW || !CH){ if(window.innerWidth && window.innerHeight) resize(); return; }   // minimised / zero-size window: nothing to draw
   if(Math.abs(real - smoothDt) < smoothDt*0.25) real = smoothDt = smoothDt*0.9 + real*0.1;   // de-jitter normal frames

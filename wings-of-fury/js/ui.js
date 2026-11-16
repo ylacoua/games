@@ -27,6 +27,8 @@ const UI = {
       <b>Z</b><span>גלגול חבית</span>
       <b>Esc</b><span>עצירה · <b>M</b> השתקה</span>
       <b>🎮</b><span>בקר משחק: סטיק שמאלי או חצים לטיסה · A או RT מקלעים · B חימוש · X גלגול חבית · Y פקודה לכנפיים · RB / LB מצערת · Start עצירה</span>
+      <b>🎮</b><span>בקר משחק בתפריטים: חצים או סטיק לבחירה · A לאישור · B חזרה</span>
+      <b>F3</b><span>מד ביצועים: זמן פריים במילישניות</span>
     </div>
     <p class="note">נחיתה: התקרב לנושאת נמוך, במצערת נמוכה ובאף כמעט ישר. מהירות מתחת ל-225 וזווית קטנה.</p>`;
   },
@@ -51,7 +53,7 @@ const UI = {
     this.confirmReset=false; Music.start();
     const p = this.homePanel;
     const nav = [['tut','משימות הדרכה','שיעורי טיסה ואימון חופשי'],['camp','משימות הקמפיין','משימות 1 עד 6'],
-                 ['extra','משימות נוספות','10 משימות מיוחדות'],['keys','תפעול המשחק','מקשים ולחצנים']]
+                 ['extra','משימות נוספות','10 משימות מיוחדות'],['keys','תפעול המשחק','מקשים ולחצנים'],['set','הגדרות','צליל, רעידת מסך והבזקים']]
       .map(([k,t,s])=>`<button class="navbtn ${p===k?'on':''}" data-act="home" data-v="${k}" aria-expanded="${p===k}"><b>${t}</b><small>${s}</small></button>`).join('');
     const reset = `<button class="link" data-act="reset">איפוס התקדמות</button>`;
     const cur = SAVE.difficulty || 'normal';
@@ -62,19 +64,42 @@ const UI = {
     const langSel = `<div class="diff lang"><span class="lbl" data-notr>שפה · Language</span><div class="seg" role="radiogroup" aria-label="Language">
       <button role="radio" lang="he" dir="rtl" aria-checked="${lg==='he'}" class="${lg==='he'?'on':''}" data-act="lang" data-v="he" data-notr>עברית</button>
       <button role="radio" lang="en" dir="ltr" aria-checked="${lg==='en'}" class="${lg==='en'?'on':''}" data-act="lang" data-v="en">English</button></div></div>`;
-    // effects: screen shake strength and full-screen flashes (also lowered by the system's "reduce motion")
-    const sh = SAVE.shake >= 1 ? 1 : SAVE.shake > 0 ? 0.5 : 0;
-    const fxSel = `<div class="diff"><span class="lbl">רעידת מסך</span><div class="seg" role="radiogroup" aria-label="רעידת מסך">
-      ${[[1,'מלאה'],[0.5,'מופחתת'],[0,'כבויה']].map(([v,n])=>`<button role="radio" aria-checked="${sh===v}" class="${sh===v?'on':''}" data-act="shake" data-v="${v}">${n}</button>`).join('')}</div>
-      <button role="switch" aria-checked="${!!SAVE.flashes}" data-act="flashes">${SAVE.flashes ? 'הבזקים: פועלים' : 'הבזקים: מופחתים'}</button></div>`;
     const notice = SAVE_NOTICE ? `<p class="tip" role="alert">${SAVE_NOTICE}</p>` : '';
     SAVE_NOTICE = null;
     this.root.innerHTML = `<div class="home">
       <header class="home-title"><h1>כנפי הרעם</h1><p class="welcome">ברוכים הבאים טייסים</p>${notice}</header>
-      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${langSel}${diffSel}${fxSel}${nav}${reset}</nav>
+      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${langSel}${diffSel}${nav}${reset}</nav>
       ${p ? `<section class="home-panel" aria-live="polite">${this.homePanelHTML(p)}</section>` : ''}
     </div>`;
     this.bind();
+    this.bindVolumes();
+  },
+  // Settings: volume sliders (main, effects, engine, music), screen shake strength and full-screen flashes
+  settingsHTML(){
+    const v = SAVE.vol || {}, pct = k => Math.round(clamp(v[k] ?? 1, 0, 1)*100);
+    const slider = (k, name) => `<label class="vol"><span>${name}</span>
+      <input type="range" min="0" max="100" step="5" value="${pct(k)}" data-vol="${k}" aria-label="${name}"><output>${pct(k)}%</output></label>`;
+    const sh = SAVE.shake >= 1 ? 1 : SAVE.shake > 0 ? 0.5 : 0;
+    return `<h3 style="margin:4px 0 8px">צליל</h3>
+      <div class="vols">${slider('main','עוצמה ראשית')}${slider('sfx','אפקטים')}${slider('engine','מנוע')}${slider('music','מוזיקה')}</div>
+      <p class="note">M משתיק ומחזיר את הצליל גם בזמן טיסה.</p>
+      <h3 style="margin:16px 0 8px">רעידת מסך</h3>
+      <div class="diff"><div class="seg" role="radiogroup" aria-label="רעידת מסך">
+      ${[[1,'מלאה'],[0.5,'מופחתת'],[0,'כבויה']].map(([v,n])=>`<button role="radio" aria-checked="${sh===v}" class="${sh===v?'on':''}" data-act="shake" data-v="${v}">${n}</button>`).join('')}</div>
+      <small>המסך רועד מפגיעות ומפיצוצים קרובים.</small></div>
+      <h3 style="margin:16px 0 8px">הבזקים</h3>
+      <div class="diff"><button role="switch" aria-checked="${!!SAVE.flashes}" data-act="flashes">${SAVE.flashes ? 'הבזקים: פועלים' : 'הבזקים: מופחתים'}</button>
+      <small>מופחתים: הברק הוא גוון חלש, ופגיעה במטוס מסומנת במסגרת אדומה במקום הבזק אדום על כל המסך.</small></div>`;
+  },
+  bindVolumes(){
+    this.root.querySelectorAll('input[data-vol]').forEach(inp => {
+      const k = inp.dataset.vol, out = inp.nextElementSibling;
+      inp.addEventListener('input', () => {
+        SAVE.vol = SAVE.vol || {}; SAVE.vol[k] = (+inp.value)/100; if(out) out.textContent = inp.value + '%';
+        SFX.init(); SFX.applyVolumes();
+      });
+      inp.addEventListener('change', () => { storeSave(); if(k==='sfx' || k==='main') SFX.pickup(); });   // a sample at the new level
+    });
   },
   homePanelHTML(p){
     const time = {day:'יום',dawn:'שחר',dusk:'שקיעה',night:'לילה'};
@@ -102,6 +127,7 @@ const UI = {
         <div class="list">${row('def', DEFENSE, '⚓')}${row('gnd', GROUND, '⚑')}
         ${SPECIAL_ORDER.map(k=>row(k, {...SPECIALS[k], name:SPECIALS[k].name + won(k)}, SPECIALS[k].icon)).join('')}</div>`;
     }
+    if(p==='set') return `<h2>הגדרות</h2><p class="sub">נשמרות אוטומטית.</p>${this.settingsHTML()}`;
     return `<h2>תפעול המשחק</h2><p class="sub">מקלדת. במסך מגע מופיעים לחצנים בתחתית המסך.</p>${this.keysHTML()}
       <h3 style="margin:16px 0 8px">תמרוני קרב</h3>${this.maneuversHTML()}
       <h3 style="margin:16px 0 8px">לחצני מסך מגע</h3>

@@ -1,6 +1,6 @@
 // ---- Static game data: planes, ordnance, upgrades, wingmen, levels ----
 // Game version: bumped with every requested change (shown on the title screen)
-const GAME_VERSION = '1.57';
+const GAME_VERSION = '1.58';
 const GAME_SPEED = 0.85;     // overall pace of the game (1 = original speed)
 
 const H = 600;          // logical world height
@@ -160,7 +160,8 @@ const reducedMotion = () => !!(window.matchMedia && matchMedia('(prefers-reduced
 function defaultSave(){ return {version:SAVE_VERSION, money:0, owned:{hellcat:true}, plane:'hellcat', up:{engine:0,armor:0,guns:0,payload:0,fuel:0}, unlocked:1, best:{},
   skins:{standard:true}, skin:'standard', won:{}, difficulty:'normal', lang:'he',
   shake: reducedMotion() ? 0.5 : 1,   // screen shake strength: 1 full, 0.5 reduced, 0 off
-  flashes: !reducedMotion()};         // full-screen flashes (lightning, being hit); off = a soft tint instead
+  flashes: !reducedMotion(),          // full-screen flashes (lightning, being hit); off = a soft tint instead
+  vol: {main:1, sfx:1, engine:1, music:1}};   // volume sliders 0..1 (audio.js squares them)
 }
 const isObj = v => !!v && typeof v === 'object' && !Array.isArray(v);
 function fillDefaults(def, s){

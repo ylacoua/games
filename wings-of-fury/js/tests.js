@@ -106,6 +106,25 @@ test('תחושה: רעידה דועכת לאפס, עצירת פגיעה לא נ�
   G = null;
   return 'דעיכה, עצירה יחידה, כיבוי, מרחק';
 });
+test('צליל: ערוצים נפרדים, מחוון בריבוע, השתקה ומגביל', async () => {
+  const keep = SAVE.vol, muted = SFX.muted;
+  try{
+    SAVE.vol = {main:1, sfx:1, engine:1, music:1}; SFX.muted = false;
+    let g = SFX.busGains();
+    assert(g.out === MAIN_GAIN && g.sfx === 1 && g.engine === 1 && g.music === 1, 'ברירת המחדל משנה את עוצמת המשחק המקורית');
+    SAVE.vol = {main:0.5, sfx:1, engine:0, music:0.5}; g = SFX.busGains();
+    assert(g.out === MAIN_GAIN*0.25 && g.music === 0.25 && g.engine === 0, 'המחוון לא עובר בריבוע או לא שקט ב-0');
+    SFX.muted = true; assert(SFX.busGains().out === 0, 'ההשתקה לא מאפסת');
+    SAVE.vol = {main:7, sfx:-1}; SFX.muted = false; g = SFX.busGains();
+    assert(g.out === MAIN_GAIN && g.sfx === 0 && g.music === 1, 'ערכים מחוץ לטווח לא נחתכים');
+    SFX.init();
+    if(SFX.ctx){
+      assert(SFX.engineBus && SFX.musicBus && SFX.limiter && SFX.limiter.ratio.value >= 12, 'חסרים ערוצים או מגביל');
+      return 'ראשי / אפקטים / מנוע / מוזיקה → מגביל';
+    }
+    return 'חישוב העוצמות (אין WebAudio בדפדפן הזה)';
+  } finally { SAVE.vol = keep; SFX.muted = muted; }
+});
 test('קצב פריימים: הגשם והעשן לא תלויים במספר הציורים בשנייה', async () => {
   freshSave(); launch(0); fly();
   G.weather.rain = 1;
@@ -150,11 +169,17 @@ test('רמות קושי: זמן הישרדות של טייס פסיבי יורד
     const want = clamp((P.y - alt)/150, -0.35, 0.35);
     if(!P.loop && !P.vl && !P.mv){ if(P.p < want-0.04) keys.ArrowUp = true; else if(P.p > want+0.04) keys.ArrowDown = true; }
     const is = G.islands[0]; if(P.x > is.x1+250 && P.f>0 && !P.loop) keys.ArrowLeft = true; if(P.x < is.x0-350 && P.f<0 && !P.loop) keys.ArrowRight = true; };
-  const sec = {};
+  // the flak and fighters are random, so one flight per level can come out close (hard and expert once ranked
+  // the wrong way round); the average of 3 flights is stable
+  const sec = {}, RUNS = 3;
   for(const k of LEVELS_D){
-    freshSave(k); launch(3); fly(G.islands[0].x0 - 300, 280); let t = 0;
-    await sim(180, tt => { t = tt; const P = G.player; if(P.dead) return true; P.fuel = P.maxFuel; pilot(P, 280); }, 0);
-    sec[k] = t; for(const kk in keys) keys[kk] = false;
+    let sum = 0;
+    for(let r = 0; r < RUNS; r++){
+      freshSave(k); launch(3); fly(G.islands[0].x0 - 300, 280); let t = 0;
+      await sim(180, tt => { t = tt; const P = G.player; if(P.dead) return true; P.fuel = P.maxFuel; pilot(P, 280); }, 0);
+      sum += t; for(const kk in keys) keys[kk] = false;
+    }
+    sec[k] = sum / RUNS;
   }
   for(let i=1;i<LEVELS_D.length;i++) assert(sec[LEVELS_D[i]] < sec[LEVELS_D[i-1]], `לא מדורג: ${JSON.stringify(sec)}`);
   return LEVELS_D.map(k=>`${DIFFICULTY[k].name}: ${sec[k].toFixed(0)} שנ'`).join(' · ') + ' (משימה 4)';
@@ -168,7 +193,7 @@ test('שפה: באנגלית אין עברית בתפריטים ובתצוגת �
   try{
     freshSave(); setLang('en');
     assert(document.documentElement.dir==='ltr', 'הכיוון לא התחלף ל-ltr');
-    for(const p of ['tut','camp','extra','keys']){ UI.homePanel = p; G = null; UI.mainMenu(); await tick(); scan(); }
+    for(const p of ['tut','camp','extra','keys','set']){ UI.homePanel = p; G = null; UI.mainMenu(); await tick(); scan(); }
     const keysL = [...LEVELS.keys(), 'def', 'gnd', ...Object.keys(SPECIALS)];
     for(const k of keysL){
       G = null; UI.briefing(k); await tick(); scan(); UI.act('hangar', String(k)); await tick(); scan();

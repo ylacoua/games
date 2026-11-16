@@ -183,6 +183,15 @@ Object.assign(LANG_EN, {'הדרכה:':'Training:', 'רוח':'Wind', 'סערה':'
   'השמירה נפגמה ושוחזרה מהגיבוי האחרון':'Your save was damaged and has been restored from the last backup',
   'השמירה נפגמה ואין גיבוי, המשחק מתחיל מחדש. העותק הפגום נשמר בצד':'Your save was damaged and no backup was found, so the game starts over. The damaged copy was kept aside',
   'בקר משחק חובר':'Gamepad connected',
+  // v1.58: settings panel (volume, shake, flashes) and frame-time overlay
+  'הגדרות':'Settings', 'צליל, רעידת מסך והבזקים':'Sound, screen shake and flashes', 'נשמרות אוטומטית':'Saved automatically',
+  'צליל':'Sound', 'עוצמה ראשית':'Main volume', 'אפקטים':'Effects', 'מוזיקה':'Music', 'הבזקים':'Flashes',
+  'M משתיק ומחזיר את הצליל גם בזמן טיסה':'M mutes and unmutes the sound, also in flight',
+  'המסך רועד מפגיעות ומפיצוצים קרובים':'The screen shakes from hits and nearby explosions',
+  'מופחתים: הברק הוא גוון חלש, ופגיעה במטוס מסומנת במסגרת אדומה במקום הבזק אדום על כל המסך':
+    'Reduced: lightning is a faint tint, and a hit on your aircraft shows as a red frame instead of a full red flash',
+  'בקר משחק בתפריטים: חצים או סטיק לבחירה · A לאישור · B חזרה':'Gamepad in menus: D-pad or stick to move · A to select · B back',
+  'מד ביצועים: זמן פריים במילישניות':'Performance meter: frame time in milliseconds',
   'בקר משחק: סטיק שמאלי או חצים לטיסה · A או RT מקלעים · B חימוש · X גלגול חבית · Y פקודה לכנפיים · RB / LB מצערת · Start עצירה':
     'Gamepad: left stick or D-pad to fly · A or RT guns · B ordnance · X barrel roll · Y wingmen order · RB / LB throttle · Start pause', 'כנפי הרעם: מטוס הלקט מעל נושאת מטוסים בקרב מול מטוסי זירו':'Wings of Fury: a Hellcat over an aircraft carrier fighting Zeros'});
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', applyLang); else applyLang();
