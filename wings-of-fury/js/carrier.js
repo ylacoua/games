@@ -49,6 +49,43 @@ function carrierAA(C, dt){
   }
 }
 
+// Deck crew in the coloured jerseys of a US carrier (yellow: plane directors, blue: handlers, red: ordnance,
+// green: arresting gear), strolling back and forth on their stretch of deck and standing still while an aircraft
+// rolls past them. At the stern the landing signal officer raises his paddles and waves them while the player
+// is on approach with the wheels down.
+const CREW = [[0.10,'#e8c23a'],[0.21,'#2f5fb0'],[0.34,'#c8402f'],[0.47,'#3f8f4a'],[0.82,'#2f5fb0'],[0.93,'#e8c23a']];
+function crewman(ctx, cx, cy, col, step, armL, armR){
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#3a3f46'; ctx.lineWidth = 1.3;                                  // legs (dungarees)
+  ctx.beginPath(); ctx.moveTo(cx, cy-4); ctx.lineTo(cx - 1.4*step, cy); ctx.moveTo(cx, cy-4); ctx.lineTo(cx + 1.4*step, cy); ctx.stroke();
+  ctx.fillStyle = col; ctx.fillRect(cx-1.4, cy-8.5, 2.8, 4.8);                         // jersey
+  ctx.strokeStyle = col; ctx.lineWidth = 1.1;                                          // arms
+  ctx.beginPath(); ctx.moveTo(cx-1, cy-7.5); ctx.lineTo(cx-1 + Math.cos(armL)*4, cy-7.5 + Math.sin(armL)*4);
+  ctx.moveTo(cx+1, cy-7.5); ctx.lineTo(cx+1 + Math.cos(armR)*4, cy-7.5 + Math.sin(armR)*4); ctx.stroke();
+  ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy-10, 1.5, 0, 7); ctx.fill();   // helmet in the same colour
+}
+function drawDeckCrew(ctx, C, x, L, t){
+  const P = G.player, deckY = DECK_Y - 3.5;
+  for(let i=0;i<CREW.length;i++){
+    const [u, col] = CREW[i], home = x + L*u;
+    const busy = (P.onDeck && P.deckC === C && Math.abs(P.x - home) < 60 && P.speed > 10)
+      || G.wingmen.some(w => !w.dead && Math.abs(w.x - home) < 50 && Math.abs(w.y - DECK_Y) < 14);
+    const walk = busy ? 0 : Math.sin(t*0.35 + i*1.9)*12, moving = !busy && Math.abs(Math.cos(t*0.35 + i*1.9)) > 0.3;
+    const step = moving ? Math.sin(t*7 + i) : 0.35;
+    const arm = busy ? -Math.PI/2 + Math.sin(t*6 + i)*0.4 : Math.PI/2 + 0.25;       // a director signals as a plane passes
+    crewman(ctx, home + walk, deckY, col, step, arm, busy ? -Math.PI/2 - Math.sin(t*6 + i)*0.4 : Math.PI/2 - 0.25);
+  }
+  // landing signal officer on his platform at the stern, port side
+  const lx = x + 6, onFinal = !P.dead && !P.onDeck && P.gear > 0.5 && P.f > 0 && P.x < x + 40 && P.x > x - 900 && P.y > DECK_Y - 260;
+  const wave = onFinal ? Math.sin(t*5)*0.35 : 0, up = onFinal ? -Math.PI*0.9 : Math.PI/2 + 0.3;
+  crewman(ctx, lx, deckY, '#d8d2c0', 0.35, up - wave, onFinal ? -Math.PI*0.1 + wave : Math.PI/2 - 0.3);
+  if(onFinal){                                                                          // the two orange paddles
+    ctx.fillStyle = '#ff8a2a';
+    const pl = [up - wave, -Math.PI*0.1 + wave];
+    for(const [k, a] of pl.entries()){ const sx = lx + (k ? 1 : -1) + Math.cos(a)*5.5, sy = deckY - 7.5 + Math.sin(a)*5.5; ctx.fillRect(sx - 1.6, sy - 1.6, 3.2, 3.2); }
+  }
+}
+
 function drawCarrier(ctx, C){
   const x=C.x, L=C.len, night = G.weather.time==='night', t = G.time;
   if(!C.guns) C.guns = makeCarrierGuns(L);
@@ -120,6 +157,8 @@ function drawCarrier(ctx, C){
   for(const px of [x+L+4, x+L+30]){
     ctx.save(); ctx.translate(px, DECK_Y-8); ctx.scale(-0.55,0.55); drawPlane(ctx,'hellcat',null,null,1,false,false,1); ctx.restore();
   }
+
+  drawDeckCrew(ctx, C, x, L, t);
 
   // --- island superstructure ---
   const ix = x+L*0.62;

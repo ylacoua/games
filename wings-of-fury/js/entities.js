@@ -16,7 +16,7 @@ function updatePlayer(dt){
   const P = G.player, st = G.stats, K = keys;
   const C = P.onDeck ? (P.deckC || G.carrier) : nearestCarrier(P.x);   // the deck we are on, or the nearest one
   if(P.dead) return;
-  P.inv = Math.max(0, P.inv-dt); P.hitT = Math.max(0, P.hitT-dt);
+  P.inv = Math.max(0, P.inv-dt); P.hitT = Math.max(0, P.hitT-dt); P.muzzle = Math.max(0, (P.muzzle||0)-dt);
   P.cool -= dt; P.ordCool -= dt; P.gunnerCool -= dt;
 
   // ---- on the carrier deck: taxi, take-off or roll out after landing ----
@@ -125,6 +125,13 @@ function updatePlayer(dt){
   if(!outOfFuel){ P.fuel -= (0.32+0.5*P.throttle)*dt; if(P.fuel<=0){ P.fuel=0; say('אזל הדלק! גלוש לנושאת',4); SFX.alarm(); } }
   else if(Math.random()<dt*0.5) {}
   if(P.hp < P.max*0.35){ P.smoke -= dt; if(P.smoke<=0){ P.smoke=0.05; puff(P.x-v.vx*0.03, P.y, '#333', 8); } }
+  // vapour: white trails in hard manoeuvres, and a contrail high up where the air is cold
+  const high = P.y < -420, hard = P.loop || P.vl || P.mv;
+  if((high || hard) && P.trX != null && P.speed > 90 && Math.abs(P.trX - P.x) + Math.abs(P.trY - P.y) < 60){
+    const tail = 12;
+    G.fx.push({type:'trail', x1:P.trX, y1:P.trY, x2:P.x - v.vx/Math.max(1,P.speed)*tail, y2:P.y - v.vy/Math.max(1,P.speed)*tail, t:0, max: high ? 1.8 : 0.7, w: high ? 2.2 : 1.4});
+  }
+  P.trX = P.x - v.vx/Math.max(1,P.speed)*12; P.trY = P.y - v.vy/Math.max(1,P.speed)*12;
 
   shootGuns(P, st, dt);
   if((K.KeyX||K.KeyB) && P.ordCool<=0 && P.ord>0) dropOrd(P);
@@ -155,7 +162,7 @@ function shootGuns(P, st, dt){
   const ca = Math.cos(spread), sa = Math.sin(spread);
   const dx = cx*ca - cy*sa, dy = cx*sa + cy*ca;
   G.shots.push({x:P.x+cx*24, y:P.y+cy*24-2, vx:dx*950+v.vx*0.5, vy:dy*950+v.vy*0.5, team:'p', dmg:6*st.gun, life:0.9});
-  P.cool = 1/st.rate; P.ammo--;
+  P.cool = 1/st.rate; P.ammo--; P.muzzle = 0.05;          // muzzle flash on the wings (render.js)
   if(Math.random()<0.6) SFX.gun();
   if(P.ammo===0) say('נגמרה התחמושת – חזור לנושאת',3);
 }
@@ -213,7 +220,10 @@ function updateProjectiles(dt){
   // bullets
   for(const s of G.shots){
     s.x+=s.vx*dt; s.y+=s.vy*dt; s.life-=dt;
-    if(s.y >= groundY(s.x)){ s.life=0; if(Math.random()<0.3) puff(s.x, s.y-2, overSea(s.x)?'#cfe6f2':'#a58d63', 3); continue; }
+    if(s.y >= groundY(s.x)){ s.life=0;
+      if(overSea(s.x)){ if(Math.random()<0.5 && G.fx.length < FX_MAX) G.fx.push({type:'spl', x:s.x, t:0, max:0.35, h:rnd(6,12)}); }   // a little spout of water
+      else if(Math.random()<0.3) puff(s.x, s.y-2, '#a58d63', 3);
+      continue; }
     if(s.team==='p') bulletVsEnemy(s); else bulletVsFriend(s);
   }
   G.shots = G.shots.filter(s=>s.life>0);
@@ -460,6 +470,21 @@ function puff(x,y,c,s,life=1){ if(G.fx.length > FX_MAX) return;
 
 function updateFx(dt){
   for(const f of G.fx){ f.t+=dt; if(f.type==='smoke'){ f.x+=f.vx*dt+G.weather.wind*0.3*dt; f.y+=f.vy*dt; } if(f.type==='text') f.y-=30*dt; }
+  // shot-down aircraft fall, spinning and trailing fire and smoke, until they hit the sea or the ground
+  for(const f of G.fx) if(f.type==='fall' && f.t < f.max){
+    f.vy += 300*dt; f.vx *= 1 - 0.3*dt; f.x += f.vx*dt; f.y += f.vy*dt; f.rot += f.spin*dt;
+    if(Math.random() < dt*28) puff(f.x, f.y, '#22201e', 9, 1.5);
+    const gy = groundY(f.x);
+    if(f.y >= gy - 4){ f.t = f.max; if(overSea(f.x)) splash(f.x); else boom(f.x, gy - 4, 32, true); }
+  }
+  // damaged enemy aircraft trail smoke from half strength, and burn below 30%
+  for(const e of G.enemies){
+    if(e.dead) continue;
+    if(e.hp0 == null) e.hp0 = e.max || e.hp;
+    const k = e.hp/e.hp0; e.burning = k < 0.3;
+    if(k < 0.55 && Math.random() < dt*(e.burning ? 30 : 14))
+      puff(e.x - Math.cos(e.a)*10, e.y - Math.sin(e.a)*10, e.burning ? '#1e1c1a' : '#45423f', e.burning ? 8 : 6, 1.2);
+  }
   G.fx = G.fx.filter(f=>f.t<f.max);
   for(const d of G.debris){ d.vy+=400*dt; d.x+=d.vx*dt; d.y+=d.vy*dt; d.r+=d.vr*dt; d.life-=dt; if(d.y>groundY(d.x)){ d.y=groundY(d.x); d.vx*=0.5; d.vy*=-0.2; }
     if(d.smoke && Math.random() < dt*18) puff(d.x, d.y, '#444', 6, 0.8); }   // smoking wreckage: ~18 puffs a second, whatever the screen's refresh rate

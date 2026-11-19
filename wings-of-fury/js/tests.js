@@ -138,6 +138,30 @@ test('גרפיקה: שמש מחוץ ללוחות, סימני חריכה מוגב
   G = null;
   return 'שמש/ירח מתחת ללוחות · חריכה ≤ 60 · 8 מצבי מזג אוויר';
 });
+test('גרפיקה 2: מטוס שהופל נופל עד הים, אויב פגוע מעשן, שובלים, עשן רך, כל מזג אוויר', async () => {
+  freshSave(); launch(0); fly(G.carrier.x + 1500, 150);
+  // an enemy over the sea is shot down: a falling wreck, which ends in a splash and disappears
+  const z = {type:'zero', x:G.player.x + 200, y:200, a:Math.PI, speed:220, hp:40, size:16, cool:9, burst:0, evade:0, dead:false};
+  G.enemies.push(z);
+  for(let i=0;i<3;i++) updateFx(1/60);
+  hurtEnemy(z, 22); for(let i=0;i<60;i++) updateFx(1/60);
+  assert(!z.dead && z.hp0 === 40 && !z.burning, 'אויב פגוע קל לא אמור לבעור');
+  hurtEnemy(z, 10); for(let i=0;i<30;i++) updateFx(1/60);
+  assert(z.burning, 'אויב פגוע קשה לא בוער');
+  hurtEnemy(z, 999);
+  const fall = G.fx.find(f => f.type === 'fall'); assert(fall, 'אין מטוס נופל');
+  let n = 0; while(G.fx.includes(fall) && n++ < 600) updateFx(1/60);
+  assert(!G.fx.includes(fall) && n < 600, 'המטוס הנופל לא הגיע לים');
+  // a hard turn leaves a vapour trail
+  const P = G.player; P.loop = {t:0}; for(let i=0;i<10;i++) update(1/60, 1200);
+  assert(G.fx.some(f => f.type === 'trail'), 'אין שובל אדים בפנייה חדה');
+  // every light and weather draws, including dawn fog, storm swell and lightning on the clouds
+  P.hp = P.max*0.15; P.muzzle = 0.05;
+  for(const time of ['day','dawn','dusk','night']) for(const rain of [0, 1]){ G.weather.time = time; G.weather.rain = rain; G.weather.flash = rain; render(ctx, CW || 320, CH || 180); }
+  assert(SMOKE_SPR.size > 0 && SMOKE_SPR.size <= 49, `מטמון העשן: ${SMOKE_SPR.size}`);
+  G = null;
+  return 'נפילה עד הים בתוך ' + n + ' צעדים · עשן ואש · שובל · 8 מצבי מזג אוויר';
+});
 test('קצב פריימים: הגשם והעשן לא תלויים במספר הציורים בשנייה', async () => {
   freshSave(); launch(0); fly();
   G.weather.rain = 1;

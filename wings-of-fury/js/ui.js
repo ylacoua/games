@@ -490,10 +490,11 @@ function drawHUD(ctx, vw, worldVW){
   // minimap
   // Radar: one linear scale for everything, in both axes, over the whole area things can be in
   // (left of our carrier to beyond the furthest enemy ship), so positions line up with each other.
-  const mw = Math.min(400, vw-400), mx = (vw-mw)/2, my = 8, mh = 42;
+  // (darker panel, taller and with bigger marks than before, so it can be read at a glance in a fight)
+  const mw = Math.min(420, vw-400), mx = (vw-mw)/2, my = 8, mh = 54;
   if(mw>120){
-    ctx.fillStyle='rgba(8,16,28,.22)'; ctx.fillRect(mx, my, mw, mh);
-    ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1; ctx.strokeRect(mx+0.5, my+0.5, mw-1, mh-1);
+    ctx.fillStyle='rgba(8,16,28,.55)'; ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeStyle='rgba(232,179,58,.35)'; ctx.lineWidth=1; ctx.strokeRect(mx+0.5, my+0.5, mw-1, mh-1);
     let x0 = -450, x1 = G.L + 450;
     for(const sh of G.ships) x1 = Math.max(x1, sh.x + sh.w/2 + 150);
     const kx = mw/(x1-x0), ky = (mh-6)/(SEA+12-CEIL);
@@ -501,10 +502,10 @@ function drawHUD(ctx, vw, worldVW){
     ctx.fillStyle='rgba(120,170,210,.35)'; ctx.fillRect(mx+1, sy(SEA), mw-2, 1);                                   // sea level
     for(const is of G.islands){ ctx.fillStyle='rgba(170,150,95,.75)'; ctx.fillRect(sx(is.x0), sy(SEA-is.h), (is.x1-is.x0)*kx, Math.max(2, is.h*ky)); }
     for(const C of [G.carrier, G.carrier2]) if(C){ ctx.fillStyle='rgba(170,190,210,.9)'; ctx.fillRect(sx(C.x), sy(DECK_Y)-1, Math.max(3, C.len*kx), 3); }
-    for(const s of G.structures) if(s.primary && !s.dead){ ctx.fillStyle='#e8b33a'; ctx.fillRect(sx(s.x)-1, sy(s.y-s.h)-1, 2, 2); }
-    for(const sh of G.ships) if(!sh.dead){ ctx.fillStyle='#e8b33a'; ctx.fillRect(sx(sh.x-sh.w/2), sy(SEA-sh.h*0.6)-1, Math.max(3, sh.w*kx), 2.5); }
-    for(const e of G.enemies){ if(e.dead) continue; ctx.fillStyle = e.type==='zero' ? '#e0503c' : '#ff9b5a'; const s = e.type==='emily' ? 4 : 2.5; ctx.fillRect(sx(e.x)-s/2, sy(e.y)-s/2, s, s); }
-    for(const w of G.wingmen) if(!w.dead){ ctx.fillStyle='#9fd0ff'; ctx.fillRect(sx(w.x)-1.25, sy(w.y)-1.25, 2.5, 2.5); }
+    for(const s of G.structures) if(s.primary && !s.dead){ ctx.fillStyle='#e8b33a'; ctx.fillRect(sx(s.x)-1.5, sy(s.y-s.h)-1.5, 3, 3); }
+    for(const sh of G.ships) if(!sh.dead){ ctx.fillStyle='#e8b33a'; ctx.fillRect(sx(sh.x-sh.w/2), sy(SEA-sh.h*0.6)-1.5, Math.max(4, sh.w*kx), 3); }
+    for(const e of G.enemies){ if(e.dead) continue; ctx.fillStyle = e.type==='zero' ? '#ff5a44' : '#ffa060'; const s = e.type==='emily' ? 5 : 3.5; ctx.fillRect(sx(e.x)-s/2, sy(e.y)-s/2, s, s); }
+    for(const w of G.wingmen) if(!w.dead){ ctx.fillStyle='#9fd0ff'; ctx.fillRect(sx(w.x)-1.5, sy(w.y)-1.5, 3, 3); }
     if(!P.dead){                                                                                                    // the player: a small arrow showing direction
       const px = sx(P.x), py = sy(P.y); ctx.fillStyle='#fff';
       ctx.beginPath(); ctx.moveTo(px+P.f*3.5, py); ctx.lineTo(px-P.f*2.5, py-2.5); ctx.lineTo(px-P.f*2.5, py+2.5); ctx.closePath(); ctx.fill();
@@ -518,7 +519,7 @@ function drawHUD(ctx, vw, worldVW){
   const bs = G.ships.find(s=>s.type==='battleship' && !s.dead); if(bs && Math.abs(bs.x-P.x)<1600){ boss=bs; bname='אוניית מערכה'; }
   const core = G.structures.find(s=>s.type==='core' && !s.dead); if(core && Math.abs(core.x-P.x)<1800){ boss=core; bname='מבצר החוף'; }
   if(boss){
-    const bw = Math.min(360, vw-60), bx=(vw-bw)/2, by=56;   // just below the radar
+    const bw = Math.min(360, vw-60), bx=(vw-bw)/2, by=68;   // just below the radar (which is 54 tall from y 8)
     ctx.fillStyle='rgba(8,16,28,.7)'; ctx.fillRect(bx,by,bw,16); ctx.fillStyle='#c8402f'; ctx.fillRect(bx+2,by+2,(bw-4)*clamp(boss.hp/boss.max,0,1),12);
     ctx.textAlign='center'; ctx.fillStyle='#fff'; ctx.font='12px Rubik, sans-serif'; ctx.fillText(bname, vw/2, by+8.5);
   }

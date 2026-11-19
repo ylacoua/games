@@ -67,7 +67,9 @@ function renderScene(ctx, cw, ch){
   const x0 = camX-100, x1 = camX+vw+100;
   drawSea(ctx, x0, x1, sky, W);
   if(sun) drawGlint(ctx, camX + sun.x*hs/scale, x0, x1, sun, W);   // the sun's (or moon's) path on the water
-  for(const is of G.islands) if(is.x1>x0 && is.x0<x1) drawIsland(ctx, is, x0, x1);
+  drawReflections(ctx, x0, x1, W);                     // dark, rippling reflections under the hulls and islands
+  if(W.rain > 0) drawRainSplashes(ctx, x0, x1, W);
+  for(const is of G.islands) if(is.x1>x0 && is.x0<x1){ drawIsland(ctx, is, x0, x1); drawShoreFoam(ctx, is, W); }
   drawCarrier(ctx, G.carrier);
   if(G.carrier2) drawCarrier(ctx, G.carrier2);
   drawSmokePillars(ctx, x0, x1, W);                    // destroyed targets keep burning: tall smoke behind them
@@ -77,6 +79,8 @@ function renderScene(ctx, cw, ch){
   for(const so of G.soldiers) drawSoldier(ctx, so);
   if(G.ground) drawGround(ctx);
   if(G.special) specialDraw(ctx);                      // special-mission objects: boats, convoy, bridge, train...
+  if(W.time==='dawn' && !stormy) drawFog(ctx, x0, x1, W);   // morning mist lying low over the water
+  drawShadows(ctx, W);                                 // aircraft flying low cast a shadow on the water / ground
   // projectiles
   ctx.lineCap='round';
   for(const s of G.shots){ ctx.strokeStyle = s.team==='p'?'#ffe58a':'#ff8f6b'; ctx.lineWidth = s.small ? 1 : 2; ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(s.x-s.vx*0.012, s.y-s.vy*0.012); ctx.stroke(); }
@@ -89,6 +93,10 @@ function renderScene(ctx, cw, ch){
     else if(e.type==='betty') drawAI(ctx, e, 'betty', 1, e.flash);
     else if(e.type==='val') drawAI(ctx, e, 'val', 1, e.flash, 1);   // the D3A had fixed, spatted landing gear
     else if(e.type==='emily') drawEmily(ctx, e);
+    if(e.burning && !e.dead){                          // badly hit: flames licking back from the engine
+      const bx = e.x - Math.cos(e.a)*4, by = e.y - Math.sin(e.a)*4, fl = 3 + Math.random()*3;
+      ctx.fillStyle = `rgba(255,${130 + (Math.random()*90|0)},40,.85)`; ctx.beginPath(); ctx.ellipse(bx, by, fl*1.4, fl*0.8, e.a, 0, 7); ctx.fill();
+    }
   }
   const P = G.player;
   if(!P.dead){
@@ -103,7 +111,16 @@ function renderScene(ctx, cw, ch){
       const yaw = (P.f>0 ? 0 : Math.PI) + (P.f>0 ? -1 : 1)*Math.PI*ease;
       const roll = -Math.sin(Math.PI*t)*0.75;
       drawPlane3D(ctx, G.stats.type, P.skin || null, 'us', yaw, roll, a, P.hitT>0, true);
-    } else drawPilotPlane(ctx, P, G.stats.type, 'us', a, P.hitT>0, P.throttle>0.05||P.speed>40, P.gear);
+    } else {
+      drawPilotPlane(ctx, P, G.stats.type, 'us', a, P.hitT>0, P.throttle>0.05||P.speed>40, P.gear);
+      drawPlayerDamage(ctx, P, a);                     // bullet holes, oil, a burning engine (render.js)
+    }
+    if(P.muzzle > 0 && !P.loop){                       // muzzle flash from the wing guns
+      const cx = P.f*Math.cos(a), cy = -Math.sin(a), mx = cx*27, my = cy*27 + 1;   // just ahead of the propeller disc
+      const mg = ctx.createRadialGradient(mx, my, 0, mx, my, 9);
+      mg.addColorStop(0, 'rgba(255,250,210,.95)'); mg.addColorStop(0.4, 'rgba(255,200,80,.8)'); mg.addColorStop(1, 'rgba(255,140,40,0)');
+      ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(mx, my, 9, 0, 7); ctx.fill();
+    }
     ctx.restore();
   }
   // effects
@@ -122,11 +139,20 @@ function renderScene(ctx, cw, ch){
   // night / dusk lighting
   if(sky.dark>0.3) drawDarkness(ctx, cw, ch, scale, camX, sky.dark, top);
   const vw0 = vw; { const vw = hvw; ctx.setTransform(hs,0,0,hs,0,0);
+  // dawn and dusk: everything (aircraft, ships, buildings) takes on the warm low light, multiplied over the picture,
+  // then the usual slight purple dimming
+  if(W.time==='dawn' || W.time==='dusk'){
+    ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = stormy ? 0.25 : 0.5;
+    ctx.fillStyle = W.time==='dawn' ? 'rgb(255,214,188)' : 'rgb(255,186,160)'; ctx.fillRect(0,0,vw,H);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+  }
   if(sky.dark>0 && sky.dark<=0.3){ ctx.fillStyle=`rgba(40,20,60,${sky.dark})`; ctx.fillRect(0,0,vw,H); }
   if(stormy){ ctx.fillStyle='rgba(30,40,50,.18)'; ctx.fillRect(0,0,vw,H); }
   // a soft darkening toward the screen edges frames the action, like the title painting (not at night: the dark
   // layer already does it)
   if(W.time!=='night') drawVignette(ctx, vw, stormy);
+  drawSpeedLines(ctx, vw, P);
+  if(G.time < 3.4) drawMissionIntro(ctx, vw);
   // rain
   if(W.rain>0){
     ctx.strokeStyle='rgba(190,210,230,.45)'; ctx.lineWidth=1; ctx.beginPath();
@@ -170,6 +196,167 @@ function drawCloud(ctx, x, y, s, W){
   ctx.ellipse(x, y-1*s, 56*s, 14*s, 0, 0, 7); ctx.ellipse(x-30*s, y+2*s, 30*s, 10*s, 0, 0, 7); ctx.ellipse(x+28*s, y-8*s, 34*s, 13*s, 0, 0, 7);
   ctx.ellipse(x+6*s, y-12*s, 26*s, 11*s, 0, 0, 7);
   ctx.fill();
+  // lightning: the clouds light up from inside for a moment (dimmer with "flashes: reduced")
+  if(W.flash > 0){
+    ctx.fillStyle = `rgba(235,240,255,${W.flash*(SAVE.flashes !== false ? 0.55 : 0.15)})`; ctx.beginPath();
+    ctx.ellipse(x, y, 46*s, 11*s, 0, 0, 7); ctx.ellipse(x+6*s, y-10*s, 22*s, 9*s, 0, 0, 7); ctx.fill();
+  }
+}
+
+// Rain on the sea: tiny rings that open and fade where the drops land, scattered across the visible water
+function drawRainSplashes(ctx, x0, x1, W){
+  const n = Math.floor(70*W.rain), span = x1 - x0;
+  ctx.strokeStyle = 'rgba(220,232,242,.5)'; ctx.lineWidth = 0.8;
+  for(let i=0;i<n;i++){
+    const tt = G.time*5 + i*0.37, ph = tt % 1, cyc = Math.floor(tt);
+    const h = Math.sin(i*12.9898 + cyc*78.233)*43758.5453, u = h - Math.floor(h);   // a new spot every cycle
+    const x = x0 + u*span, y = SEA + 3 + (i%4)*9;
+    ctx.globalAlpha = 1 - ph; ctx.beginPath(); ctx.ellipse(x, y, 1 + ph*4, 0.6 + ph*1.2, 0, 0, 7); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// Dawn fog: a low white band over the sea and the foot of the islands, with a few soft banks drifting through it
+function drawFog(ctx, x0, x1, W){
+  const g = ctx.createLinearGradient(0, SEA - 80, 0, SEA + 30);
+  g.addColorStop(0, 'rgba(240,230,225,0)'); g.addColorStop(0.6, 'rgba(240,230,225,.38)'); g.addColorStop(1, 'rgba(240,230,225,.15)');
+  ctx.fillStyle = g; ctx.fillRect(x0, SEA - 80, x1 - x0, 110);
+  const span = x1 - x0 + 400;
+  for(let i=0;i<7;i++){
+    const x = x0 - 200 + (((i*331 + G.time*(8 + i*2)) % span) + span) % span, y = SEA - 18 - (i%3)*12;
+    softSmoke(ctx, '#f2e8e2', x, y, 60 + (i%3)*25, 0.35);
+  }
+}
+
+// The island's two waterlines (where the ground meets the sea), found once per island
+function shoreOf(is){
+  if(is.shore) return is.shore;
+  let l = is.x0, r = is.x1;
+  while(l < is.x1 && groundY(l) >= SEA - 1) l += 4;
+  while(r > is.x0 && groundY(r) >= SEA - 1) r -= 4;
+  return (is.shore = [l, r]);
+}
+
+// Reflections: under each hull and island, a darker band of broken horizontal strokes that ripple sideways, so the
+// objects sit in the water instead of on top of it. Drawn right after the sea, before the objects themselves.
+function drawReflections(ctx, x0, x1, W){
+  const night = W.time==='night';
+  const band = (a, b, depth, rgb, alpha) => {
+    if(b < x0 || a > x1) return;
+    a = Math.max(a, Math.floor(x0/26)*26); b = Math.min(b, x1);   // only the part on screen (long coastlines)
+    for(let i=0;i<5;i++){
+      const y = SEA + 2 + i*depth/5, k = 1 - i/5, sh = Math.sin(G.time*2.2 + i*1.7)*3*(i+1)/3;
+      ctx.fillStyle = `rgba(${rgb},${alpha*k})`;
+      for(let x = a; x < b; x += 26){ const w = Math.min(20, b - x); ctx.fillRect(x + sh + (i%2)*6, y, w*(0.6 + 0.4*k), 1.6); }
+    }
+  };
+  for(const C of carriers()) band(C.x - 20, C.x + C.len + 40, 22, night ? '0,0,0' : '20,26,36', night ? 0.3 : 0.3);
+  for(const sh of G.ships) if(!sh.dead) band(sh.x - sh.w/2, sh.x + sh.w/2, 16, '20,26,36', 0.28);
+  for(const is of G.islands){ const [l, r] = shoreOf(is); band(l + 10, r - 10, 18, night ? '10,12,8' : '70,80,40', 0.22); }
+}
+
+// Foam where the island meets the sea: a few white ovals that swell and fade in a slow rhythm on each side
+function drawShoreFoam(ctx, is, W){
+  const [l, r] = shoreOf(is), night = W.time==='night';
+  for(const [x, dir] of [[l, -1], [r, 1]]){
+    for(let i=0;i<4;i++){
+      const ph = (G.time*0.5 + i*0.25 + (is.seed || 0)) % 1, fx = x + dir*(4 + i*9 + ph*6);
+      ctx.fillStyle = night ? `rgba(160,180,200,${0.3*(1-ph)})` : `rgba(245,250,252,${0.75*(1-ph)})`;
+      ctx.beginPath(); ctx.ellipse(fx, SEA + 1, 7 + ph*5, 1.6, 0, 0, 7); ctx.fill();
+    }
+  }
+}
+
+// Shadows: an aircraft below ~260 world units casts a soft dark oval straight down - on the sea, the island or
+// the carrier's deck. It grows sharper and darker as the aircraft gets lower, which makes height easy to judge.
+function drawShadows(ctx, W){
+  if(W.time==='night') return;
+  const base = W.time==='day' ? 0.32 : 0.2, decks = carriers();
+  const one = (x, y, w) => {
+    let gy = groundY(x);
+    for(const C of decks) if(x > C.x - 20 && x < C.x + C.len + 40 && y < DECK_Y) gy = DECK_Y - 3;
+    const h = gy - y; if(h < 6 || h > 260) return;
+    const q = 1 - h/260;
+    ctx.globalAlpha = base*q; ctx.beginPath(); ctx.ellipse(x, gy + 1.5, w*(0.55 + 0.45*q), 1.6 + 1.6*q, 0, 0, 7); ctx.fill();
+  };
+  ctx.fillStyle = '#081018';
+  const P = G.player;
+  if(!P.dead && !P.onDeck) one(P.x, P.y, 20);
+  for(const w of G.wingmen) if(!w.dead && w.state === 'fly') one(w.x, w.y, 18);
+  for(const e of G.enemies) if(!e.dead) one(e.x, e.y, e.type === 'zero' ? 16 : e.type === 'emily' ? 50 : 24);
+  ctx.globalAlpha = 1;
+}
+
+// Damage you can see on your own aircraft (drawn in the plane's frame, nose toward +x): bullet holes from 60%
+// strength, an oil streak along the fuselage from 40%, and the engine on fire below 22%.
+function drawPlayerDamage(ctx, P, a){
+  const k = P.hp/P.max, r = Math.abs(visRoll(P)); if(k > 0.6 || (r > 0.02 && r < Math.PI-0.02)) return;   // not mid-roll (3D model)
+  ctx.save(); ctx.scale(P.f, 1); ctx.rotate(-a);
+  if(r > 1) ctx.scale(1, -1);
+  ctx.fillStyle = 'rgba(20,18,16,.85)';
+  const holes = k < 0.35 ? 6 : 3;
+  for(let i=0;i<holes;i++){ ctx.beginPath(); ctx.arc(-10 + i*4.3 + (i%2)*1.5, -1.5 + (i%3)*1.4, 0.9 + (i%2)*0.4, 0, 7); ctx.fill(); }
+  if(k < 0.4){ ctx.strokeStyle = 'rgba(25,20,15,.55)'; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.moveTo(8, 1); ctx.quadraticCurveTo(-4, 2.5, -18, 1.5); ctx.stroke(); }
+  if(k < 0.22){
+    const fl = 4 + Math.random()*3;
+    ctx.fillStyle = `rgba(255,${130 + (Math.random()*90|0)},40,.9)`; ctx.beginPath(); ctx.ellipse(10, -1, fl, 2.6, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,170,.9)'; ctx.beginPath(); ctx.ellipse(12, -1, fl*0.4, 1.3, 0, 0, 7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// Mission start: the picture fades in from black, and the mission's name and difficulty appear across the
+// middle of the screen for a moment (HUD units). G.time starts at 0 with every mission.
+function drawMissionIntro(ctx, vw){
+  const t = G.time;
+  if(t < 0.7){ ctx.fillStyle = `rgba(5,9,15,${1 - t/0.7})`; ctx.fillRect(0, 0, vw, H); }
+  const a = t < 0.35 ? 0 : t < 0.9 ? (t-0.35)/0.55 : t < 2.6 ? 1 : Math.max(0, 1 - (t-2.6)/0.8);
+  if(a <= 0 || !G.def || !G.def.name) return;
+  ctx.save(); ctx.globalAlpha = a; ctx.textAlign = 'center'; ctx.direction = 'rtl';
+  const y = H*0.36, rise = (1 - Math.min(1, (t-0.35)/0.55))*8;
+  ctx.fillStyle = 'rgba(5,9,15,.45)'; ctx.fillRect(0, y - 40, vw, 66);
+  ctx.font = '34px "Secular One", Rubik, sans-serif'; ctx.fillStyle = '#e8b33a'; ctx.fillText(G.def.name, vw/2, y + rise);
+  ctx.font = '15px Rubik, sans-serif'; ctx.fillStyle = '#efe6cf'; ctx.fillText(`רמת קושי: ${diff().name}`, vw/2, y + 20 + rise);
+  ctx.restore();
+}
+
+// Speed lines: thin streaks racing past the edges of the screen at full speed or in a steep dive (HUD units).
+// They follow the screen-shake setting, so "shake off" also turns them off.
+function drawSpeedLines(ctx, vw, P){
+  if(P.dead || P.onDeck) return;
+  const top = G.stats.speed, k = clamp((P.speed - top*0.88)/(top*0.25), 0, 1) + (P.p < -0.7 ? clamp((P.speed - 150)/150, 0, 0.6) : 0);
+  const amt = Math.min(1, k) * clamp(SAVE.shake ?? 1, 0, 1); if(amt <= 0.02) return;
+  ctx.strokeStyle = `rgba(255,255,255,${0.22*amt})`; ctx.lineWidth = 1.2; ctx.beginPath();
+  for(let i=0;i<18;i++){
+    const row = (i*0.618) % 1, y = row < 0.5 ? row*H*0.6 + 30 : H - (row-0.5)*H*0.6 - 30;   // top and bottom bands only
+    const span = vw + 240, x = (((i*397) - G.time*1500*P.f) % span + span) % span - 120, len = 50 + (i%4)*25;
+    ctx.moveTo(x, y); ctx.lineTo(x + len*P.f, y);
+  }
+  ctx.stroke();
+}
+
+// ---- Soft smoke ----
+// Every puff of smoke is a soft, round "cloud" image instead of a hard-edged circle: the image is painted once per
+// colour (64x64, opaque core fading to nothing at the rim) and then stretched and faded with drawImage, which is
+// also cheaper than building a path for each puff. The visible size is about 0.7 of the image, so callers pass
+// the radius they used to draw and softSmoke enlarges it.
+const SMOKE_SPR = new Map();
+function smokeSprite(c){
+  let s = SMOKE_SPR.get(c); if(s) return s;
+  if(SMOKE_SPR.size > 48) SMOKE_SPR.clear();
+  s = document.createElement('canvas'); s.width = s.height = 64;
+  const g = s.getContext('2d'); g.fillStyle = c; g.fillRect(0, 0, 64, 64);
+  g.globalCompositeOperation = 'destination-in';          // keep the colour, take the alpha from a soft disc
+  const m = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.45, 'rgba(0,0,0,.8)'); m.addColorStop(0.75, 'rgba(0,0,0,.3)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = m; g.fillRect(0, 0, 64, 64);
+  SMOKE_SPR.set(c, s); return s;
+}
+function softSmoke(ctx, c, x, y, r, a){
+  if(a <= 0.003 || r <= 0) return;
+  const R = r*1.45, ga = ctx.globalAlpha; ctx.globalAlpha = Math.min(1, a*ga);
+  ctx.drawImage(smokeSprite(c), x - R, y - R, R*2, R*2);
+  ctx.globalAlpha = ga;
 }
 
 // A destroyed target keeps burning for a while: a column of smoke rises from it, leans with the wind, widens and
@@ -185,8 +372,8 @@ function drawSmokePillars(ctx, x0, x1, W){
     for(let i=0;i<N;i++){
       const p = (G.time*0.16 + i/N + seed) % 1;              // 0 at the fire, 1 at the top, then it starts again
       const y = base - p*tall*life, x = s.x + p*p*wind*3 + Math.sin(G.time*0.9 + i*2.1)*4*p;
-      const r = 9 + p*34, a = (night ? 0.32 : 0.26)*(1-p)*life*Math.min(1, p*6);
-      ctx.fillStyle = `rgba(${night ? '18,18,22' : '42,40,38'},${a})`; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill();
+      const r = 9 + p*34, a = (night ? 0.5 : 0.42)*(1-p)*life*Math.min(1, p*6);
+      softSmoke(ctx, night ? '#121216' : '#2a2826', x, y, r, a);
     }
   }
 }
@@ -254,12 +441,19 @@ function drawSea(ctx, x0, x1, sky, W){
   ctx.fillStyle=g; ctx.fillRect(x0,SEA,x1-x0,H-SEA);
   // a light line where the far sea meets the sky, and darker swell bands that drift slowly
   ctx.fillStyle = W.time==='night' ? 'rgba(120,140,180,.12)' : 'rgba(235,245,250,.28)'; ctx.fillRect(x0, SEA, x1-x0, 1.5);
-  ctx.fillStyle = 'rgba(0,20,40,.10)';
+  // in a storm the swell runs higher and faster, and its crests break into whitecaps
+  const storm = W.rain > 0.5, swell = storm ? 7 : 3, speed = storm ? 1.4 : 0.6;
+  ctx.fillStyle = storm ? 'rgba(0,15,30,.16)' : 'rgba(0,20,40,.10)';
   for(let row=0; row<3; row++){
-    const yy = SEA + 16 + row*24, ph = G.time*0.6 + row*2;
+    const yy = SEA + 16 + row*24, ph = G.time*speed + row*2;
     ctx.beginPath(); ctx.moveTo(x0, yy+12);
-    for(let x = Math.floor(x0/40)*40; x <= x1+40; x += 40) ctx.lineTo(x, yy + Math.sin(x*0.012 + ph)*3);
+    for(let x = Math.floor(x0/40)*40; x <= x1+40; x += 40) ctx.lineTo(x, yy + Math.sin(x*0.012 + ph)*swell);
     ctx.lineTo(x1+40, yy+12); ctx.closePath(); ctx.fill();
+    if(storm){
+      ctx.fillStyle = 'rgba(235,242,246,.55)';
+      for(let x = Math.floor(x0/40)*40; x <= x1+40; x += 40){ const s = Math.sin(x*0.012 + ph); if(s < -0.8) ctx.fillRect(x - 6, yy + s*swell - 1, 12 + (x%7), 1.6); }
+      ctx.fillStyle = 'rgba(0,15,30,.16)';
+    }
   }
   ctx.strokeStyle='rgba(255,255,255,.18)'; ctx.lineWidth=1.5; ctx.beginPath();
   const amp = W.rain>0.5?3:1.5;
@@ -442,8 +636,7 @@ function drawFx(ctx, f){
   switch(f.type){
     case 'boom':{
       // 1) a dark cloud that grows out of the fireball and lingers after it
-      if(k > 0.25){ const q = (k-0.25)/0.75; ctx.fillStyle = `rgba(38,34,30,${0.55*(1-q)})`;
-        ctx.beginPath(); ctx.arc(f.x, f.y - q*f.r*0.6, f.r*(0.55 + q*0.6), 0, 7); ctx.fill(); }
+      if(k > 0.25){ const q = (k-0.25)/0.75; softSmoke(ctx, '#26221e', f.x, f.y - q*f.r*0.6, f.r*(0.55 + q*0.6), 0.75*(1-q)); }
       // 2) the fireball: white-hot centre, orange body, red edge
       const r = f.r*(0.4+k);
       const g = ctx.createRadialGradient(f.x,f.y,0,f.x,f.y,r);
@@ -458,7 +651,7 @@ function drawFx(ctx, f){
       break; }
     case 'flak': {
       // an air burst: a fireball that flashes and rolls out, then a dirty black cloud hangs where it was
-      ctx.fillStyle=`rgba(32,30,28,${0.8*(1-k)})`; ctx.beginPath(); ctx.arc(f.x,f.y,f.r*(0.5+k*0.7),0,7); ctx.fill();
+      softSmoke(ctx, '#201e1c', f.x, f.y, f.r*(0.5+k*0.7), 0.95*(1-k));
       if(k < 0.45){
         const q = k/0.45, rr = f.r*(0.35 + q*0.85), g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
         g.addColorStop(0, `rgba(255,248,210,${1-q})`); g.addColorStop(0.35, `rgba(255,190,70,${0.95*(1-q)})`);
@@ -466,14 +659,24 @@ function drawFx(ctx, f){
         ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, 7); ctx.fill();
       }
       break; }
-    case 'smoke':
-      ctx.fillStyle=f.c; ctx.globalAlpha=0.5*(1-k); ctx.beginPath(); ctx.arc(f.x,f.y,f.s*(0.6+k),0,7); ctx.fill(); ctx.globalAlpha=1; break;
+    case 'smoke': softSmoke(ctx, f.c, f.x, f.y, f.s*(0.6+k), 0.62*(1-k)); break;
     case 'splash':
       ctx.fillStyle=`rgba(225,240,250,${1-k})`;
       for(let i=-2;i<=2;i++){ ctx.beginPath(); ctx.ellipse(f.x+i*7, SEA-30*Math.sin(k*Math.PI)*(1-Math.abs(i)*0.25), 3, 10*(1-k)+2, 0, 0, 7); ctx.fill(); } break;
     case 'wake':
       ctx.fillStyle=`rgba(230,245,255,${0.5*(1-k)})`; ctx.fillRect(f.x-6-k*10, f.y, 12+k*20, 2); break;
     case 'column': drawColumn(ctx, f); break;
+    case 'fall': {
+      ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot); drawPlane(ctx, f.kind, f.skin, null, 1, false, false); ctx.restore();
+      const fl = 5 + Math.random()*4;                  // the fire on the wreck
+      ctx.fillStyle = `rgba(255,${120 + (Math.random()*100|0)},40,.9)`; ctx.beginPath(); ctx.arc(f.x, f.y, fl, 0, 7); ctx.fill();
+      ctx.fillStyle = 'rgba(255,240,180,.85)'; ctx.beginPath(); ctx.arc(f.x, f.y, fl*0.4, 0, 7); ctx.fill();
+      break; }
+    case 'spl': {                                      // bullet hitting the sea: two thin spouts that rise and fall
+      const h = f.h*Math.sin(k*Math.PI); ctx.strokeStyle = `rgba(230,242,250,${0.85*(1-k)})`; ctx.lineWidth = 1.2;
+      ctx.beginPath(); ctx.moveTo(f.x-1.5, SEA); ctx.lineTo(f.x-2.5, SEA-h); ctx.moveTo(f.x+1.5, SEA); ctx.lineTo(f.x+2, SEA-h*0.7); ctx.stroke(); break; }
+    case 'trail': ctx.strokeStyle = `rgba(245,250,255,${0.55*(1-k)})`; ctx.lineWidth = f.w + k*2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(f.x1, f.y1); ctx.lineTo(f.x2, f.y2); ctx.stroke(); break;
     case 'tracer': ctx.strokeStyle=f.c; ctx.lineWidth=0.8; ctx.globalAlpha=1-k; ctx.beginPath(); ctx.moveTo(f.x1,f.y1); ctx.lineTo(f.x2,f.y2); ctx.stroke(); ctx.globalAlpha=1; break;
     case 'text':
       ctx.font='bold 14px Rubik, sans-serif'; ctx.textAlign='center'; ctx.fillStyle=`rgba(255,215,90,${1-k})`; ctx.fillText(f.text,f.x,f.y); break;
@@ -493,6 +696,9 @@ function drawDarkness(ctx, cw, ch, scale, camX, alpha, top){
   const hole=(x,y,r,a=1)=>{ const g=d.createRadialGradient(x,y,0,x,y,r); g.addColorStop(0,`rgba(0,0,0,${a})`); g.addColorStop(1,'rgba(0,0,0,0)'); d.fillStyle=g; d.beginPath(); d.arc(x,y,r,0,7); d.fill(); };
   const P=G.player;
   if(!P.dead) hole(P.x,P.y,150,0.85);
+  if(!P.dead && P.muzzle > 0) hole(P.x + P.f*Math.cos(heading(P))*24, P.y - Math.sin(heading(P))*24, 70, 0.7);   // gunfire lights up the dark
+  for(const f of G.fx) if(f.type==='fall') hole(f.x, f.y, 55, 0.7);                                            // a plane going down in flames
+  for(const e of G.enemies) if(!e.dead && e.burning) hole(e.x, e.y, 40, 0.5);
   hole(G.carrier.x+G.carrier.len*0.66+21, DECK_Y-90, 60, 0.7);
   for(let i=0;i<6;i++) hole(G.carrier.x+40+i*90, DECK_Y, 40, 0.5);
   for(const f of G.fx){
