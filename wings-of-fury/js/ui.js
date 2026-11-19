@@ -490,10 +490,11 @@ function drawHUD(ctx, vw, worldVW){
   // minimap
   // Radar: one linear scale for everything, in both axes, over the whole area things can be in
   // (left of our carrier to beyond the furthest enemy ship), so positions line up with each other.
-  // (darker panel, taller and with bigger marks than before, so it can be read at a glance in a fight)
+  // (taller and with bigger marks than before, so it can be read at a glance in a fight; the panel itself stays
+  // see-through - .55 in v1.60 hid the aircraft flying behind it)
   const mw = Math.min(420, vw-400), mx = (vw-mw)/2, my = 8, mh = 54;
   if(mw>120){
-    ctx.fillStyle='rgba(8,16,28,.55)'; ctx.fillRect(mx, my, mw, mh);
+    ctx.fillStyle='rgba(8,16,28,.24)'; ctx.fillRect(mx, my, mw, mh);
     ctx.strokeStyle='rgba(232,179,58,.35)'; ctx.lineWidth=1; ctx.strokeRect(mx+0.5, my+0.5, mw-1, mh-1);
     let x0 = -450, x1 = G.L + 450;
     for(const sh of G.ships) x1 = Math.max(x1, sh.x + sh.w/2 + 150);
