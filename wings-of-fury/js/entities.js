@@ -36,7 +36,9 @@ function updatePlayer(dt){
       P.speed += (P.throttle*st.speed*0.85 - P.speed)*0.7*dt;
       P.x += P.speed*dt;
       if(P.speed>0) G.state='fly';
-      if((K.ArrowUp && P.speed>120) || P.x > C.x+C.len){ P.onDeck=false; P.airT=0; if(K.ArrowUp) P.p=0.18; say('בהצלחה, טייס!',2); }
+      // rolling off the bow without pulling up: the nose comes up a touch, so the aircraft climbs away instead of
+      // settling below the deck edge
+      if((K.ArrowUp && P.speed>120) || P.x > C.x+C.len){ P.onDeck=false; P.airT=0; P.p = K.ArrowUp ? 0.18 : Math.max(P.p, 0.08); say('בהצלחה, טייס!',2); }
     }
     if(P.x < C.x || P.x > C.x+C.len){
       if(P.landing && P.speed>150){ P.onDeck=false; P.landing=false; }   // touch-and-go

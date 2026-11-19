@@ -162,6 +162,33 @@ test('גרפיקה 2: מטוס שהופל נופל עד הים, אויב פגו�
   G = null;
   return 'נפילה עד הים בתוך ' + n + ' צעדים · עשן ואש · שובל · 8 מצבי מזג אוויר';
 });
+test('גרסה: כל הסקריפטים ב-index.html נטענים עם מספר הגרסה (בלי קבצים ישנים מהמטמון)', async () => {
+  const html = await (await fetch('index.html', {cache:'no-store'})).text();
+  const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);
+  const bad = srcs.filter(s => !s.endsWith('?v=' + GAME_VERSION));
+  assert(srcs.length > 10 && !bad.length, `לא מעודכנים ל-${GAME_VERSION}: ${bad.slice(0, 4).join(', ')}`);
+  return `${srcs.length} סקריפטים · v=${GAME_VERSION}`;
+});
+test('המראה: המטוס לא קופץ למטה כשהוא עוזב את הסיפון', async () => {
+  const worst = [];
+  for(const pull of [false, true]){
+    freshSave(); launch(0); const P = G.player, C = G.carrier;
+    for(const k in keys) keys[k] = false; keys.KeyW = true;
+    let prev = null, w = 0, air = 0;
+    for(let i=0;i<700 && air < 60;i++){                  // the first second in the air
+      if(pull && P.speed > 125 && P.onDeck) keys.ArrowUp = true;
+      update(1/60, 1200);
+      const drawn = P.y - (P.liftV ?? 0);
+      if(prev != null && !P.onDeck){ air++; w = Math.max(w, drawn - prev); }   // screen y grows downward: positive = down
+      prev = drawn;
+    }
+    assert(air >= 60, 'המטוס לא המריא');
+    for(const k in keys) keys[k] = false;
+    worst.push(w); G = null;
+  }
+  assert(worst.every(w => w < 1), `ירידה בפריים אחד: ${worst.map(w => w.toFixed(2)).join(' / ')}`);
+  return `ירידה מרבית בפריים: ${worst.map(w => w.toFixed(2)).join(' / ')} (גלגול מהחרטום / משיכה)`;
+});
 test('קצב פריימים: הגשם והעשן לא תלויים במספר הציורים בשנייה', async () => {
   freshSave(); launch(0); fly();
   G.weather.rain = 1;

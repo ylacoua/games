@@ -102,7 +102,7 @@ function renderScene(ctx, cw, ch){
   if(!P.dead){
     const a = heading(P);
     // lift the sprite so the wheels sit on the deck rather than sinking into it
-    const lift = deckLift(G.stats.type, P.x, P.y, P.gear);
+    const lift = P.liftV ?? deckLift(G.stats.type, P.x, P.y, P.gear);   // smoothed in update() (main.js)
     ctx.save(); ctx.translate(P.x, P.y-lift);
     if(P.inv>0 && Math.floor(G.time*12)%2) ctx.globalAlpha=0.5;
     if(P.loop){

@@ -199,6 +199,8 @@ function update(dt, vw){
   G.time += dt;
   updateWeather(dt);
   updatePlayer(dt);
+  // the player's wheels-on-deck drawing offset follows its target smoothly once airborne (no jumps at the deck edge)
+  { const tl = deckLift(G.stats.type, P.x, P.y, P.gear); P.liftV = (P.onDeck || P.liftV == null) ? tl : P.liftV + (tl - P.liftV)*Math.min(1, dt*8); }
   updateWingmen(dt);
   updateEnemies(dt);
   updateGround(dt);

@@ -139,11 +139,15 @@ function wheelDrop(type, gear){
 }
 // How far to raise an aircraft sitting at DECK_Y-9 (or descending onto it) so its wheels rest exactly on the
 // flight deck instead of sinking into it. Fades out as it climbs away from the deck.
+// How far to raise an aircraft's drawing so its wheels sit on the deck (our carrier, or the second one in Carrier
+// Defense). It fades out over 60 units past either end of the deck and over 30 units of height: it used to switch
+// off all at once 20 units past the bow, which dropped a plane rolling off the deck ~7 units in a single frame.
 function deckLift(type, x, y, gear){
   if(!G || !gear) return 0;
-  const over = C => C && x > C.x-20 && x < C.x+C.len+20;      // our carrier, or the second one in Carrier Defense
-  if(!over(G.carrier) && !over(G.carrier2)) return 0;
-  return Math.max(0, wheelDrop(type, gear) - 9) * clamp(1 - (DECK_Y-9-y)/30, 0, 1);
+  let h = 0;
+  for(const C of [G.carrier, G.carrier2]) if(C){ const out = Math.max(C.x - x, x - (C.x + C.len), 0); h = Math.max(h, clamp(1 - out/60, 0, 1)); }
+  if(!h) return 0;
+  return Math.max(0, wheelDrop(type, gear) - 9) * clamp(1 - (DECK_Y-9-y)/30, 0, 1) * h;
 }
 
 // `color` may be a skin (see SKINS in data.js): its colours replace the type's scheme and its markings are added.
