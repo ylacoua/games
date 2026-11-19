@@ -287,20 +287,8 @@ function frameWork(now){
   } else drawTitleBackdrop(now/1000);
 }
 
-// animated ocean behind the menus
-function drawTitleBackdrop(t){
-  const scale = CH/H, vw = CW/scale;
-  ctx.setTransform(scale,0,0,scale,0,0);
-  const g = ctx.createLinearGradient(0,0,0,SEA); g.addColorStop(0,'#2b3c6b'); g.addColorStop(1,'#f2a66a');
-  ctx.fillStyle=g; ctx.fillRect(0,0,vw,SEA);
-  ctx.fillStyle='rgba(255,210,150,.9)'; ctx.beginPath(); ctx.arc(vw*0.25, SEA-60, 46, 0, 7); ctx.fill();
-  const s = ctx.createLinearGradient(0,SEA,0,H); s.addColorStop(0,'#4b5f86'); s.addColorStop(1,'#1e2a48');
-  ctx.fillStyle=s; ctx.fillRect(0,SEA,vw,H-SEA);
-  for(let i=0;i<3;i++){
-    const x = ((t*90 + i*vw/3) % (vw+200)) - 100, y = 200 + i*60 + Math.sin(t+i)*10;
-    ctx.save(); ctx.translate(x,y); ctx.rotate(Math.sin(t+i)*0.05); drawPlane(ctx, ['hellcat','corsair','avenger'][i], null, null, 1.4, false, true); ctx.restore();
-  }
-}
+// the air battle at sunset behind the menus (menuscene.js)
+function drawTitleBackdrop(t){ drawMenuScene(ctx, CW, CH, t); }
 
 UI.init();
 // Title screen: any key, click or tap continues to the main menu
