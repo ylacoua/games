@@ -205,7 +205,8 @@ function crashPlayer(reason){
   boom(P.x, Math.min(P.y, groundY(P.x)-4), 50, true, true); SFX.planeBoom(); addTrauma(0.85);
   if(overSea(P.x) && P.y>SEA-20) splash(P.x);
   for(let i=0;i<10;i++) G.debris.push({x:P.x,y:P.y,vx:rnd(-160,160),vy:rnd(-260,-40),r:rnd(0,6),vr:rnd(-8,8),life:2.5,c:G.stats.color});
-  say(reason + (G.lives>0 ? ` · נותרו ${G.lives} מטוסים` : ''), 4);
+  const bailed = bailOut(P);                                       // high enough: the pilot jumps (bailout.js)
+  say(reason + (bailed ? ' · הטייס קפץ במצנח!' : '') + (G.lives>0 ? ` · נותרו ${G.lives} מטוסים` : ''), 4);
   G.endT = 2.8;
 }
 

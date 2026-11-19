@@ -25,7 +25,7 @@ function tapS(){
 function pressAction(code){
   if(code==='KeyS') tapS();
   if(!G) return;
-  if(code==='Escape' || code==='KeyP'){ if(G.paused){ G.paused=false; UI.hide(); } else UI.pause(); }
+  if(code==='Escape' || code==='KeyP'){ if(G.paused){ G.paused=false; FlightMusic.duck(false); UI.hide(); } else UI.pause(); }
   if(code==='KeyM') say(SFX.toggleMute() ? 'צליל כבוי' : 'צליל פועל', 1.5);
   if(code==='KeyC') toggleWingMode();
   if(code==='Enter' && G.state==='rearm') UI.act('takeoff');
@@ -185,14 +185,57 @@ function toggleWingMode(){
   say({escort:'כנפיים: ליווי וחיפוי צמוד', attack:'כנפיים: תקיפה חופשית – כל אחד בוחר יריב משלו', defend:'כנפיים: הגנה קרובה על נושאת המטוסים'}[G.wingMode], 2.5);
 }
 
-// touch pad
-document.querySelectorAll('#touch button').forEach(b=>{
-  const k = b.dataset.k;
-  const down = e=>{ e.preventDefault(); SFX.init(); if(!G) return;
-    if(k==='Escape'){ UI.pause(); return; } if(k==='KeyC'){ toggleWingMode(); return; } keys[k]=true; if(k==='KeyS') tapS(); };
-  const up = e=>{ e.preventDefault(); keys[k]=false; };
-  b.addEventListener('pointerdown', down); b.addEventListener('pointerup', up); b.addEventListener('pointerleave', up); b.addEventListener('pointercancel', up);
+// ---- Touch controls (phones and tablets) ----
+// Two pads at the bottom corners, shown only while flying on a touch screen. Each finger is tracked on its own,
+// and a finger that slides from one button to the next releases the first and presses the second (so ▲ to ▼ is one
+// smooth movement, as on a real stick). Pause and the wingmen order act once, on the moment they are touched.
+const TOUCH = {fingers: new Map()};                    // pointerId -> the button it is holding
+function touchPress(b){
+  const k = b.dataset.k; b.classList.add('on');
+  if(!G) return;
+  if(k==='Escape'){ UI.pause(); return; } if(k==='KeyC'){ toggleWingMode(); return; }
+  keys[k] = true; if(k==='KeyS') tapS();
+  if(k==='KeyW' && G.state==='rearm') UI.act('takeoff');
+}
+function touchRelease(b){
+  b.classList.remove('on'); const k = b.dataset.k;
+  if(k !== 'Escape' && k !== 'KeyC' && ![...TOUCH.fingers.values()].some(o => o !== b && o.dataset.k === k)) keys[k] = false;
+}
+function touchAt(x, y){ const el = document.elementFromPoint(x, y); return el && el.closest ? el.closest('#touch button') : null; }
+function touchUse(){                                   // any touch: from now on the pads are offered while flying
+  if(!document.body.classList.contains('touch-on')) document.body.classList.add('touch-on');
+}
+window.addEventListener('touchstart', touchUse, {passive: true, once: true});
+if(window.matchMedia && matchMedia('(pointer:coarse)').matches) touchUse();
+document.querySelectorAll('#touch .pad').forEach(pad=>{
+  pad.addEventListener('pointerdown', e=>{
+    e.preventDefault(); SFX.init(); touchUse();
+    const b = touchAt(e.clientX, e.clientY); if(!b) return;
+    try{ pad.setPointerCapture(e.pointerId); }catch(err){}
+    TOUCH.fingers.set(e.pointerId, b); touchPress(b);
+  });
+  pad.addEventListener('pointermove', e=>{ if(TOUCH.fingers.has(e.pointerId)) touchSlide(e.pointerId, touchAt(e.clientX, e.clientY)); });
+  const end = e=>touchLift(e.pointerId);
+  pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end); pad.addEventListener('lostpointercapture', end);
 });
+// a finger moved onto another button (or off the buttons: now = null)
+function touchSlide(id, now){
+  const was = TOUCH.fingers.get(id);
+  if(now === was) return;
+  const k = now && now.dataset.k;
+  if(now && (k === 'Escape' || k === 'KeyC')) return;              // one-shot buttons are never slid onto
+  TOUCH.fingers.delete(id); if(was) touchRelease(was);
+  TOUCH.fingers.set(id, now || null); if(now) touchPress(now);
+}
+function touchLift(id){ const b = TOUCH.fingers.get(id); TOUCH.fingers.delete(id); if(b) touchRelease(b); }
+// pads show while flying (not over the menus); a hidden pad lets go of every finger
+let touchShown = null;
+function touchSync(){
+  const show = !!(G && !G.paused && G.state!=='over' && !UI.open());
+  if(show === touchShown) return;
+  touchShown = show; document.body.classList.toggle('flying', show);
+  if(!show) for(const [id, b] of TOUCH.fingers){ TOUCH.fingers.delete(id); if(b) touchRelease(b); }
+}
 
 function update(dt, vw){
   const P = G.player;
@@ -217,11 +260,15 @@ function update(dt, vw){
   // all targets down: campaign missions end with a counter-attack on the carrier (extras.js)
   if(!G.complete && !G.tutorial && !G.ground && !G.special && primariesLeft()===0) campaignEndgame();
   repairCrews();
+  starTick();                                                       // announces stars won or lost (extras.js)
+  radioUpdate(dt);                                                  // flight music intensity and radio calls (radio.js)
+  chutesUpdate(dt);                                                 // pilots under parachutes and in the water (bailout.js)
   if(G.carrier.hp<=0){ boom(G.carrier.x+G.carrier.len/2, DECK_Y, 120, true); UI.result(false, 'נושאת המטוסים הוטבעה.'); return; }
   if(P.dead){
     G.endT -= dt;
     if(G.endT<=0){
       if(G.lives>0){ if(G.tutorial) tutorialRespawn(); else { G.state='rearm'; UI.openDeck(true); } }
+      else if(chutePending()){ G.endT = 0.5; if(!G.waitSaid){ G.waitSaid = true; say('אין מטוסים נוספים – הכול תלוי עכשיו בחילוץ הטייס', 5); } }
       else UI.result(false, 'כל המטוסים אבדו.');
     }
   }
@@ -282,6 +329,7 @@ function frameWork(now){
       update(real/steps * GAME_SPEED * ts, vw);
     }
     feelTick(real);                                      // shake and hit-stop run on real time
+    touchSync();
     if(!G) { drawTitleBackdrop(now/1000); return; }
     render(ctx, CW, CH);
   } else drawTitleBackdrop(now/1000);
@@ -302,6 +350,12 @@ UI.init();
     SFX.init(); SFX.tone(220, 440, 0.25, 0.08, 'triangle');
     t.remove(); UI.mainMenu();
     window.removeEventListener('keydown', go, true);
+    // on a phone: full screen, turned sideways where the browser allows it (both need this first tap)
+    if(e.pointerType === 'touch'){
+      const de = document.documentElement;
+      try{ const p = de.requestFullscreen && de.requestFullscreen({navigationUI:'hide'});
+        if(p && p.then) p.then(()=>{ try{ screen.orientation.lock('landscape').catch(()=>{}); }catch(err){} }).catch(()=>{}); }catch(err){}
+    }
   };
   window.addEventListener('keydown', go, true);
   t.addEventListener('pointerdown', go);

@@ -125,7 +125,7 @@ function newLevel(idx, loadout, def){
     startWingLaunch(wm, 0.6 + (loadout.wing.length-1-i)*1.4, G.carrier.x + 170 + i*80);   // parked ahead of the player; the one furthest forward launches first
     G.wingmen.push(wm);
   });
-  Music.stop();
+  Music.stop(); FlightMusic.start();                                // the menu theme gives way to the flight score (radio.js)
   resetPlayer();
   say('המטוס על הסיפון. הגבר מצערת (W / →) ומשוך ↑ כדי להמריא');
 }

@@ -288,6 +288,109 @@ test('שיירה: מטוסי הכנף בתקיפה חופשית מטביעים �
   assert(subs > 0, 'המפציצים לא השמידו אף צוללת');
   return `${boats} סירות, ${subs} צוללות`;
 });
+test('כוכבים בזמן הטיסה: מצב חי, הודעה כשכוכב אובד או מושג, ומדליות', async () => {
+  const msgs = () => G.msg.map(m => m.text).join(' | ');
+  // campaign: star 3 announced when the last side building falls; star 2 lost on the second crash
+  freshSave(); launch(0); fly(); god();
+  let st = starStatus(); assert(st && st.s2 && st.s3==='open' && /מבנים משניים 0\//.test(st.p), 'מצב התחלתי שגוי: ' + JSON.stringify({s2:st&&st.s2, s3:st&&st.s3, p:st&&st.p}));
+  killStructs(); await sim(0.2, () => god());
+  assert(starStatus().s3==='ok' && /הכוכב השלישי הושג/.test(msgs()), 'לא הודיע על הכוכב השלישי: ' + msgs());
+  G.lost = 2; await sim(0.1);
+  assert(!starStatus().s2 && /הכוכב השני אבד/.test(msgs()), 'לא הודיע על אובדן הכוכב השני');
+  render(ctx, CW || 320, CH || 180);
+  // convoy: a ship sunk is a third star lost for good, said once
+  freshSave(); launch('convoy'); fly(); god();
+  const ship = G.special.convoy[0]; ship.hp = 0; ship.dead = true; await sim(0.2, () => god());
+  assert(starStatus().s3==='fail' && msgs().split('הכוכב השלישי אבד').length === 2, 'אובדן הכוכב השלישי בשיירה לא דווח פעם אחת');
+  // training and lessons have no stars
+  freshSave(); launch('training'); assert(starStatus()===null, 'יש כוכבים באימון');
+  // medals: paid once each when the star total reaches them, also for stars won before medals existed
+  freshSave(); SAVE.money = 0; SAVE.stars = {0:3, 1:3, 2:3, 3:3, def:2};   // 14 stars
+  G = null; UI.homePanel = null; UI.mainMenu();
+  assert(SAVE.medals[12] && !SAVE.medals[24] && SAVE.money === 1500, 'מדליית הארד לא ניתנה נכון: $' + SAVE.money);
+  assert(/מדליית ארד/.test(UI.root.textContent) && /14\/48/.test(UI.root.textContent), 'מסך הבית לא מציג כוכבים ומדליה');
+  UI.mainMenu(); assert(SAVE.money === 1500, 'מדליה שולמה פעמיים');
+  return `${starsMax()} כוכבים אפשריים, ${MEDALS.length} מדליות`;
+});
+test('מוזיקת טיסה ורדיו: עוצמה לפי הקרב, שכבות, קריאות רדיו עם המתנה', async () => {
+  // the layer mix: calm = pad only, full fight = drums in, boss layer only with a boss
+  const m0 = FlightMusic.mix(0, false), m1 = FlightMusic.mix(1, true);
+  assert(m0.pad > 0.5 && m0.pulse === 0 && m0.drive === 0 && m0.boss === 0, 'בשקט יש יותר מהפד');
+  assert(m1.pulse === 1 && m1.drive === 1 && m1.boss === 1, 'בקרב מלא חסרות שכבות');
+  freshSave(); launch(0, {wing:['wildcat']}); fly(); god();
+  assert(FlightMusic.playing || !SFX.ctx, 'מוזיקת הטיסה לא התחילה');
+  G.enemies.length = 0; assert(combatIntensity().k === 0, 'עוצמה בלי אויבים');
+  // a Zero right behind the player, flying the same way
+  const P = G.player; P.f = 1; P.a = 0;
+  const z = {type:'zero', x:P.x - 180, y:P.y, a:0, speed:240, full:240, hp:999, max:999, size:16, cool:9, burst:0, evade:0, dead:false, hpScaled:true};
+  G.enemies.push(z);
+  assert(combatIntensity().k > 0.2, 'זירו קרוב לא מעלה את העוצמה');
+  const w = G.wingmen[0]; w.state = 'escort'; w.x = P.x - 100; w.y = P.y - 60;
+  radioUpdate(1/60);
+  const calls = () => (G.radio ? G.radio.list : []).map(m => m.who + ': ' + m.text).join(' | ');
+  assert(/זירו מאחוריך/.test(calls()), 'אין קריאת רדיו על זירו מאחור: ' + calls());
+  const n = G.radio.list.length; radioUpdate(1/60); radioUpdate(1/60);
+  assert(G.radio.list.length === n, 'הקריאה חוזרת בלי המתנה');
+  // the carrier hit, and the LSO on approach
+  G.carrier.hp -= 50; radioUpdate(1/60);
+  assert(/תחת התקפה/.test(calls()), 'הנושאת לא קראה לעזרה');
+  G.enemies.length = 0; G.radio.list.length = 0;
+  P.x = G.carrier.x + G.carrier.len/2 - 400; P.y = SEA - 120; P.f = 1; P.speed = 260; radioUpdate(1/60);
+  assert(/מהר מדי/.test(calls()), 'קצין הנחיתה לא הזהיר על מהירות: ' + calls());
+  render(ctx, CW || 320, CH || 180);
+  // back in the menus the flight score stops
+  G = null; UI.mainMenu(); assert(!FlightMusic.playing, 'מוזיקת הטיסה ממשיכה בתפריט');
+  return 'שכבות, עוצמה, 3 סוגי קריאות';
+});
+test('מגע: לחיצה, החלקה בין כפתורים, שתי אצבעות, ושחרור כשהמשטחים נעלמים', async () => {
+  freshSave(); launch(0); fly(); for(const k in keys) keys[k] = false;
+  const btn = k => { const b = document.createElement('button'); b.dataset.k = k; return b; };
+  const up = btn('ArrowUp'), down = btn('ArrowDown'), fire = btn('Space'), cmd = btn('KeyC');
+  // finger 1 on ▲, then slides to ▼
+  TOUCH.fingers.set(1, up); touchPress(up);
+  assert(keys.ArrowUp && up.classList.contains('on'), 'לחיצה על ▲ לא נרשמה');
+  touchSlide(1, down);
+  assert(!keys.ArrowUp && keys.ArrowDown && !up.classList.contains('on'), 'החלקה מ-▲ ל-▼ לא החליפה מקש');
+  // finger 2 fires at the same time; lifting it leaves the stick alone
+  TOUCH.fingers.set(2, fire); touchPress(fire); assert(keys.Space && keys.ArrowDown, 'שתי אצבעות לא עובדות יחד');
+  touchLift(2); assert(!keys.Space && keys.ArrowDown, 'הרמת אצבע שחררה מקש של אצבע אחרת');
+  // sliding onto the wingmen order does nothing (it acts only when touched)
+  const mode = G.wingMode; touchSlide(1, cmd); assert(G.wingMode === mode && keys.ArrowDown, 'החלקה הפעילה פקודה');
+  // sliding off the buttons lets go
+  touchSlide(1, null); assert(!keys.ArrowDown, 'יציאה מהכפתורים לא שחררה');
+  // the pads hide over a menu and release every finger
+  TOUCH.fingers.set(3, up); touchPress(up); touchShown = null; UI.pause(); touchSync();
+  assert(!keys.ArrowUp && !TOUCH.fingers.size && !document.body.classList.contains('flying'), 'המשטחים לא שחררו בתפריט');
+  UI.act('resume'); touchSync(); assert(document.body.classList.contains('flying'), 'המשטחים לא חזרו אחרי ההפסקה');
+  document.body.classList.remove('flying');
+  return 'לחיצה, החלקה, 2 אצבעות, הסתרה';
+});
+test('מערכה: מפה, והתוצאה של משימה עוברת לבאה', async () => {
+  freshSave(); SAVE.unlocked = 3; SAVE.best = {0:true, 1:true};
+  // mission 1 with both extra stars, mission 2 with only one
+  SAVE.stars = {0:3, 1:2}; SAVE.starsDetail = {1:{s2:true, s3:false}};
+  assert(campaignIntel(0) === null, 'למשימה הראשונה אין משימה קודמת');
+  const a = campaignIntel(1), b = campaignIntel(2);
+  assert(a.supply && a.veterans, 'שלושה כוכבים בשמירה ישנה לא נחשבים לשני היעדים');
+  assert(!b.supply && b.veterans, 'פרטי הכוכבים של משימה 2 שגויים');
+  // the effect on the mission itself
+  const base = (() => { SAVE.best = {}; launch(1); return {lives: G.lives, every: G.def.zeroEvery}; })();
+  SAVE.best = {0:true, 1:true}; launch(1);
+  assert(G.lives === base.lives + 1 && Math.abs(G.def.zeroEvery - base.every*1.25) < 1e-6, `ההשפעה לא חלה: ${G.lives}/${base.lives}, ${G.def.zeroEvery}/${base.every}`);
+  assert(LEVELS[1].zeroEvery === base.every, 'הגדרת המשימה המקורית השתנתה');
+  // a star won once is remembered even after a worse replay
+  G = null; launch(2); SAVE.starsDetail[2] = {s2:true, s3:false}; G.lost = 3; G.structures.forEach(s => s.dead = true);
+  rateMission(2); assert(SAVE.starsDetail[2].s2 && SAVE.starsDetail[2].s3, 'כוכב שהושג פעם נשכח');
+  // the map: one node per mission, the next one pulsing, locked ones not clickable
+  G = null; UI.homePanel = 'camp'; UI.mainMenu();
+  const nodes = UI.root.querySelectorAll('.cmap .mnode');
+  assert(nodes.length === LEVELS.length, 'מספר הנקודות במפה שגוי');
+  assert(UI.root.querySelectorAll('.cmap .mnode.next').length === 1, 'אין משימה הבאה מסומנת');
+  assert(!nodes[LEVELS.length-1].dataset.act, 'משימה נעולה לחיצה במפה');
+  UI.briefing(1); assert(/מצב המערכה/.test(UI.root.textContent), 'אין מצב מערכה בתדריך');
+  UI.homePanel = null;
+  return 'מפה, ספירת כוכבים, השפעה על משימה';
+});
 test('סקינים: נפתחים בניצחון ונקנים', async () => {
   freshSave(); assert(!skinUnlocked('olive'), 'סקין פתוח לפני ניצחון');
   SAVE.best[0] = true; assert(skinUnlocked('olive'), 'הסקין לא נפתח אחרי ניצחון');
@@ -385,8 +488,39 @@ specialWin('assault', 600, (S, t) => {
 // ---------- losing ----------
 test('הפסד: כל המטוסים אבדו בקמפיין', async () => {
   freshSave(); launch(0); fly();
-  await sim(200, () => { const P = G.player; if(!P.dead && !P.onDeck) crashPlayer('בדיקה'); if(G.state==='rearm') UI.act('takeoff'); if(P.onDeck) fly(); }, 0);
+  // crashes at sea level: too low to bail out, so no pilot comes back
+  await sim(200, () => { const P = G.player; if(!P.dead && !P.onDeck){ P.y = groundY(P.x) - 20; crashPlayer('בדיקה'); } if(G.state==='rearm') UI.act('takeoff'); if(P.onDeck) fly(); }, 0);
   assert(/נכשלה/.test(resultTitle()), resultTitle() || 'לא הסתיים'); return resultTitle();
+});
+test('מצנח: קפיצה, חילוץ בסירה מחזיר מטוס, שבי מעל אי, זירו יורה על הטייס', async () => {
+  // shot down high over the sea: he jumps, lands in the water, the launch picks him up and the plane comes back
+  freshSave(); launch(0); fly(G.carrier.x + 1100, 200);
+  const lives = G.lives; crashPlayer('בדיקה');
+  assert(G.chutes && G.chutes.length === 1 && G.chutes[0].state === 'air', 'הטייס לא קפץ');
+  assert(G.lives === lives - 1, 'מספר המטוסים לא ירד');
+  await sim(60, () => { if(G.state==='rearm') return true; }, 10);       // the deck menu opens after the crash
+  UI.act('takeoff'); fly(G.carrier.x + 300, -600); G.enemies.length = 0;
+  let sawWater = false;
+  await sim(60, () => { god(); G.enemies.length = 0; if(G.chutes[0] && G.chutes[0].state==='water') sawWater = true; return !chutePending(); }, 10);
+  assert(sawWater, 'הטייס לא נחת במים');
+  assert(!chutePending() && G.lives === lives && G.rescued === 1, `החילוץ לא החזיר מטוס (${G.lives}/${lives})`);
+  // shot down over an island: taken prisoner
+  const is = G.islands[0]; fly((is.x0 + is.x1)/2, groundY((is.x0 + is.x1)/2) - 160); god(); G.player.inv = 0;
+  crashPlayer('בדיקה'); G.endT = 1e9; G.chutes[0].vx = 0; G.weather.wind = 0;
+  await sim(20, () => { G.weather.wind = 0; return !chutePending(); }, 0);
+  assert(G.captured === 1, 'הטייס לא נפל בשבי מעל האי');
+  // a pilot in the water, a Zero low overhead: he gets shot unless covered
+  freshSave(); launch(0); fly(G.carrier.x + 4000, -700); god();
+  G.chutes = [{x: G.carrier.x + 1500, y: SEA, vx: 0, state: 'water', hp: CHUTE.hp, t: 0, open: 1, hit: 0, boat: {x: G.carrier.x - 9000}}];
+  const c = G.chutes[0];
+  await sim(30, () => { god(); G.player.x = G.carrier.x + 4000; G.player.y = -700;
+    G.enemies = G.enemies.filter(e => e.zz); if(!G.enemies.length) G.enemies.push({zz:true, type:'zero', x:c.x - 200, y:SEA - 150, a:0, speed:0, full:240, hp:999, max:999, size:16, cool:99, burst:0, evade:0, dead:false, hpScaled:true});
+    G.enemies[0].x = c.x - 200; G.enemies[0].y = SEA - 150; return c.state === 'gone'; }, 15);
+  assert(c.hp <= 0, 'הזירו לא פגע בטייס שבמים: ' + c.hp);
+  // the last aircraft lost with a pilot still in the air: the mission waits for him
+  freshSave(); launch(0); G.lives = 1; fly(G.carrier.x + 900, 150); crashPlayer('בדיקה');
+  await sim(5); assert(G.state !== 'over' && chutePending(), 'המשימה הסתיימה לפני שהטייס חולץ');
+  return 'חילוץ, שבי, ירי על הטייס, המתנה לחילוץ';
 });
 test('הפסד: הטייס שבמים נהרג כשלא מגינים עליו', async () => {
   freshSave(); launch('rescue'); fly();

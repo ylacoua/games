@@ -28,6 +28,7 @@ const UI = {
       <b>Esc</b><span>עצירה · <b>M</b> השתקה</span>
       <b>🎮</b><span>בקר משחק: סטיק שמאלי או חצים לטיסה · A או RT מקלעים · B חימוש · X גלגול חבית · Y פקודה לכנפיים · RB / LB מצערת · Start עצירה</span>
       <b>🎮</b><span>בקר משחק בתפריטים: חצים או סטיק לבחירה · A לאישור · B חזרה</span>
+      <b>📱</b><span>מסך מגע: חצים וגלגול חבית בפינה השמאלית · מצערת, חימוש, ירי, פקודה ועצירה בימנית. אפשר להחליק אצבע מכפתור לכפתור. מומלץ לשחק כשהמכשיר לרוחב</span>
       <b>F3</b><span>מד ביצועים: זמן פריים במילישניות</span>
     </div>
     <p class="note">נחיתה: התקרב לנושאת נמוך, במצערת נמוכה ובאף כמעט ישר. מהירות מתחת ל-225 וזווית קטנה.</p>`;
@@ -64,11 +65,13 @@ const UI = {
     const langSel = `<div class="diff lang"><span class="lbl" data-notr>שפה · Language</span><div class="seg" role="radiogroup" aria-label="Language">
       <button role="radio" lang="he" dir="rtl" aria-checked="${lg==='he'}" class="${lg==='he'?'on':''}" data-act="lang" data-v="he" data-notr>עברית</button>
       <button role="radio" lang="en" dir="ltr" aria-checked="${lg==='en'}" class="${lg==='en'?'on':''}" data-act="lang" data-v="en">English</button></div></div>`;
-    const notice = SAVE_NOTICE ? `<p class="tip" role="alert">${SAVE_NOTICE}</p>` : '';
+    const medals = awardMedals(); if(medals.length) storeSave();       // stars collected before medals existed count too
+    const notice = (SAVE_NOTICE ? `<p class="tip" role="alert">${SAVE_NOTICE}</p>` : '')
+      + medals.map(m => `<p class="tip medal" role="status"><b>${m.icon} קיבלת ${m.name}!</b> אספת ${m.n} כוכבים · +$${m.r.toLocaleString('en-US')}</p>`).join('');
     SAVE_NOTICE = null;
     this.root.innerHTML = `<div class="home">
       <header class="home-title"><h1>כנפי הרעם</h1><p class="welcome">ברוכים הבאים טייסים</p>${notice}</header>
-      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${langSel}${diffSel}${nav}${reset}</nav>
+      <nav class="home-nav" aria-label="תפריט ראשי">${this.money()}${starSummaryHTML()}${langSel}${diffSel}${nav}${reset}</nav>
       ${p ? `<section class="home-panel" aria-live="polite">${this.homePanelHTML(p)}</section>` : ''}
     </div>`;
     this.bind();
@@ -117,7 +120,8 @@ const UI = {
           <span class="num">${i+1}</span><span class="txt"><b>${L.name}</b>
           <small>${time[L.time]}${L.rain?' · גשם':''}${L.wind?' · רוח':''}${L.storm?' · סערה':''} · תגמול $${L.reward}</small></span>
           ${L.boss?'<span class="pill boss">בוס</span>':''}${savedStars(i)?`<span class="stars" title="הכוכבים שלך">${starStr(savedStars(i))}</span>`:''}${done?'<span class="pill ok">✓ הושלמה</span>':locked?'<span class="pill">🔒 נעולה</span>':''}</button>`;}).join('');
-      return `<h2>משימות הקמפיין</h2><p class="sub">האוקיינוס השקט, 1944. כל משימה שמושלמת פותחת את הבאה.</p><div class="list">${rows}</div>`;
+      return `<h2>משימות הקמפיין</h2><p class="sub">האוקיינוס השקט, 1944. כל משימה שמושלמת פותחת את הבאה, והתוצאה שלה משפיעה על הבאה: כוכב שני מביא מטוס חלופי נוסף, וכוכב שלישי מנתק את האספקה של האויב.</p>
+        ${campaignMapHTML()}<div class="list">${rows}</div>`;
     }
     if(p==='extra'){
       const row = (k, L, icon) => `<button class="item" data-act="brief" data-v="${k}"><span class="num">${icon}</span>
@@ -151,6 +155,7 @@ const UI = {
       <p class="sub">${L.brief}</p>
       <h3>מה צריך לעשות</h3><ol class="goals">${this.goalsFor(k, L).map(g=>`<li>${g}</li>`).join('')}</ol>
       ${starGoalsHTML(k)}
+      ${intelHTML(k)}
       ${L.tip?`<p class="tip"><b>טיפ:</b> ${L.tip}</p>`:''}
       <div class="row" style="margin-top:16px;justify-content:flex-end"><button data-act="menu">חזרה</button><button class="primary" data-act="hangar" data-v="${k}">המשך לחדר התדריכים</button></div>`);
   },
@@ -343,7 +348,7 @@ const UI = {
     const ords = Object.keys(ORD).map(k=>`<button class="card ${lo.ord===k?'sel':''}" data-act="dord" data-v="${k}" style="text-align:start"><b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
     const livesTxt = G.training ? 'ללא הגבלה' : `${G.lives} מתוך 5`;
     this.show(`<h2>${this.crashed?'מטוס חלופי':'על סיפון הנושאת'}</h2>
-      <p class="sub">${this.crashed?'הטייס חולץ מהמים. בחר מטוס חלופי מהסיפון.':(diff().repair < 1 ? 'המטוס תודלק וחומש מחדש, אבל תוקן רק בחלקו.' : 'המטוס תוקן, תודלק וחומש מחדש.')}
+      <p class="sub">${this.crashed?(chutePending() ? 'הטייס שקפץ במצנח עדיין מחכה לחילוץ – המרא וחפה עליו. בחר מטוס חלופי מהסיפון.' : 'בחר מטוס חלופי מהסיפון.'):(diff().repair < 1 ? 'המטוס תודלק וחומש מחדש, אבל תוקן רק בחלקו.' : 'המטוס תוקן, תודלק וחומש מחדש.')}
       ${done?'כל המטרות הושמדו!':`נותרו ${left} מטרות.`} מטוסים שנותרו: ${livesTxt} · נושאת: ${Math.round(G.carrier.hp/G.carrier.max*100)}%</p>
       <h3>בחר מטוס</h3><div class="grid" style="margin:8px 0 16px">${planes}</div>
       <h3>בחר חימוש</h3><div class="grid" style="margin:8px 0 16px">${ords}</div>
@@ -353,7 +358,7 @@ const UI = {
 
   pause(){
     if(!G || G.state==='rearm' || G.state==='over') return;
-    G.paused = true; SFX.setEngine(false,0);
+    G.paused = true; SFX.setEngine(false,0); FlightMusic.duck(true);
     this.show(`<h2>הפסקה</h2><p class="sub">${G.def.name} · נותרו ${primariesLeft()} מטרות · שלל $${G.earned}</p>
       ${this.keysHTML()}<h3 style="margin:14px 0 8px">תמרוני קרב</h3>${this.maneuversHTML()}<div class="row" style="margin-top:14px"><button class="primary" data-act="resume">המשך</button><button data-act="abort">נטוש משימה</button></div>`);
   },
@@ -420,7 +425,7 @@ const UI = {
         if(this.level==='def'){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, {...DEFENSE}); defenseSetup(); }
         else if(this.level==='gnd'){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, {...GROUND}); groundSetup(); }
         else if(SPECIALS[this.level]){ newLevel(2, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}, specialDef(this.level)); specialSetup(this.level); }
-        else newLevel(this.level, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()});
+        else { newLevel(this.level, {plane:lo.plane, ord:lo.ord, wing:lo.wing.slice()}); applyCampaignIntel(); }
         this.hide(); break;
       }
       case 'dord': G.loadout.ord=v; this.openDeck(); break;
@@ -436,7 +441,7 @@ const UI = {
         say(`${G.stats.name} מוכן להמראה. W / → להגברת מצערת`,3); break; }
       case 'finish': this.result(true); break;
       case 'abort': this.result(false, 'נטשת את המשימה.'); break;
-      case 'resume': G.paused=false; this.hide(); break;
+      case 'resume': G.paused=false; FlightMusic.duck(false); this.hide(); break;
       case 'training': G=null; this.trainingHangar(); break;
       case 'tutorial': G=null; this.tutorialMenu(); break;
       case 'defense': G=null; this.tab='mission'; if(this.lo) this.lo.wing=[]; this.hangar('def'); break;
@@ -487,6 +492,9 @@ function drawHUD(ctx, vw, worldVW){
     ctx.textAlign='left'; ctx.direction='ltr'; ctx.font='11px Rubik, sans-serif'; ctx.fillStyle='#efe6cf';
     ctx.fillText(Math.round(k*100)+'%', 14, 98); ctx.textAlign='right'; ctx.direction='rtl';
   }
+  drawStarStrip(ctx);                                                // live star status under the mission panel (extras.js)
+  drawRadio(ctx);                                                    // radio calls under it (radio.js)
+  ctx.textAlign='right'; ctx.direction='rtl';
   // minimap
   // Radar: one linear scale for everything, in both axes, over the whole area things can be in
   // (left of our carrier to beyond the furthest enemy ship), so positions line up with each other.

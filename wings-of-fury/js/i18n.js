@@ -155,7 +155,7 @@ function applyLang(){
   const en = isEn(), h = document.documentElement;
   h.lang = en ? 'en' : 'he'; h.dir = en ? 'ltr' : 'rtl';
   document.title = en ? 'Wings of Fury' : 'כנפי הרעם';
-  const statics = document.querySelectorAll('#title, #title *, #touch button');
+  const statics = document.querySelectorAll('#title, #title *, #touch button, #rotate');
   statics.forEach(el => {
     for(const n of el.childNodes) if(n.nodeType === 3 && n.nodeValue.trim()){
       if(!HE_STATIC.has(n)) HE_STATIC.set(n, n.nodeValue);

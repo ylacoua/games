@@ -55,10 +55,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .pill{font-size:12px;padding:2px 8px;border-radius:10px;background:#22344d;color:var(--steel)}
 .pill.boss{background:var(--red);color:#fff}
 .note{font-size:13px;color:var(--steel)}
-#touch{position:fixed;inset:auto 0 0 0;display:none;justify-content:space-between;padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px));z-index:4;pointer-events:none}
-#touch .pad{display:grid;grid-template-columns:repeat(3,54px);grid-template-rows:repeat(2,54px);gap:6px;pointer-events:auto}
-#touch button{background:rgba(20,35,58,.55);border-color:rgba(143,163,184,.5);padding:0;font-size:20px;touch-action:none}
-@media (pointer:coarse){#touch{display:flex}}
+/* touch pads: shown only while flying on a device that has been touched (main.js sets touch-on and flying) */
+#touch{position:fixed;inset:auto 0 0 0;display:none;justify-content:space-between;align-items:flex-end;
+  padding:10px max(12px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(12px,env(safe-area-inset-left,0px));z-index:4;pointer-events:none;
+  direction:ltr}   /* the stick pad stays on the left, with ◀ left of ▶, in Hebrew too */
+body.touch-on.flying #touch{display:flex}
+#touch .pad{display:grid;grid-template-columns:repeat(3,var(--tb));grid-template-rows:repeat(2,var(--tb));gap:8px;pointer-events:auto;touch-action:none;
+  -webkit-user-select:none;user-select:none;--tb:clamp(52px,13vh,70px)}
+#touch button{background:rgba(20,35,58,.45);border:1.5px solid rgba(143,163,184,.45);border-radius:14px;padding:0;font-size:22px;color:#efe6cf;
+  touch-action:none;-webkit-tap-highlight-color:transparent;transition:background .06s,transform .06s}
+#touch button.on{background:rgba(232,179,58,.5);border-color:var(--signal);transform:scale(.94)}
+#touch button[data-k="Space"]{background:rgba(160,50,40,.5)} #touch button[data-k="Space"].on{background:rgba(255,110,70,.7)}
+#rotate{display:none;position:fixed;top:calc(8px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);z-index:5;pointer-events:none;
+  background:rgba(8,16,28,.85);border:1px solid var(--signal);border-radius:6px;padding:8px 14px;color:var(--paper);font-size:14px;white-space:nowrap}
+@media (orientation:portrait){ body.touch-on.flying #rotate{display:block} }
 #title{position:fixed;inset:0;z-index:10;background:#05090f;overflow:hidden;cursor:pointer;display:flex;align-items:center;justify-content:center}
 #title .blur{position:absolute;inset:-40px;background:url("img/title.jpg") center/cover;filter:blur(24px) brightness(.45)}
 #title img{position:relative;max-width:100%;max-height:100%;object-fit:contain;display:block}
@@ -124,6 +134,16 @@ button.link:hover{background:none;color:var(--paper)}
 .stars-res li.ok{color:var(--paper)} .stars-res li.ok::first-letter{color:var(--signal)}
 .stars-goals{list-style:none;padding-inline-start:0} .stars-goals li{color:var(--steel)}
 .item .stars{flex:none;color:var(--signal);font-size:14px;letter-spacing:1px}
+.starsum{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:2px 8px;margin:-4px 0 4px;text-shadow:0 2px 6px #000;font-size:18px}
+.starsum .stars{color:var(--signal);font-size:15px;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.starsum small{flex-basis:100%;text-align:center;font-size:11.5px;color:var(--steel)}
+.tip.medal{border-inline-start-color:#f2c14e;background:#1d2a1a}
+.cmap{display:block;width:100%;height:auto;margin:0 0 12px;border:1px solid #2c4262;border-radius:5px;font-family:Rubik,sans-serif}
+.cmap .mnode:not(.locked){cursor:pointer} .cmap .mnode:not(.locked):hover circle:not(.pulse){stroke:#e8b33a;stroke-width:3}
+.cmap .pulse{fill:none;stroke:#f2efe6;stroke-width:2;transform-box:fill-box;transform-origin:center;animation:cmapPulse 1.6s ease-out infinite}
+@keyframes cmapPulse{from{opacity:.9;transform:scale(.8)}to{opacity:0;transform:scale(1.7)}}
+.intel{list-style:none;margin:6px 0 0;padding:0;font-size:14px;line-height:1.7;color:var(--steel)}
+.intel li.ok{color:var(--paper)} .intel li.ok::first-letter{color:#7fd08a}
 .skinprev{width:100%;height:auto;aspect-ratio:18/7;background:linear-gradient(#9cc4e4,#d8e8f2);border-radius:4px}
 .board:has(.goals){width:min(700px,100%)}
 .goals{margin:8px 0 6px;padding-inline-start:22px;line-height:1.7;font-size:15px}
@@ -133,7 +153,7 @@ button.link:hover{background:none;color:var(--paper)}
 @media (max-width:760px){
   .home,[dir=ltr] .home{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr);overflow-y:auto;background:rgba(8,14,24,.6)}
   .home-nav{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-  .home-nav .money,.home-nav .link{grid-column:1/-1}
+  .home-nav .money,.home-nav .starsum,.home-nav .link{grid-column:1/-1}
   .navbtn{padding:10px 12px} .navbtn b{font-size:17px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important} #title .press{animation:none}}
@@ -152,6 +172,7 @@ button.link:hover{background:none;color:var(--paper)}
     <button data-k="KeyS" aria-label="האט">⇩</button><button data-k="Space" aria-label="ירי">✸</button><button data-k="Escape" aria-label="עצור">II</button>
   </div>
 </div>
+<div id="rotate" role="status">📱↻ סובב את המכשיר לרוחב</div>
 <div id="ui"></div>
 <div id="title" role="button" tabindex="0" aria-label="כנפי הרעם – לחץ על מקש כלשהו להתחלה">
   <div class="blur"></div>
@@ -163,28 +184,30 @@ button.link:hover{background:none;color:var(--paper)}
 
 <!-- ?v= is the game version (GAME_VERSION in data.js): a new version gets new addresses, so browsers can't keep
      running an old cached script after an update. Bump all of them together with GAME_VERSION (a test checks). -->
-<script src="js/data.js?v=1.64"></script>
-<script src="js/lang-en.js?v=1.64"></script>
-<script src="js/i18n.js?v=1.64"></script>
-<script src="js/audio.js?v=1.64"></script>
-<script src="js/world.js?v=1.64"></script>
-<script src="js/entities.js?v=1.64"></script>
-<script src="js/ai.js?v=1.64"></script>
-<script src="js/maneuvers.js?v=1.64"></script>
-<script src="js/aircraft.js?v=1.64"></script>
-<script src="js/plane3d.js?v=1.64"></script>
-<script src="js/render.js?v=1.64"></script>
-<script src="js/carrier.js?v=1.64"></script>
-<script src="js/ships.js?v=1.64"></script>
-<script src="js/structures.js?v=1.64"></script>
-<script src="js/tutorial.js?v=1.64"></script>
-<script src="js/defense.js?v=1.64"></script>
-<script src="js/ground.js?v=1.64"></script>
-<script src="js/ground-draw.js?v=1.64"></script>
-<script src="js/specials.js?v=1.64"></script>
-<script src="js/extras.js?v=1.64"></script>
-<script src="js/ui.js?v=1.64"></script>
-<script src="js/menuscene.js?v=1.64"></script>
-<script src="js/main.js?v=1.64"></script>
+<script src="js/data.js?v=1.65"></script>
+<script src="js/lang-en.js?v=1.65"></script>
+<script src="js/i18n.js?v=1.65"></script>
+<script src="js/audio.js?v=1.65"></script>
+<script src="js/world.js?v=1.65"></script>
+<script src="js/entities.js?v=1.65"></script>
+<script src="js/ai.js?v=1.65"></script>
+<script src="js/maneuvers.js?v=1.65"></script>
+<script src="js/aircraft.js?v=1.65"></script>
+<script src="js/plane3d.js?v=1.65"></script>
+<script src="js/render.js?v=1.65"></script>
+<script src="js/carrier.js?v=1.65"></script>
+<script src="js/ships.js?v=1.65"></script>
+<script src="js/structures.js?v=1.65"></script>
+<script src="js/tutorial.js?v=1.65"></script>
+<script src="js/defense.js?v=1.65"></script>
+<script src="js/ground.js?v=1.65"></script>
+<script src="js/ground-draw.js?v=1.65"></script>
+<script src="js/specials.js?v=1.65"></script>
+<script src="js/extras.js?v=1.65"></script>
+<script src="js/radio.js?v=1.65"></script>
+<script src="js/bailout.js?v=1.65"></script>
+<script src="js/ui.js?v=1.65"></script>
+<script src="js/menuscene.js?v=1.65"></script>
+<script src="js/main.js?v=1.65"></script>
 </body>
 </html>

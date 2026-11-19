@@ -248,6 +248,8 @@ const SFX = {
   thunder(){ this.noise(2.5, 300, 0.8); },
   hit(){ this.tone(220,90,0.12,0.15,'square'); },
   pickup(){ this.tone(500,1000,0.15,0.08,'triangle'); },
+  // a radio call: a short burst of band-passed static and a "roger" beep
+  radio(){ this.noise(0.16, 1800, 0.09, 'bandpass', 2.5); this.tone(1250,1250,0.07,0.035,'sine'); },
   alarm(){ this.tone(880,660,0.25,0.07,'square'); }
 };
 
@@ -309,6 +311,7 @@ const Music = (() => {
   return {
     get playing(){ return playing; },
     start(){
+      if(typeof FlightMusic !== 'undefined') FlightMusic.stop();     // back in the menus: the flight score fades out
       SFX.init(); if(!SFX.ctx || playing) return;
       playing = true;
       bus = SFX.ctx.createGain(); bus.gain.value = 0.5; bus.connect(SFX.musicBus);

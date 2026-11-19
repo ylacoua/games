@@ -88,6 +88,7 @@ function renderScene(ctx, cw, ch){
   for(const d of G.drops) drawDrop(ctx, d);
   // aircraft
   for(const w of G.wingmen) if(!w.dead) drawAI(ctx, w, w.kind, 1, w.flash, w.gear||0);
+  drawChutes(ctx);                                     // pilots who bailed out, and the rescue launch (bailout.js)
   for(const e of G.enemies){
     if(e.type==='zero') drawAI(ctx, e, 'zero', 1, e.flash);
     else if(e.type==='betty') drawAI(ctx, e, 'betty', 1, e.flash);
