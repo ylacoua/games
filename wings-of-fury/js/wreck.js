@@ -1,8 +1,12 @@
 // ---- Shot-down enemy aircraft: how they fall, burn, break up and end in the sea or on the ground ----
-// A downed aircraft is a 'fall' effect that picks one of three ways down:
-//   spiral - the nose drops along the path and it rolls round its own axis (drawn by squashing it, as in a 3D roll)
-//   flat   - a slow flat spin, almost straight down (a plane that has lost a wing spins faster)
+// A downed aircraft is a 'fall' effect that picks one of four ways down:
+//   spiral - the nose drops along the path and it rolls round its own axis
+//   flat   - a flat spin: it turns round the vertical axis, nose a little down, sinking almost straight down
+//            (a plane that has lost a wing spins faster)
+//   dive   - from high up only: it noses over into a long, steep, ever faster dive straight into the sea
 //   glide  - a long burning glide, mostly for the bombers
+// spiral, flat and dive are drawn with the 3D model (plane3d.js), so the roll and the spin really turn the
+// aircraft in depth; the glide, seen side on, uses the detailed sprite.
 // Some lose a wing on the way, some Zeros blow apart in the air, and some pilots jump. The fire is a tongue of
 // flame from the engine streaming back along the path, the smoke a continuous ribbon that widens, greys and drifts
 // on the wind, and stays in the sky for a few seconds after the end. Into the sea: a tall splash, the tail standing
@@ -15,21 +19,37 @@ const sgn = () => Math.random() < 0.5 ? -1 : 1;
 function makeFall(e){
   const big = e.type === 'betty' || e.type === 'val', r = Math.random();
   const falling = G.fx.filter(f => f.type === 'fall').length;
-  const mode = big ? (r < 0.65 ? 'glide' : r < 0.9 ? 'spiral' : 'flat') : (r < 0.5 ? 'spiral' : r < 0.75 ? 'flat' : 'glide');
+  // high up, a third of them go into the long dive; otherwise spiral / flat spin / glide
+  const high = groundY(e.x) - e.y > 450;
+  const mode = high && Math.random() < 0.35 ? 'dive'
+    : big ? (r < 0.65 ? 'glide' : r < 0.9 ? 'spiral' : 'flat') : (r < 0.5 ? 'spiral' : r < 0.75 ? 'flat' : 'glide');
   // a Zero has no armour and no self-sealing tanks: now and then it simply blows apart (and so does anything
   // beyond a handful already falling, to keep the screen readable)
   const burst = (e.type === 'zero' && Math.random() < 0.22) || falling >= WRECK.maxFalling;
   const f = {type: 'fall', kind: e.type, skin: e.skin || null, x: e.x, y: e.y,
     vx: Math.cos(e.a)*e.speed*0.6, vy: Math.sin(e.a)*e.speed*0.4 - 30, rot: e.a, spin: rnd(2, 3.2)*sgn(), roll: 0, rollV: rnd(5, 8)*sgn(),
     mode, t: 0, max: 14, fire: 0.35, trail: [], trailT: 0,
-    burstT: burst ? rnd(0.15, 0.4) : -1, wingOff: !burst && mode !== 'glide' && Math.random() < 0.3,
+    face: Math.cos(e.a) >= 0 ? 1 : -1, yaw: Math.cos(e.a) >= 0 ? 0 : Math.PI, diveAng: rnd(1.1, 1.4), wingSide: sgn(),
+    burstT: burst ? rnd(0.15, 0.4) : -1, wingOff: !burst && mode !== 'glide' && mode !== 'dive' && Math.random() < 0.3,
     bailT: !burst && SEA - e.y > 220 && Math.random() < 0.3 ? rnd(0.5, 1.1) : -1};
   wreckWhine(f);
   return f;
 }
 
+// the 3D attitude of a spiral, flat spin or dive (null for the glide, drawn as a sprite)
+function fall3D(f){
+  if(f.mode === 'flat') return {yaw: f.yaw, roll: 0.2*Math.sin(f.t*3), pitch: -0.5};
+  if(f.mode !== 'spiral' && f.mode !== 'dive') return null;
+  return {yaw: f.face > 0 ? 0 : Math.PI, roll: f.roll, pitch: -Math.atan2(f.vy, f.face*f.vx)};   // nose along the path
+}
 // the point the fire comes from, in the world
 function fallFirePoint(f){
+  const A = fall3D(f);
+  if(A){
+    const [ox, oy, oz] = f.kind === 'betty' ? [6, 3, 9] : [16, 1, 0];
+    const p = xform([ox, oy, oz], Math.cos(A.roll), Math.sin(A.roll), Math.cos(A.pitch), Math.sin(A.pitch), Math.cos(A.yaw), Math.sin(A.yaw));
+    return {x: f.x + p[0], y: f.y + p[1]};
+  }
   const [ox, oy] = WRECK_ENGINE[f.kind] || [14, 1], c = Math.cos(f.rot), s = Math.sin(f.rot);
   const sy = fallFlip(f) * fallSquash(f);
   return {x: f.x + c*ox - s*oy*sy, y: f.y + s*ox + c*oy*sy};
@@ -59,9 +79,18 @@ function updateFalls(dt){
 function updateFall(f, dt, W){
   if(f.mode === 'glide'){ f.vy += 140*dt; f.vx *= 1 - 0.12*dt; }
   else if(f.mode === 'flat'){ f.vy = Math.min(190, f.vy + 260*dt); f.vx *= 1 - 1.2*dt; }
+  else if(f.mode === 'dive'){
+    // nose over to a steep angle, then straight down it, faster and faster
+    const want = f.face > 0 ? f.diveAng : Math.PI - f.diveAng;
+    let h = Math.atan2(f.vy, f.vx), d = Math.atan2(Math.sin(want - h), Math.cos(want - h));
+    h += clamp(d, -1.4*dt, 1.4*dt);
+    const spd = Math.min(560, Math.hypot(f.vx, f.vy) + 170*dt);
+    f.vx = Math.cos(h)*spd; f.vy = Math.sin(h)*spd;
+  }
   else { f.vy += 300*dt; f.vx *= 1 - 0.3*dt; }
   f.x += f.vx*dt; f.y += f.vy*dt;
-  if(f.mode === 'flat') f.rot += f.spin*(f.wingOff && f.wingGone ? 1.8 : 1)*dt;
+  if(f.mode === 'flat'){ f.yaw += f.spin*(f.wingGone ? 1.8 : 1)*dt; f.rot = Math.PI/2 - 0.5; }   // turning round the vertical axis
+  else if(f.mode === 'dive'){ f.rot = Math.atan2(f.vy, f.vx); f.roll += 1.3*dt; }               // a slow roll on the way down
   else {
     // the nose follows the path down
     let d = Math.atan2(f.vy, f.vx) - f.rot; d = Math.atan2(Math.sin(d), Math.cos(d));
@@ -110,8 +139,10 @@ function wreckImpact(f, gy){
   addTraumaAt(f.x, gy, 0.3, 320);
   if(overSea(f.x)){
     splash(f.x);
-    G.fx.push({type: 'wsplash', x: f.x, t: 0, max: 1.3, h: f.kind === 'betty' ? 80 : 58, w: f.kind === 'betty' ? 18 : 12});
-    G.fx.push({type: 'sink', x: f.x, kind: f.kind, skin: f.skin, dir: Math.sign(f.vx) || 1, t: 0, max: 2.6});
+    const dive = f.mode === 'dive';                                    // straight in at full speed: a much taller column
+    G.fx.push({type: 'wsplash', x: f.x, t: 0, max: dive ? 1.7 : 1.3, h: (f.kind === 'betty' ? 80 : 58)*(dive ? 1.9 : 1), w: (f.kind === 'betty' ? 18 : 12)*(dive ? 1.3 : 1)});
+    if(dive){ addTraumaAt(f.x, gy, 0.35, 450); SFX.boom(false); }
+    G.fx.push({type: 'sink', x: f.x, kind: f.kind, skin: f.skin, dir: Math.sign(f.vx) || 1, t: 0, max: dive ? 1.4 : 2.6, steep: dive});
     G.fx.push({type: 'slick', x: f.x + (Math.sign(f.vx) || 1)*10, t: 0, max: 12, w: rnd(28, 46), burn: Math.random() < 0.45});
   } else {
     boom(f.x, gy - 4, 32, true, true); SFX.boom(false);
@@ -131,7 +162,8 @@ function updateEnemyChute(f, dt, W){
 function wreckWhine(f){
   const P = G.player; if(!P || P.dead || Math.hypot(f.x - P.x, f.y - P.y) > 1000) return;
   if((SFX.diveUntil || 0) > G.time) return;
-  const h = Math.max(40, groundY(f.x) - f.y), dur = Math.min(4, f.mode === 'glide' ? h/120 : Math.sqrt(2*h/300) + 0.4);
+  const h = Math.max(40, groundY(f.x) - f.y);
+  const dur = f.mode === 'dive' ? Math.min(5, h/330 + 1) : Math.min(4, f.mode === 'glide' ? h/120 : Math.sqrt(2*h/300) + 0.4);
   SFX.diveUntil = G.time + dur;
   if(SFX.dive) SFX.dive(dur);
 }
@@ -184,6 +216,19 @@ function drawFlame(ctx, x, y, vx, vy, size){
   ctx.restore();
 }
 function drawFall(ctx, f){
+  const A = fall3D(f);
+  if(A){
+    // the flame first, so the aircraft stays readable with the fire streaming out from behind it
+    const fp = fallFirePoint(f); drawFlame(ctx, fp.x, fp.y, f.vx, f.vy, f.fire*0.8);
+    ctx.save(); ctx.translate(f.x, f.y);
+    drawPlane3D(ctx, f.kind, f.skin, 'jp', A.yaw, A.roll, A.pitch, false, false, f.wingGone ? {noWing: f.wingSide} : null);
+    ctx.restore();
+    // the fire streaming on past the tail, and the glow of the burning engine
+    const tp = xform([-20, 0, 0], Math.cos(A.roll), Math.sin(A.roll), Math.cos(A.pitch), Math.sin(A.pitch), Math.cos(A.yaw), Math.sin(A.yaw));
+    drawFlame(ctx, f.x + tp[0], f.y + tp[1], f.vx, f.vy, f.fire*0.55);
+    ctx.fillStyle = `rgba(255,${170 + (Math.random()*70|0)},60,.55)`; ctx.beginPath(); ctx.arc(fp.x, fp.y, 1.5 + 1.5*f.fire, 0, 7); ctx.fill();
+    return;
+  }
   ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot);
   ctx.scale(1, fallFlip(f) * fallSquash(f));                       // upright whichever way it heads, squashed while it rolls
   if(f.wingGone){ ctx.fillStyle = '#1b1a18'; ctx.beginPath(); ctx.moveTo(-2, 1); ctx.lineTo(6, 0); ctx.lineTo(3, 4); ctx.lineTo(-1, 3.5); ctx.fill(); }
@@ -225,7 +270,7 @@ function drawSink(ctx, f, k){
   const down = Math.min(1, k*1.25)*26;
   if(k < 0.8){
     ctx.save(); ctx.beginPath(); ctx.rect(f.x - 40, SEA - 60, 80, 60); ctx.clip();
-    ctx.translate(f.x, SEA + down - 6); ctx.scale(f.dir, 1); ctx.rotate(1.2);       // nose down, tail up
+    ctx.translate(f.x, SEA + down - 6); ctx.scale(f.dir, 1); ctx.rotate(f.steep ? 1.45 : 1.2);   // nose down, tail up
     drawPlane(ctx, f.kind, f.skin, null, 1, false, false); ctx.restore();
   }
   ctx.fillStyle = `rgba(230,242,250,${0.8*(1 - k)})`;

@@ -162,14 +162,14 @@ test('גרפיקה 2: מטוס שהופל נופל עד הים, אויב פגו�
   G = null;
   return 'נפילה עד הים בתוך ' + n + ' צעדים · עשן ואש · שובל · 8 מצבי מזג אוויר';
 });
-test('נפילת מטוסי אויב: שלוש צורות נפילה, כנף נתלשת, פיצוץ באוויר, שובל, ים, יבשה, מצנח', async () => {
+test('נפילת מטוסי אויב: ארבע צורות נפילה (תלת־ממד, צלילה ארוכה), כנף נתלשת, פיצוץ באוויר, שובל, ים, יבשה, מצנח', async () => {
   freshSave(); launch(0); fly(G.carrier.x + 1500, -800); god();
   const seaX = G.carrier.x + 1500, landX = (G.islands[0].x0 + G.islands[0].x1)/2;
   const mk = (x, o={}) => { const e = {type:o.type||'zero', x, y:SEA - 400, a:0.3, speed:220, hp:1, max:1, size:16, dead:false}; const f = makeFall(e); Object.assign(f, o.f||{}); G.fx.push(f); return f; };
   const run = (f, n=900) => { let i = 0; while(G.fx.includes(f) && i++ < n){ updateFx(1/60); if(i % 30 === 0) render(ctx, CW || 320, CH || 180); } return i; };
   const types = new Set();
   // each way down reaches the sea, leaves a lingering smoke trail, a tall splash, a sinking tail and an oil slick
-  for(const mode of ['spiral', 'flat', 'glide']){
+  for(const mode of ['spiral', 'flat', 'glide', 'dive']){
     G.fx.length = 0;
     const f = mk(seaX, {f:{mode, burstT:-1, wingOff:false, bailT:-1}});
     const steps = run(f);
@@ -182,6 +182,22 @@ test('נפילת מטוסי אויב: שלוש צורות נפילה, כנף נ�
   G.fx.length = 0; const sp = mk(seaX, {f:{mode:'spiral', burstT:-1, wingOff:false, bailT:-1}});
   for(let i = 0; i < 90; i++) updateFx(1/60);
   assert(Math.sin(sp.rot) > 0.5, 'האף לא יורד בצלילה: ' + sp.rot.toFixed(2));
+  // the flat spin turns round the vertical axis (in 3D), not in the plane of the screen
+  G.fx.length = 0; const fl = mk(seaX, {f:{mode:'flat', burstT:-1, wingOff:false, bailT:-1}}); const yaw0 = fl.yaw;
+  for(let i = 0; i < 60; i++) updateFx(1/60);
+  assert(Math.abs(fl.yaw - yaw0) > 1.5 && fall3D(fl) && fall3D(fl).pitch < 0, 'הסחרור השטוח לא מסתובב סביב הציר האנכי');
+  // the long dive: only from high up, steep and fast, straight into the sea with a tall column
+  let dives = 0, lowDives = 0;
+  for(let i = 0; i < 300; i++){
+    if(makeFall({type:'zero', x:seaX, y:SEA - 800, a:0, speed:220, dead:false}).mode === 'dive') dives++;
+    if(makeFall({type:'zero', x:seaX, y:SEA - 300, a:0, speed:220, dead:false}).mode === 'dive') lowDives++;
+  }
+  assert(dives > 50 && lowDives === 0, `צלילות: ${dives} מגובה רב, ${lowDives} מגובה נמוך`);
+  G.fx.length = 0; const dv = mk(seaX, {f:{mode:'dive', burstT:-1, wingOff:false, bailT:-1, y:SEA - 800}});
+  let steep = 0, fast = 0;
+  for(let i = 0; i < 900 && G.fx.includes(dv); i++){ updateFx(1/60); steep = Math.max(steep, Math.atan2(dv.vy, Math.abs(dv.vx))); fast = Math.max(fast, Math.hypot(dv.vx, dv.vy)); }
+  const col = G.fx.find(x => x.type === 'wsplash');
+  assert(steep > 1.05 && fast > 450 && col && col.h > 100, `הצלילה: זווית ${steep.toFixed(2)}, מהירות ${fast|0}, עמוד מים ${col && col.h}`);
   // a wing tears off
   G.fx.length = 0; const w = mk(seaX, {f:{mode:'flat', burstT:-1, wingOff:true, bailT:-1}});
   for(let i = 0; i < 30; i++) updateFx(1/60);

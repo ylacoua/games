@@ -56,9 +56,10 @@ function shadeHex(hex, k){
   return `rgb(${r|0},${g|0},${b|0})`;
 }
 
-function drawPlane3D(ctx, type, color, nation, yaw, roll, pitch, flash, prop){
+// opts.noWing: -1 or 1 leaves that main wing out (a falling enemy that has lost one, wreck.js)
+function drawPlane3D(ctx, type, color, nation, yaw, roll, pitch, flash, prop, opts){
   // per-type model family and the aircraft's real paint scheme (or the player's skin, passed as `color`)
-  const shape = {corsair:'corsair', dauntless:'bomber', helldiver:'bomber', avenger:'heavy'}[type] || 'fighter';
+  const shape = {corsair:'corsair', dauntless:'bomber', helldiver:'bomber', avenger:'heavy', val:'bomber', betty:'heavy'}[type] || 'fighter';
   const scheme = (color && typeof color==='object' && color.s) || SCHEMES[(AIRCRAFT[type]||AIRCRAFT.hellcat).scheme];
   color = scheme.top;
   const M = buildModel(shape);
@@ -67,6 +68,7 @@ function drawPlane3D(ctx, type, color, nation, yaw, roll, pitch, flash, prop){
   const under = scheme.under;
   const list = [];
   for(const f of M.faces){
+    if(opts && opts.noWing && f.ins === opts.noWing) continue;
     const q = f.p.map(v=>xform(v,cr,sr,cp,sp,cy,sy));
     // face normal from the first three points
     const ax=q[1][0]-q[0][0], ay=q[1][1]-q[0][1], az=q[1][2]-q[0][2];
