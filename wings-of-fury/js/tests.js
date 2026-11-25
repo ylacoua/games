@@ -162,6 +162,52 @@ test('גרפיקה 2: מטוס שהופל נופל עד הים, אויב פגו�
   G = null;
   return 'נפילה עד הים בתוך ' + n + ' צעדים · עשן ואש · שובל · 8 מצבי מזג אוויר';
 });
+test('נפילת מטוסי אויב: שלוש צורות נפילה, כנף נתלשת, פיצוץ באוויר, שובל, ים, יבשה, מצנח', async () => {
+  freshSave(); launch(0); fly(G.carrier.x + 1500, -800); god();
+  const seaX = G.carrier.x + 1500, landX = (G.islands[0].x0 + G.islands[0].x1)/2;
+  const mk = (x, o={}) => { const e = {type:o.type||'zero', x, y:SEA - 400, a:0.3, speed:220, hp:1, max:1, size:16, dead:false}; const f = makeFall(e); Object.assign(f, o.f||{}); G.fx.push(f); return f; };
+  const run = (f, n=900) => { let i = 0; while(G.fx.includes(f) && i++ < n){ updateFx(1/60); if(i % 30 === 0) render(ctx, CW || 320, CH || 180); } return i; };
+  const types = new Set();
+  // each way down reaches the sea, leaves a lingering smoke trail, a tall splash, a sinking tail and an oil slick
+  for(const mode of ['spiral', 'flat', 'glide']){
+    G.fx.length = 0;
+    const f = mk(seaX, {f:{mode, burstT:-1, wingOff:false, bailT:-1}});
+    const steps = run(f);
+    assert(!G.fx.includes(f) && steps < 900, `נפילה מסוג ${mode} לא הגיעה לים`);
+    assert(f.trail.length > 10, `אין שובל עשן ב-${mode}`);
+    for(const t of ['trailfade', 'wsplash', 'sink', 'slick']) assert(G.fx.some(x => x.type === t), `חסר ${t} אחרי נפילה לים (${mode})`);
+    types.add(mode);
+  }
+  // spiral: the nose follows the path down (pointing down by the end)
+  G.fx.length = 0; const sp = mk(seaX, {f:{mode:'spiral', burstT:-1, wingOff:false, bailT:-1}});
+  for(let i = 0; i < 90; i++) updateFx(1/60);
+  assert(Math.sin(sp.rot) > 0.5, 'האף לא יורד בצלילה: ' + sp.rot.toFixed(2));
+  // a wing tears off
+  G.fx.length = 0; const w = mk(seaX, {f:{mode:'flat', burstT:-1, wingOff:true, bailT:-1}});
+  for(let i = 0; i < 30; i++) updateFx(1/60);
+  assert(w.wingGone && G.fx.some(x => x.type === 'part' && x.shape === 'wing'), 'הכנף לא נתלשה');
+  // a Zero blowing apart in the air: four burning pieces, the trail stays
+  G.fx.length = 0; const b = mk(seaX, {f:{burstT:0.1, bailT:-1}});
+  for(let i = 0; i < 12; i++) updateFx(1/60);
+  assert(!G.fx.includes(b) && G.fx.filter(x => x.type === 'part').length === 4, 'הפיצוץ באוויר לא פירק את המטוס לארבעה חלקים');
+  // onto land: a fireball and a burning wreck that burns out
+  G.fx.length = 0; const l = mk(landX, {f:{mode:'flat', burstT:-1, wingOff:false, bailT:-1, vx:0}});
+  run(l);
+  const wr = G.fx.find(x => x.type === 'wreck'); assert(wr, 'אין שבר בוער על היבשה');
+  // the enemy pilot jumps, comes down and is gone
+  G.fx.length = 0; const p = mk(seaX, {f:{mode:'glide', burstT:-1, wingOff:false, bailT:0.1}});
+  for(let i = 0; i < 20; i++) updateFx(1/60);
+  const ch = G.fx.find(x => x.type === 'echute'); assert(ch, 'טייס האויב לא קפץ');
+  let n = 0; while(G.fx.includes(ch) && n++ < 3000) updateFx(1/60);
+  assert(!G.fx.includes(ch), 'המצנח של טייס האויב לא נעלם');
+  // too many falling at once: the rest blow apart
+  G.fx.length = 0; for(let i = 0; i < 8; i++) mk(seaX + i*30);
+  assert(G.fx.filter(f => f.type === 'fall' && f.burstT < 0).length <= WRECK.maxFalling, 'יותר מדי מטוסים נופלים בבת אחת');
+  // night lights and every drawing path
+  G.weather.time = 'night'; render(ctx, CW || 320, CH || 180);
+  G = null;
+  return [...types].join(', ') + ' · כנף · פיצוץ · יבשה · מצנח';
+});
 test('גרסה: כל הסקריפטים ב-index.html נטענים עם מספר הגרסה (בלי קבצים ישנים מהמטמון)', async () => {
   const html = await (await fetch('index.html', {cache:'no-store'})).text();
   const srcs = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map(m => m[1]);

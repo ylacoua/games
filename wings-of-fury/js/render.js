@@ -667,12 +667,8 @@ function drawFx(ctx, f){
     case 'wake':
       ctx.fillStyle=`rgba(230,245,255,${0.5*(1-k)})`; ctx.fillRect(f.x-6-k*10, f.y, 12+k*20, 2); break;
     case 'column': drawColumn(ctx, f); break;
-    case 'fall': {
-      ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot); drawPlane(ctx, f.kind, f.skin, null, 1, false, false); ctx.restore();
-      const fl = 5 + Math.random()*4;                  // the fire on the wreck
-      ctx.fillStyle = `rgba(255,${120 + (Math.random()*100|0)},40,.9)`; ctx.beginPath(); ctx.arc(f.x, f.y, fl, 0, 7); ctx.fill();
-      ctx.fillStyle = 'rgba(255,240,180,.85)'; ctx.beginPath(); ctx.arc(f.x, f.y, fl*0.4, 0, 7); ctx.fill();
-      break; }
+    case 'fall': case 'trailfade': case 'part': case 'wsplash': case 'sink': case 'slick': case 'wreck': case 'echute':
+      drawWreckFx(ctx, f, k); break;                   // shot-down aircraft and what they leave behind (wreck.js)
     case 'spl': {                                      // bullet hitting the sea: two thin spouts that rise and fall
       const h = f.h*Math.sin(k*Math.PI); ctx.strokeStyle = `rgba(230,242,250,${0.85*(1-k)})`; ctx.lineWidth = 1.2;
       ctx.beginPath(); ctx.moveTo(f.x-1.5, SEA); ctx.lineTo(f.x-2.5, SEA-h); ctx.moveTo(f.x+1.5, SEA); ctx.lineTo(f.x+2, SEA-h*0.7); ctx.stroke(); break; }
@@ -698,7 +694,7 @@ function drawDarkness(ctx, cw, ch, scale, camX, alpha, top){
   const P=G.player;
   if(!P.dead) hole(P.x,P.y,150,0.85);
   if(!P.dead && P.muzzle > 0) hole(P.x + P.f*Math.cos(heading(P))*24, P.y - Math.sin(heading(P))*24, 70, 0.7);   // gunfire lights up the dark
-  for(const f of G.fx) if(f.type==='fall') hole(f.x, f.y, 55, 0.7);                                            // a plane going down in flames
+  wreckLights(hole);                                   // planes going down in flames, burning parts, oil and wrecks (wreck.js)
   for(const e of G.enemies) if(!e.dead && e.burning) hole(e.x, e.y, 40, 0.5);
   hole(G.carrier.x+G.carrier.len*0.66+21, DECK_Y-90, 60, 0.7);
   for(let i=0;i<6;i++) hole(G.carrier.x+40+i*90, DECK_Y, 40, 0.5);

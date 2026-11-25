@@ -341,8 +341,7 @@ function hurtEnemy(e, d){
     boom(e.x, e.y, emily?90:24, emily || e.type!=='zero', true); SFX.planeBoom();
     // smaller aircraft don't vanish in the blast: the wreck falls, spinning and burning, until it hits the
     // sea or the ground (a 'fall' effect, entities.js); the score and the kill count already happened above
-    if(!emily) G.fx.push({type:'fall', kind:e.type, skin:e.skin || null, x:e.x, y:e.y, vx:Math.cos(e.a)*e.speed*0.6, vy:Math.sin(e.a)*e.speed*0.4 - 30,
-      rot:e.a, spin:rnd(3, 6)*(Math.random() < 0.5 ? -1 : 1), t:0, max:8});
+    if(!emily) G.fx.push(makeFall(e));                                 // spiral, flat spin or glide, break-up, bail-out (wreck.js)
     for(let i=0;i<(emily?14:4);i++) G.debris.push({x:e.x,y:e.y,vx:Math.cos(e.a)*e.speed*0.6+rnd(-90,90),vy:rnd(-150,40),r:0,vr:rnd(-8,8),life:2.2,c:e.type==='zero'?'#c9c3a8':'#556b4a',smoke:true});
     if(e.type==='emily'){ say('"אמילי" הופלה!',4); hitStop(0.12); addTrauma(0.7); }
   }

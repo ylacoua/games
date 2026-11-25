@@ -248,6 +248,15 @@ const SFX = {
   thunder(){ this.noise(2.5, 300, 0.8); },
   hit(){ this.tone(220,90,0.12,0.15,'square'); },
   pickup(){ this.tone(500,1000,0.15,0.08,'triangle'); },
+  // a plane diving to its end: a whine that rises in pitch and loudness as it speeds up, cut off at the bottom
+  dive(dur){
+    if(!this.ctx || this.muted || !this.voice()) return;
+    const c = this.ctx, t = c.currentTime, o = c.createOscillator(), lp = c.createBiquadFilter(), g = c.createGain();
+    o.type = 'sawtooth'; o.frequency.setValueAtTime(260, t); o.frequency.exponentialRampToValueAtTime(820, t + dur);
+    lp.type = 'lowpass'; lp.frequency.setValueAtTime(700, t); lp.frequency.exponentialRampToValueAtTime(2600, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03, t + dur*0.85); g.gain.exponentialRampToValueAtTime(0.0001, t + dur + 0.05);
+    o.connect(lp); lp.connect(g); g.connect(this.master); o.start(t); o.stop(t + dur + 0.1);
+  },
   // a radio call: a short burst of band-passed static and a "roger" beep
   radio(){ this.noise(0.16, 1800, 0.09, 'bandpass', 2.5); this.tone(1250,1250,0.07,0.035,'sine'); },
   alarm(){ this.tone(880,660,0.25,0.07,'square'); }

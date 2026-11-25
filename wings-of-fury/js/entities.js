@@ -474,12 +474,7 @@ function puff(x,y,c,s,life=1){ if(G.fx.length > FX_MAX) return;
 function updateFx(dt){
   for(const f of G.fx){ f.t+=dt; if(f.type==='smoke'){ f.x+=f.vx*dt+G.weather.wind*0.3*dt; f.y+=f.vy*dt; } if(f.type==='text') f.y-=30*dt; }
   // shot-down aircraft fall, spinning and trailing fire and smoke, until they hit the sea or the ground
-  for(const f of G.fx) if(f.type==='fall' && f.t < f.max){
-    f.vy += 300*dt; f.vx *= 1 - 0.3*dt; f.x += f.vx*dt; f.y += f.vy*dt; f.rot += f.spin*dt;
-    if(Math.random() < dt*28) puff(f.x, f.y, '#22201e', 9, 1.5);
-    const gy = groundY(f.x);
-    if(f.y >= gy - 4){ f.t = f.max; if(overSea(f.x)) splash(f.x); else boom(f.x, gy - 4, 32, true); }
-  }
+  updateFalls(dt);                                                  // wreck.js: falls, parts, impacts, enemy parachutes
   // damaged enemy aircraft trail smoke from half strength, and burn below 30%
   for(const e of G.enemies){
     if(e.dead) continue;
