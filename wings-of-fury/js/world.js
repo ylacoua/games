@@ -126,6 +126,8 @@ function newLevel(idx, loadout, def){
     G.wingmen.push(wm);
   });
   Music.stop(); FlightMusic.start();                                // the menu theme gives way to the flight score (radio.js)
+  if(!def) campaignTargets(idx);                                    // campaign: radar station, flak ship (combat.js)
+  stockInit();                                                      // the carrier's magazine (combat.js)
   resetPlayer();
   say('המטוס על הסיפון. הגבר מצערת (W / →) ומשוך ↑ כדי להמריא');
 }
@@ -148,7 +150,7 @@ function makeShip(type, x, minX, maxX){
 function resetPlayer(){
   const st = G.stats, lo = G.loadout, home = G.homeDeck || G.carrier;   // the carrier we last landed on
   G.player = {x:home.x+70, deckC:home, y:DECK_Y-9, f:1, p:0, loop:null, speed:0, throttle:0, hp:st.hp, max:st.hp, fuel:st.fuel, maxFuel:st.fuel,
-    skin:playerSkin(), ammo:500, ordType:lo.ord, ord:st.ord[lo.ord], ordMax:st.ord[lo.ord], onDeck:true, cool:0, ordCool:0, gunnerCool:0, inv:2, dead:false, stall:false, hitT:0, smoke:0, gear:1, gearWant:1, airT:0};
+    skin:playerSkin(), ammo:500, ordType:lo.ord, ord:stockLoad(lo.ord, st.ord[lo.ord]), ordMax:st.ord[lo.ord], onDeck:true, cool:0, ordCool:0, gunnerCool:0, inv:2, dead:false, stall:false, hitT:0, smoke:0, gear:1, gearWant:1, airT:0};
   G.state='deck';
   SFX.setEngineProfile(G.loadout.plane);
 }

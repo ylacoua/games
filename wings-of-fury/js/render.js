@@ -79,6 +79,7 @@ function renderScene(ctx, cw, ch){
   for(const so of G.soldiers) drawSoldier(ctx, so);
   if(G.ground) drawGround(ctx);
   if(G.special) specialDraw(ctx);                      // special-mission objects: boats, convoy, bridge, train...
+  drawCraters(ctx);                                    // bomb craters on airstrips (combat.js)
   if(W.time==='dawn' && !stormy) drawFog(ctx, x0, x1, W);   // morning mist lying low over the water
   drawShadows(ctx, W);                                 // aircraft flying low cast a shadow on the water / ground
   // projectiles
@@ -90,7 +91,7 @@ function renderScene(ctx, cw, ch){
   for(const w of G.wingmen) if(!w.dead) drawAI(ctx, w, w.kind, 1, w.flash, w.gear||0);
   drawChutes(ctx);                                     // pilots who bailed out, and the rescue launch (bailout.js)
   for(const e of G.enemies){
-    if(e.type==='zero') drawAI(ctx, e, 'zero', 1, e.flash);
+    if(e.type==='zero'){ drawAI(ctx, e, 'zero', e.big || 1, e.flash); if(e.float) drawFloats(ctx, e); }   // heavy fighters drawn bigger, floatplanes on floats (combat.js)
     else if(e.type==='betty') drawAI(ctx, e, 'betty', 1, e.flash);
     else if(e.type==='val') drawAI(ctx, e, 'val', 1, e.flash, 1);   // the D3A had fixed, spatted landing gear
     else if(e.type==='emily') drawEmily(ctx, e);
@@ -113,7 +114,7 @@ function renderScene(ctx, cw, ch){
       const roll = -Math.sin(Math.PI*t)*0.75;
       drawPlane3D(ctx, G.stats.type, P.skin || null, 'us', yaw, roll, a, P.hitT>0, true);
     } else {
-      drawPilotPlane(ctx, P, G.stats.type, 'us', a, P.hitT>0, P.throttle>0.05||P.speed>40, P.gear);
+      drawPilotPlane(ctx, P, G.stats.type, 'us', a, P.hitT>0, (P.throttle>0.05||P.speed>40) && engK(P) > 0 && P.fuel > 0, P.gear);   // a stopped engine: the propeller stands still
       drawPlayerDamage(ctx, P, a);                     // bullet holes, oil, a burning engine (render.js)
     }
     if(P.muzzle > 0 && !P.loop){                       // muzzle flash from the wing guns
@@ -135,6 +136,8 @@ function renderScene(ctx, cw, ch){
   }
   for(const f of G.fx) drawFx(ctx, f);
   if(G.special) specialDrawOver(ctx);                  // drawn above the aircraft: flames, flares, sun glare
+  drawCrates(ctx);                                     // supply crates under their parachutes (combat.js)
+  if(!G.tutorial) drawCloudBanks(ctx);                 // clouds in the play area, in front of the aircraft (combat.js)
   ctx.restore();
 
   // night / dusk lighting
@@ -169,7 +172,9 @@ function renderScene(ctx, cw, ch){
     if(flashes){ ctx.fillStyle='rgba(200,40,30,.18)'; ctx.fillRect(0,0,vw,H); }
     else { ctx.strokeStyle='rgba(200,40,30,.55)'; ctx.lineWidth=10; ctx.strokeRect(5,5,vw-10,H-10); }
   }
+  drawCloudMist(ctx, vw, H);                           // inside a cloud: the view mists over (combat.js)
   drawHUD(ctx, vw, vw0);
+  drawCombatHUD(ctx, vw);                              // streak banner, damaged systems, power-up, magazine (combat.js)
   drawTutorial(ctx, vw);
   drawDefenseHUD(ctx, vw);
   drawGroundHUD(ctx, vw);

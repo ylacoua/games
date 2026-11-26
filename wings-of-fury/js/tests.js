@@ -370,7 +370,7 @@ test('כוכבים בזמן הטיסה: מצב חי, הודעה כשכוכב א�
   freshSave(); SAVE.money = 0; SAVE.stars = {0:3, 1:3, 2:3, 3:3, def:2};   // 14 stars
   G = null; UI.homePanel = null; UI.mainMenu();
   assert(SAVE.medals[12] && !SAVE.medals[24] && SAVE.money === 1500, 'מדליית הארד לא ניתנה נכון: $' + SAVE.money);
-  assert(/מדליית ארד/.test(UI.root.textContent) && /14\/48/.test(UI.root.textContent), 'מסך הבית לא מציג כוכבים ומדליה');
+  assert(/מדליית ארד/.test(UI.root.textContent) && UI.root.textContent.includes(`14/${starsMax()}`), 'מסך הבית לא מציג כוכבים ומדליה');
   UI.mainMenu(); assert(SAVE.money === 1500, 'מדליה שולמה פעמיים');
   return `${starsMax()} כוכבים אפשריים, ${MEDALS.length} מדליות`;
 });
@@ -452,6 +452,96 @@ test('מערכה: מפה, והתוצאה של משימה עוברת לבאה', a
   UI.briefing(1); assert(/מצב המערכה/.test(UI.root.textContent), 'אין מצב מערכה בתדריך');
   UI.homePanel = null;
   return 'מפה, ספירת כוכבים, השפעה על משימה';
+});
+test('קרב: רצף הפלות, טיסה נועזת, נזק למערכות, נחיתה בלי מנוע, הסתתרות בענן, ארגז אספקה', async () => {
+  freshSave(); launch(0); fly(G.carrier.x + 2000, 100); god();
+  const P = G.player, zero = (dx=200) => { const e = {type:'zero', x:P.x + dx, y:P.y, a:Math.PI, speed:220, hp:30, max:30, size:16, cool:9, burst:0, evade:0, dead:false, hpScaled:true}; G.enemies.push(e); return e; };
+  // streak: three of the player's kills in a row; a kill by someone else does not count
+  for(let i = 0; i < 3; i++){ const e = zero(); e.byP = G.time; hurtEnemy(e, 999); }
+  assert(G.combo.n === 3 && G.comboBonus > 0 && /משולשת/.test(G.combo.text), 'רצף ההפלות לא נספר: ' + JSON.stringify(G.combo));
+  const n0 = G.combo.n; hurtEnemy(zero(), 999); assert(G.combo.n === n0, 'הפלה של מישהו אחר נספרה ברצף');
+  // the player's own bullet marks the kill; five in one sortie: ace in a day
+  const z = zero(30); bulletVsEnemy({x:z.x, y:z.y, dmg:999, team:'p', own:true, life:1});
+  const z2 = zero(30); bulletVsEnemy({x:z2.x, y:z2.y, dmg:999, team:'p', own:true, life:1});
+  assert(P.aceDay && G.combo.n === 5, 'אס ביום אחד לא ניתן: ' + P.sortie);
+  // daring: three seconds skimming the waves away from the carrier
+  P.x = G.carrier.x + 2000; P.y = SEA - 30; P.speed = 220; const e0 = G.earned;
+  for(let i = 0; i < 200; i++){ P.y = SEA - 30; combatUpdate(1/60); }
+  assert(G.daringBonus > 0 && G.earned > e0, 'אין בונוס על טיסה על הגלים');
+  // systems: enough heavy hits damage all three; the engine stops, the controls slow, the tank leaks
+  for(let i = 0; i < 400 && !(P.sys && P.sys.eng >= 2 && P.sys.ctrl && P.sys.leak); i++) hitSystem(P, 30);
+  assert(engK(P) === 0 && ctrlK(P) === 0.7 && P.sys.leak, 'נזק למערכות לא נרשם: ' + JSON.stringify(P.sys));
+  const f0 = P.fuel; for(let i = 0; i < 60; i++) systemsUpdate(1/60); assert(f0 - P.fuel > 1, 'המיכל לא דולף');
+  const e1 = G.earned; deadStickLanding(P); assert(G.deadsticks === 1 && G.earned > e1, 'אין בונוס לנחיתה בלי מנוע');
+  // clouds: inside one, distant enemies and the AA lose the player; close up they still see him
+  cloudsUpdate(1/60); const b = G.banks[0]; P.x = b.x; P.y = b.y;
+  assert(hiddenInCloud(P.x, P.y) && playerHidden(P.x + 300, P.y) && !playerHidden(P.x + 80, P.y), 'הענן לא מסתיר');
+  assert(!gunTarget(P.x, P.y + 300, 900), 'הנ"מ רואה דרך הענן');
+  // a supply crate: comes down ahead, flying through it gives the power-up
+  P.x = G.carrier.x + 2000; P.y = 100; G.crateT = 0; G.crates = []; cratesUpdate(1/60);
+  assert(G.crates.length === 1, 'לא צנח ארגז');
+  G.crates[0].kind = 'guns'; G.crates[0].x = P.x; G.crates[0].y = P.y; cratesUpdate(1/60);
+  assert(powGuns() === 2 && !G.crates.length, 'הארגז לא נתן תחמושת כבדה');
+  render(ctx, CW || 320, CH || 180);
+  G = null;
+  return 'רצף ×5, אס ביום אחד, גלים, 3 מערכות, ענן, ארגז';
+});
+test('אויבים ומטרות חדשים: מטוס ימי, לוחם כבד, קמיקזה, מכ"ם, ספינת נ"מ, מסלול מחורר, מלאי חימוש', async () => {
+  freshSave(); launch(3); fly(2000, 100); god();
+  // campaign additions: a radar station, and a flak ship when the mission has destroyers
+  const radar = G.structures.find(s => s.radarCamp); assert(radar && campaignRadarOn(), 'אין מכ"ם בקמפיין');
+  const ds = G.ships.find(s => s.type === 'destroyer'); if(ds) assert(G.ships.some(s => s.flak && s.turrets.length === 3), 'אין ספינת נ"מ');
+  hitStruct(radar, 99999, 'bomb'); assert(!campaignRadarOn(), 'המכ"ם עדיין פעיל אחרי שהושמד');
+  // floatplane and kamikaze pair
+  G.rufeT = 0; G.kamiT = 0; G.enemies.length = 0; campaignSpawns(1/60);
+  const fp = G.enemies.find(e => e.float); assert(fp && fp.takeoff && fp.takeoff.water, 'מטוס ימי לא הופיע');
+  assert(G.enemies.filter(e => e.forceKami).length === 2, 'אין זוג קמיקזה');
+  await sim(6, () => { god(); });
+  assert(!fp.takeoff || fp.dead, 'המטוס הימי לא המריא מהמים');
+  // heavy fighters: about a quarter of the Zeros from mission 3 on
+  const site = launchSites()[0]; let heavy = 0;
+  for(let i = 0; i < 200; i++){ const e = launchFrom(site, 'zero'); if(e.heavy) heavy++; }
+  G.enemies.length = 0;
+  assert(heavy > 20 && heavy < 90, 'מספר לוחמים כבדים: ' + heavy);
+  // a bomb on an airstrip stops take-offs from that island for a minute
+  const is = site.is, sx = (is.strip.x0 + is.strip.x1)/2;
+  explode(sx, groundY(sx) - 2, 40, 10, 'p', 'bomb');
+  assert(stripCratered(is) && !launchSites().some(s => s.is === is), 'המסלול לא חורר');
+  // ordnance stock: what is loaded comes off the shelf, what returns goes back, an empty magazine cannot be chosen
+  const P = G.player, s0 = G.stock[P.ordType], carried = P.ord;
+  P.onDeck = true; UI.openDeck(false);
+  assert(G.stock[P.ordType] === s0 + carried, 'החימוש שחזר לא חזר למלאי');
+  G.stock.torpedo = 0; UI.openDeck();
+  assert(UI.root.querySelector('[data-act="dord"][data-v="torpedo"]').disabled, 'אפשר לבחור טורפדו כשהמלאי ריק');
+  UI.hide(); launch('training'); assert(!G.stock, 'יש מלאי באימון');
+  G = null;
+  return `לוחמים כבדים ${heavy}/200 · מסלול · מלאי`;
+});
+test('משימות חדשות: אספקה למכותרים, עין בשמיים, ליווי התובלה', async () => {
+  // supply: X near the zone releases a canister (not a bomb); six in the zone completes it
+  freshSave(); launch('supply'); fly(); god(); await sim(0.1);
+  const S = G.special, P = G.player, zx = (S.zone.x0 + S.zone.x1)/2;
+  assert(S.carry === 4 && S.stock === 6, `טעינת מכלים: ${S.carry}/${S.stock}`);
+  P.x = zx + 300; P.y = 100; P.ordCool = 0; const ord = P.ord; dropOrd(P);
+  assert(S.cans.length === 1 && P.ord === ord && S.carry === 3, 'X ליד האזור לא הטיל מכל');
+  S.cans.length = 0; S.carry += 1;
+  for(let i = 0; i < 6; i++) S.cans.push({x: zx, y: groundY(zx) - 40, vx: 0, vy: 0, t: 2, open: 1});
+  await sim(5, () => { god(); P.x = G.carrier.x + 900; P.y = 100; G.weather.wind = 0; return G.complete; });
+  assert(G.complete && S.del === 6, 'האספקה לא הושלמה: ' + S.del);
+  // recon: level passes over each mark complete it without an alarm; opening fire raises one
+  freshSave(); launch('recon'); fly(); god();
+  const R = G.special;
+  for(const m of R.marks){
+    await sim(3, () => { god(); const Q = G.player; Q.x = m.s.x; Q.y = groundY(m.s.x) - 250; Q.p = 0; Q.speed = 200; return m.done; });
+  }
+  assert(R.marks.every(m => m.done) && G.complete && !R.alarm, 'הצילומים לא הושלמו בלי אזעקה');
+  keys.Space = true; await sim(0.2, () => god()); keys.Space = false;
+  assert(R.alarm && G.def.zeroEvery < 100, 'ירי לא הפעיל אזעקה');
+  // escort: with every Zero shot down at once, the transport lands and the mission is won
+  freshSave(); launch('escort'); fly();
+  await sim(260, () => { god(); killPlanes(); const v = G.special.tr; G.player.x = v.x - 100; G.player.y = v.y - 80; }, 0);
+  assert(won(), 'ליווי התובלה לא הסתיים בניצחון: ' + resultTitle());
+  return 'אספקה 6/6 · 4 צילומים · התובלה נחתה';
 });
 test('סקינים: נפתחים בניצחון ונקנים', async () => {
   freshSave(); assert(!skinUnlocked('olive'), 'סקין פתוח לפני ניצחון');

@@ -263,6 +263,7 @@ function update(dt, vw){
   starTick();                                                       // announces stars won or lost (extras.js)
   radioUpdate(dt);                                                  // flight music intensity and radio calls (radio.js)
   chutesUpdate(dt);                                                 // pilots under parachutes and in the water (bailout.js)
+  combatUpdate(dt);                                                 // bonuses, systems, clouds, crates, new enemies (combat.js)
   if(G.carrier.hp<=0){ boom(G.carrier.x+G.carrier.len/2, DECK_Y, 120, true); UI.result(false, 'נושאת המטוסים הוטבעה.'); return; }
   if(P.dead){
     G.endT -= dt;

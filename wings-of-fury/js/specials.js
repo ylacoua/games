@@ -61,7 +61,7 @@ function drawSpecialHUD(ctx, vw){
   const lines = [].concat(S.M.hud(S)).filter(Boolean);
   ctx.save(); ctx.direction='rtl'; ctx.textAlign='center'; ctx.textBaseline='middle';
   ctx.font='14px Rubik, sans-serif';
-  const w = Math.max(...lines.map(l=>ctx.measureText(l).width)) + 30, y = G.ground ? 112 : 66;
+  const w = Math.max(...lines.map(l=>ctx.measureText(l).width)) + 30, y = G.ground ? 112 : 82;   // below the radar (8 to 62)
   ctx.fillStyle='rgba(20,34,52,.22)'; ctx.fillRect(vw/2-w/2, y-13, w, 8 + lines.length*19);
   ctx.shadowColor='rgba(0,0,0,.7)'; ctx.shadowBlur=3; ctx.fillStyle='#f2d58a';
   lines.forEach((l,i)=>ctx.fillText(l, vw/2, y + i*19));

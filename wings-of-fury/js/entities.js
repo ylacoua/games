@@ -74,7 +74,7 @@ function updatePlayer(dt){
     if(!P.mv) say(P.lastMv==='split' ? 'יציאה מספליט S' : 'יציאה מפניית פטיש', 0.8);
   } else if(!P.vl){
     // pitch stays available during the turn
-    const tr = st.turn*0.5*(P.stall?0.4:1)*(P.loop?0.5:1);   // pitch rate: gentler than the turn-around
+    const tr = st.turn*ctrlK(P)*0.5*(P.stall?0.4:1)*(P.loop?0.5:1);   // pitch rate: gentler than the turn-around (damaged controls: slower)
     if(K.ArrowUp && !P.pull) P.p += tr*dt;
     if(K.ArrowDown && !P.pull) P.p -= tr*dt;
     P.p = clamp(P.p, -1.35, 1.35);
@@ -98,7 +98,7 @@ function updatePlayer(dt){
     else if(P.vl.ang >= Math.PI*2){ P.p = 0; P.vl = null; P.lastMv = 'loop'; }
   }
   if(P.loop){
-    P.loop.t += dt * st.turn/1.25;          // ~0.65s for a Hellcat, quicker for agile planes
+    P.loop.t += dt * st.turn*ctrlK(P)/1.25; // ~0.65s for a Hellcat, quicker for agile planes
     P.speed -= 40*dt;                       // a hard turn bleeds a little speed
     if(P.loop.t >= 1){ P.f = -P.f; P.loop = null; }
   }
@@ -114,9 +114,10 @@ function updatePlayer(dt){
   P.gear = clamp(P.gear + clamp(want-P.gear, -dt/0.9, dt/0.9), 0, 1);
 
   const a = heading(P);
-  const target = (outOfFuel ? 0 : P.throttle*st.speed) * (1 - 0.12*P.gear);
+  // engine damage (combat.js): 80% power when hit, none once it has stopped; a boost crate adds 25%
+  const target = (outOfFuel ? 0 : P.throttle*st.speed*engK(P)*powBoost()) * (1 - 0.12*P.gear);
   P.speed += (target-P.speed)*0.55*dt - (Math.sin(a)>0 ? 145 : 70)*Math.sin(a)*dt;   // dives gain speed more slowly than climbs lose it
-  P.speed = clamp(P.speed, 0, st.speed*1.2);
+  P.speed = clamp(P.speed, 0, st.speed*1.2*powBoost());
   if(P.dive) P.speed = Math.min(P.speed, st.speed*0.78);                 // dive brakes hold a steady, slow dive
   P.stall = P.speed < 100 && !P.loop && !P.vl && !P.mv;
   if(P.stall) P.p = Math.max(-1.3, P.p - 1.1*dt);
@@ -136,7 +137,7 @@ function updatePlayer(dt){
   P.trX = P.x - v.vx/Math.max(1,P.speed)*12; P.trY = P.y - v.vy/Math.max(1,P.speed)*12;
 
   shootGuns(P, st, dt);
-  if((K.KeyX||K.KeyB) && P.ordCool<=0 && P.ord>0) dropOrd(P);
+  if((K.KeyX||K.KeyB) && P.ordCool<=0 && (P.ord>0 || (G.special && G.special.M.drop))) dropOrd(P);
   if(st.gunner) rearGunner(P);
 
   // ---- landing / ground collision ----
@@ -149,6 +150,7 @@ function updatePlayer(dt){
       P.deckC = C; G.homeDeck = C;                           // re-arm and take off again from this carrier
       P.onDeck=true; P.landing=true; P.y=DECK_Y-9; P.p=0; P.throttle=0; G.state='landing';
       SFX.tone(200,120,0.3,0.1,'triangle'); say('נחיתה! וו הבלימה נתפס',2); addTrauma(0.3);   // the hook catches: a thump
+      deadStickLanding(P);                                   // with no engine: a bonus (combat.js)
       return;
     }
     return crashPlayer(Math.abs(P.p)>=0.32 ? 'נחיתה בזווית תלולה מדי' : 'מהיר מדי לנחיתה – הורד מצערת (S)');
@@ -163,7 +165,7 @@ function shootGuns(P, st, dt){
   const spread = rnd(-0.03,0.03);
   const ca = Math.cos(spread), sa = Math.sin(spread);
   const dx = cx*ca - cy*sa, dy = cx*sa + cy*ca;
-  G.shots.push({x:P.x+cx*24, y:P.y+cy*24-2, vx:dx*950+v.vx*0.5, vy:dy*950+v.vy*0.5, team:'p', dmg:6*st.gun, life:0.9});
+  G.shots.push({x:P.x+cx*24, y:P.y+cy*24-2, vx:dx*950+v.vx*0.5, vy:dy*950+v.vy*0.5, team:'p', dmg:6*st.gun*powGuns(), life:0.9, own:true});
   P.cool = 1/st.rate; P.ammo--; P.muzzle = 0.05;          // muzzle flash on the wings (render.js)
   if(Math.random()<0.6) SFX.gun();
   if(P.ammo===0) say('נגמרה התחמושת – חזור לנושאת',3);
@@ -180,21 +182,23 @@ function rearGunner(P){
   }
   if(!best) return;
   const ang = Math.atan2(best.y-P.y, best.x-P.x) + rnd(-0.08,0.08);
-  G.shots.push({x:P.x-fx*14, y:P.y-6, vx:Math.cos(ang)*800, vy:Math.sin(ang)*800, team:'p', dmg:4, life:0.7});
+  G.shots.push({x:P.x-fx*14, y:P.y-6, vx:Math.cos(ang)*800, vy:Math.sin(ang)*800, team:'p', dmg:4, life:0.7, own:true});
   P.gunnerCool = 0.32; SFX.enemyGun();
 }
 
 function dropOrd(P){
   const v = playerVel(P), a = heading(P), t = P.ordType;
+  if(G.special && G.special.M.drop && G.special.M.drop(G.special, P)) return;   // e.g. supply canisters (missions2.js)
+  if(P.ord <= 0) return;
   P.ord--;
-  if(t==='bomb'){ G.drops.push({kind:'bomb', x:P.x, y:P.y+8, vx:v.vx*0.9, vy:v.vy*0.9+20, team:'p', dmg:ORD.bomb.dmg, r:ORD.bomb.radius}); P.ordCool=0.3; }
+  if(t==='bomb'){ G.drops.push({kind:'bomb', x:P.x, y:P.y+8, vx:v.vx*0.9, vy:v.vy*0.9+20, team:'p', dmg:ORD.bomb.dmg, r:ORD.bomb.radius, own:true}); P.ordCool=0.3; }
   else if(t==='rocket'){
     const dx=P.f*Math.cos(a), dy=-Math.sin(a);
-    G.drops.push({kind:'rocket', x:P.x+dx*10, y:P.y+6, vx:dx*640+v.vx*0.5, vy:dy*640+v.vy*0.5, team:'p', dmg:ORD.rocket.dmg, r:ORD.rocket.radius, life:2.4});
+    G.drops.push({kind:'rocket', x:P.x+dx*10, y:P.y+6, vx:dx*640+v.vx*0.5, vy:dy*640+v.vy*0.5, team:'p', dmg:ORD.rocket.dmg, r:ORD.rocket.radius, life:2.4, own:true});
     P.ordCool=0.22; SFX.rocket();
   } else {
     const alt = groundY(P.x) - P.y;
-    G.drops.push({kind:'torpedo', x:P.x, y:P.y+8, vx:v.vx*0.8, vy:Math.max(v.vy,0)+10, team:'p', dmg:ORD.torpedo.dmg, r:ORD.torpedo.radius, run:false, dir:P.f, ok:alt<160});
+    G.drops.push({kind:'torpedo', x:P.x, y:P.y+8, vx:v.vx*0.8, vy:Math.max(v.vy,0)+10, team:'p', dmg:ORD.torpedo.dmg, r:ORD.torpedo.radius, run:false, dir:P.f, ok:alt<160, own:true});
     P.ordCool=0.8; SFX.drop();
   }
 }
@@ -215,6 +219,7 @@ function damagePlayer(d){
   P.hp -= d*PLAYER_DAMAGE*diff().dmg; P.hitT=0.15; SFX.hit();
   addTrauma(d >= 12 ? 0.35 : 0.15);                          // a flak or bomb hit jolts harder than a bullet
   if(P.hp<=0){ P.hp=0; crashPlayer('המטוס הופל'); }
+  else if(!G.tutorial) hitSystem(P, d);                     // engine, controls or a fuel tank (combat.js)
 }
 
 // ---- projectiles ----
@@ -319,8 +324,11 @@ function detonate(d){
     return;
   }
   if(d.y>SEA-6 && overSea(d.x)) splash(d.x);
+  OWN_BLAST = !!d.own;                                       // aircraft caught in it count toward the player's streak
   explode(d.x, Math.min(d.y, groundY(d.x)), d.r, d.dmg, d.team, d.kind);
+  OWN_BLAST = false;
 }
+let OWN_BLAST = false;
 
 // Area damage
 function explode(x, y, r, dmg, team, kind){
@@ -338,7 +346,8 @@ function explode(x, y, r, dmg, team, kind){
     }
     for(const so of G.soldiers) if(!so.dead && !(so.safe>0) && Math.abs(so.x-x)<r && y>so.y-40) killSoldier(so);
     groundBlast(x, y, r, dmg);
-    for(const e of G.enemies) if(!e.dead && dist2(x,y,e.x,e.y) < (r+(e.size||16))**2) hurtEnemy(e, dmg*0.8);
+    craterStrip(x, y, kind);                                 // bombs on an airstrip stop take-offs for a while (combat.js)
+    for(const e of G.enemies) if(!e.dead && dist2(x,y,e.x,e.y) < (r+(e.size||16))**2){ if(OWN_BLAST) e.byP = G.time; hurtEnemy(e, dmg*0.8); }
     if(G.special) specialBlast(x, y, r, dmg, 'p');       // boats, submarines, the bridge, the train
   } else {
     const P=G.player;
@@ -353,7 +362,7 @@ function bulletVsEnemy(s){
   for(const e of G.enemies){
     if(e.dead) continue;
     const hit = e.boxW ? (Math.abs(s.x-e.x)<e.boxW/2 && Math.abs(s.y-e.y)<e.boxH/2) : dist2(s.x,s.y,e.x,e.y) < (e.size||16)**2;
-    if(hit && !dodges(e)){ s.life=0; hurtEnemy(e, s.dmg); spark(s.x,s.y); return; }
+    if(hit && !dodges(e)){ s.life=0; if(s.own) e.byP = G.time; hurtEnemy(e, s.dmg); spark(s.x,s.y); return; }
   }
   for(const st of G.structures){
     if(!st.dead && s.x>st.x-st.w/2 && s.x<st.x+st.w/2 && s.y>st.y-st.h){ s.life=0; hitStruct(st, s.dmg, 'gun'); spark(s.x,s.y); return; }
@@ -413,7 +422,7 @@ function hitShip(sh, d, kind, x){
     sh.dead=true; sh.sink=0.001; earn(sh.type, sh.x, SEA-sh.h);
     if(sh.type==='battleship' || sh.type==='jcarrier'){ hitStop(0.12); addTrauma(0.7); } else { hitStop(0.06); addTrauma(0.4); }
     for(let i=0;i<5;i++) setTimeout(()=>G && boom(sh.x+rnd(-sh.w/2,sh.w/2), SEA-sh.h, 50, true), i*220);
-    say(sh.type==='battleship'?'אוניית המערכה טובעת!':sh.type==='jcarrier'?'הנושאת היפנית הוטבעה! לא ימריאו ממנה עוד מטוסים':'משחתת אויב הוטבעה',3);
+    say(sh.type==='battleship'?'אוניית המערכה טובעת!':sh.type==='jcarrier'?'הנושאת היפנית הוטבעה! לא ימריאו ממנה עוד מטוסים':sh.flak?'ספינת הנ"מ הוטבעה!':'משחתת אויב הוטבעה',3);
   }
 }
 

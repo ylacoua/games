@@ -54,7 +54,7 @@ const UI = {
     this.confirmReset=false; Music.start();
     const p = this.homePanel;
     const nav = [['tut','משימות הדרכה','שיעורי טיסה ואימון חופשי'],['camp','משימות הקמפיין','משימות 1 עד 6'],
-                 ['extra','משימות נוספות','10 משימות מיוחדות'],['keys','תפעול המשחק','מקשים ולחצנים'],['set','הגדרות','צליל, רעידת מסך והבזקים']]
+                 ['extra','משימות נוספות',`${SPECIAL_ORDER.length + 2} משימות מיוחדות`],['keys','תפעול המשחק','מקשים ולחצנים'],['set','הגדרות','צליל, רעידת מסך והבזקים']]
       .map(([k,t,s])=>`<button class="navbtn ${p===k?'on':''}" data-act="home" data-v="${k}" aria-expanded="${p===k}"><b>${t}</b><small>${s}</small></button>`).join('');
     const reset = `<button class="link" data-act="reset">איפוס התקדמות</button>`;
     const cur = SAVE.difficulty || 'normal';
@@ -340,12 +340,15 @@ const UI = {
     SFX.setEngine(false,0);
     if(G.tutorial && G.tutorial.lesson.id==='landing' && crashed===false){ G.tutorial.landed = true; this.tutorialDone(); return; }
     if(crashed !== undefined) this.crashed = crashed;
+    // after a landing, what the aircraft did not drop goes back to the magazine (combat.js)
+    const P0 = G.player; if(crashed === false && P0 && !P0.returned){ P0.returned = true; stockReturn(P0.ordType, P0.ord); }
     const lo = G.loadout, st = planeStats(lo.plane, lo.up), done = G.complete, left = primariesLeft();
     const avail = Object.keys(PLANES).filter(k=>G.training || SAVE.owned[k]);
     const planes = avail.map(k=>{const b=PLANES[k];
       return `<button class="card ${lo.plane===k?'sel':''}" data-act="dplane" data-v="${k}" style="text-align:start">
       <b>${b.name}</b><p>${b.desc}</p></button>`;}).join('');
-    const ords = Object.keys(ORD).map(k=>`<button class="card ${lo.ord===k?'sel':''}" data-act="dord" data-v="${k}" style="text-align:start"><b>${ORD[k].name} ×${st.ord[k]}</b><p>${ORD[k].note}</p></button>`).join('');
+    const ords = Object.keys(ORD).map(k=>{ const n = G.stock ? G.stock[k] : null;
+      return `<button class="card ${lo.ord===k?'sel':''}" data-act="dord" data-v="${k}" style="text-align:start" ${n === 0 ? 'disabled' : ''}><b>${ORD[k].name} ×${n == null ? st.ord[k] : Math.min(n, st.ord[k])}</b><p>${ORD[k].note}</p>${n == null ? '' : `<span class="pill">${n ? `במלאי הנושאת: ${n}` : 'המלאי נגמר'}</span>`}</button>`; }).join('');
     const livesTxt = G.training ? 'ללא הגבלה' : `${G.lives} מתוך 5`;
     this.show(`<h2>${this.crashed?'מטוס חלופי':'על סיפון הנושאת'}</h2>
       <p class="sub">${this.crashed?(chutePending() ? 'הטייס שקפץ במצנח עדיין מחכה לחילוץ – המרא וחפה עליו. בחר מטוס חלופי מהסיפון.' : 'בחר מטוס חלופי מהסיפון.'):(diff().repair < 1 ? 'המטוס תודלק וחומש מחדש, אבל תוקן רק בחלקו.' : 'המטוס תוקן, תודלק וחומש מחדש.')}

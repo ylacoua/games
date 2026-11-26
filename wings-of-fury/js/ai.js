@@ -12,7 +12,7 @@ function fireFlak(sx, sy, tx, ty, tvx, tvy, err, dmg, big){
 // pick a flying target for a gun: player first, else a nearby wingman
 function gunTarget(x, y, range){
   const P = G.player;
-  if(!P.dead && !P.onDeck && Math.hypot(P.x-x, P.y-y)<range && P.y<y-30){ const v=playerVel(P); return {x:P.x,y:P.y,vx:v.vx,vy:v.vy,isP:true}; }
+  if(!P.dead && !P.onDeck && Math.hypot(P.x-x, P.y-y)<range && P.y<y-30 && !hiddenInCloud(P.x, P.y)){ const v=playerVel(P); return {x:P.x,y:P.y,vx:v.vx,vy:v.vy,isP:true}; }
   for(const w of G.wingmen) if(!w.dead && w.state==='fly' && Math.abs(w.x-x)<range*0.8 && w.y<y-30)
     return {x:w.x,y:w.y,vx:Math.cos(w.a)*w.speed,vy:Math.sin(w.a)*w.speed};
   return null;
@@ -116,13 +116,13 @@ function updateGround(dt){
     for(const t of sh.turrets){
       if(t.dead) continue;
       const tx = sh.x+t.dx, ty = SEA-sh.h*0.5-8;
-      const tg = gunTarget(tx, ty, 760);
+      const tg = gunTarget(tx, ty, sh.flak ? 920 : 760);         // a flak ship reaches further and fires faster (combat.js)
       if(!tg) continue;
       t.aim = Math.atan2(tg.y-ty, tg.x-tx);
       t.cool -= dt;
       if(t.cool<=0){
         fireFlak(tx, ty, tg.x, tg.y, tg.vx, tg.vy, (night?90:55)*(tg.isP&&P.lit?0.3:1)*diff().aaErr, sh.type==='battleship'?14:9+lvl, sh.type==='battleship');
-        t.cool = (sh.type==='battleship' ? rnd(1.3,2.0) : rnd(1.8,2.6)) * diff().aaRate;
+        t.cool = (sh.type==='battleship' ? rnd(1.3,2.0) : rnd(1.8,2.6)) * diff().aaRate * (sh.flak ? 0.55 : 1);
       }
     }
   }
@@ -244,7 +244,7 @@ function shootFrom(e, team, dmg, spd=760){
 function launchSites(){
   const sites = [];
   G.islands.forEach((is,i)=>{
-    if(is.strip && !is.captured && G.structures.some(s=>s.island===i && !s.dead && !s.hidden)) sites.push({kind:'island', x:(is.strip.x0+is.strip.x1)/2, is});
+    if(is.strip && !is.captured && !stripCratered(is) && G.structures.some(s=>s.island===i && !s.dead && !s.hidden)) sites.push({kind:'island', x:(is.strip.x0+is.strip.x1)/2, is});
   });
   for(const sh of G.ships) if(sh.type==='jcarrier' && !sh.dead) sites.push({kind:'carrier', x:sh.x, sh});
   return sites;
@@ -268,6 +268,7 @@ function launchFrom(site, type, delay=0){
     ? {type:'betty', x, y, a:dir>0?0:Math.PI, speed:0, full, hp:90, size:24, cool:0, bombs:3, dead:false}
     : {type:'zero',  x, y, a:dir>0?0:Math.PI, speed:0, full, hp:34+G.idx*5, size:16, cool:1, burst:0, evade:0, dead:false};
   e.max = e.hp;
+  if(type==='zero' && campaignOn() && G.idx >= 2 && Math.random() < 0.25) makeHeavy(e);   // a J2M heavy fighter (combat.js)
   e.takeoff = {t:-delay, ground:y, deck: site.kind==='carrier' ? site.sh : null};
   G.enemies.push(e);
   return e;
@@ -308,7 +309,7 @@ function updateSpawns(dt, viewW){
       for(let i=0;i<n;i++) launchFrom(site, 'zero', i*1.6);
       say(site.kind==='carrier' ? 'מטוסי זירו ממריאים מהנושאת היפנית!' : (n>1 ? 'מטוסי זירו ממריאים מהאי!' : 'מטוס זירו ממריא מהאי!'), 2.5);
     }
-    G.zeroT = def.zeroEvery*rnd(0.65,1.0)*escalation()*diff().spawn;   // campaign: fighters come more often as the mission drags on
+    G.zeroT = def.zeroEvery*rnd(0.65,1.0)*escalation()*diff().spawn*(campaignRadarOn() ? 0.65 : 1);   // campaign: fighters come more often as the mission drags on, and while the radar works
   }
   if(def.bombers){
     G.bomberT -= dt;
@@ -337,6 +338,7 @@ function hurtEnemy(e, d){
   e.hp -= d; e.flash=0.08;
   if(e.hp<=0){
     e.dead = true; earn(e.type, e.x, e.y);
+    if(e.byP != null && G.time - e.byP < 0.05) comboKill(e);           // the player's own kill: streaks (combat.js)
     const emily = e.type==='emily';
     boom(e.x, e.y, emily?90:24, emily || e.type!=='zero', true); SFX.planeBoom();
     // smaller aircraft don't vanish in the blast: the wreck falls, spinning and burning, until it hits the
@@ -371,7 +373,7 @@ function zeroAI(e, dt, lvl){
   // A Zero keeps its target for a while, and avoids one that several other Zeros are already chasing,
   // so the attackers spread out over the player and the wingmen.
   const air = [];
-  if(!P.dead && !P.onDeck) air.push({o:P, x:P.x, y:P.y, vx:playerVel(P).vx, vy:playerVel(P).vy});
+  if(!P.dead && !P.onDeck && !playerHidden(e.x, e.y)) air.push({o:P, x:P.x, y:P.y, vx:playerVel(P).vx, vy:playerVel(P).vy});   // a cloud hides him
   for(const w of G.wingmen) if(!w.dead && w.state==='fly') air.push({o:w, x:w.x, y:w.y, vx:Math.cos(w.a)*w.speed, vy:Math.sin(w.a)*w.speed});
   if(G.special) for(const v of specialAirTargets()) air.push(v);   // e.g. the rescue floatplane
   e.tgtT = (e.tgtT||0) - dt;
