@@ -216,6 +216,16 @@ test('נפילת מטוסי אויב: ארבע צורות נפילה (תלת־מ
   const ch = G.fx.find(x => x.type === 'echute'); assert(ch, 'טייס האויב לא קפץ');
   let n = 0; while(G.fx.includes(ch) && n++ < 3000) updateFx(1/60);
   assert(!G.fx.includes(ch), 'המצנח של טייס האויב לא נעלם');
+  // a pilot only jumps where the player can see it: never from a kill far off screen
+  const far = n => { let k = 0; for(let i = 0; i < 300; i++) if(makeFall({type:'zero', x:G.player.x + n, y:SEA - 500, a:0, speed:220, dead:false}).bailT >= 0) k++; return k; };
+  G.player.y = SEA - 500; G.player.dead = false;
+  const nearJumps = far(200), farJumps = far(1200);
+  assert(nearJumps > 30 && farJumps === 0, `קפיצות: ${nearJumps} קרוב, ${farJumps} רחוק מחוץ למסך`);
+  // too many effects: the oldest go, but a falling aircraft and a parachute stay
+  G.fx.length = 0; const keepF = mk(seaX, {f:{mode:'glide', burstT:-1, wingOff:false, bailT:-1}}); G.fx.push({type:'echute', x:seaX, y:0, vx:0, t:0, max:40});
+  for(let i = 0; i < FX_MAX*2; i++) G.fx.push({type:'spl', x:0, t:0, max:5, h:5});
+  updateFx(1/60);
+  assert(G.fx.includes(keepF) && G.fx.some(f => f.type === 'echute') && G.fx.length <= FX_MAX*1.5, 'מטוס נופל או מצנח נמחקו כשהיו יותר מדי אפקטים');
   // too many falling at once: the rest blow apart
   G.fx.length = 0; for(let i = 0; i < 8; i++) mk(seaX + i*30);
   assert(G.fx.filter(f => f.type === 'fall' && f.burstT < 0).length <= WRECK.maxFalling, 'יותר מדי מטוסים נופלים בבת אחת');

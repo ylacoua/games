@@ -31,7 +31,9 @@ function makeFall(e){
     mode, t: 0, max: 14, fire: 0.35, trail: [], trailT: 0,
     face: Math.cos(e.a) >= 0 ? 1 : -1, yaw: Math.cos(e.a) >= 0 ? 0 : Math.PI, diveAng: rnd(1.1, 1.4), wingSide: sgn(),
     burstT: burst ? rnd(0.15, 0.4) : -1, wingOff: !burst && mode !== 'glide' && mode !== 'dive' && Math.random() < 0.3,
-    bailT: !burst && SEA - e.y > 220 && Math.random() < 0.3 ? rnd(0.5, 1.1) : -1};
+    // the pilot jumps only where the player can see it happen: a canopy from a kill far off screen (by a wingman
+    // or the carrier's guns) used to drift into view later with no aircraft going down anywhere near it
+    bailT: !burst && SEA - e.y > 220 && fallInView(e) && Math.random() < 0.3 ? rnd(0.5, 1.1) : -1};
   wreckWhine(f);
   return f;
 }
@@ -41,6 +43,11 @@ function fall3D(f){
   if(f.mode === 'flat') return {yaw: f.yaw, roll: 0.2*Math.sin(f.t*3), pitch: -0.5};
   if(f.mode !== 'spiral' && f.mode !== 'dive') return null;
   return {yaw: f.face > 0 ? 0 : Math.PI, roll: f.roll, pitch: -Math.atan2(f.vy, f.face*f.vx)};   // nose along the path
+}
+// is (x, y) on the player's screen, more or less? (the view is about 1,100 wide around the aircraft)
+function fallInView(e){
+  const P = G.player; if(!P || P.dead) return false;
+  return Math.abs(e.x - P.x) < 520 && Math.abs(e.y - P.y) < 380;
 }
 // the point the fire comes from, in the world
 function fallFirePoint(f){

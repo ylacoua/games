@@ -496,6 +496,12 @@ function updateFx(dt){
   for(const d of G.debris){ d.vy+=400*dt; d.x+=d.vx*dt; d.y+=d.vy*dt; d.r+=d.vr*dt; d.life-=dt; if(d.y>groundY(d.x)){ d.y=groundY(d.x); d.vx*=0.5; d.vy*=-0.2; }
     if(d.smoke && Math.random() < dt*18) puff(d.x, d.y, '#444', 6, 0.8); }   // smoking wreckage: ~18 puffs a second, whatever the screen's refresh rate
   G.debris = G.debris.filter(d=>d.life>0);
-  if(G.fx.length > FX_MAX*1.5) G.fx.splice(0, G.fx.length - FX_MAX*1.5);          // drop the oldest
+  // too many effects: drop the oldest ones - but never a falling aircraft, a parachute or a wreck, which
+  // live long and would vanish in mid-air (a canopy left behind with no aircraft, or the other way round)
+  if(G.fx.length > FX_MAX*1.5){
+    const keep = f => f.type==='fall' || f.type==='echute' || f.type==='part' || f.type==='sink' || f.type==='wreck' || f.type==='slick';
+    let drop = G.fx.length - FX_MAX*1.5;
+    G.fx = G.fx.filter(f => drop <= 0 || keep(f) || (drop--, false));
+  }
   if(G.debris.length > DEBRIS_MAX*1.5) G.debris.splice(0, G.debris.length - DEBRIS_MAX*1.5);
 }
